@@ -43,7 +43,8 @@ import { useToast } from "@/components/ui/use-toast" // Import useToast hook
 import { Badge } from "@/components/ui/badge"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { generatePresupuestoPDF, generateServicioPDF } from "@/lib/pdf-generator"
+import { generateServicioPDF } from "@/lib/pdf-generator"
+import { generarPDFPresupuesto } from "@/lib/pdf-presupuesto"
 
 interface ServiceFormProps {
   servicioAEditar?: (Servicio & { isPresupuesto?: boolean }) | null
@@ -833,7 +834,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       toast({ title: "Presupuesto creado" })
       if (newPresupuesto) {
         console.log("[v0] Generating PDF")
-        generatePresupuestoPDF(newPresupuesto)
+        generarPDFPresupuesto(newPresupuesto as any)
       }
       console.log("[v0] Calling onSaved")
       onSaved()
