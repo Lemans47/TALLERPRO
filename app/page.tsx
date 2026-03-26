@@ -11,6 +11,7 @@ import { DollarSign, TrendingUp, TrendingDown, Wrench, AlertCircle, Plus, Refres
 import { useMonth } from "@/lib/month-context"
 import { fetchDashboardData } from "@/lib/api-client"
 import type { Servicio, Gasto } from "@/lib/database"
+import { useAuth } from "@/lib/auth-context"
 
 interface KPIs {
   ingresosSinIVA: number
@@ -24,6 +25,8 @@ interface KPIs {
 }
 
 export default function DashboardPage() {
+  const { role } = useAuth()
+  const isOperador = role === "operador"
   const [kpis, setKpis] = useState<KPIs>({
     ingresosSinIVA: 0,
     ingresosConIVA: 0,
@@ -140,13 +143,15 @@ export default function DashboardPage() {
           icon={<TrendingDown className="w-5 h-5" />}
           variant="destructive"
         />
-        <KPICard
-          title="Utilidad"
-          value={formatCurrency(kpis.utilidadOperacional)}
-          description={`Margen: ${kpis.margenPromedio.toFixed(1)}%`}
-          icon={<TrendingUp className="w-5 h-5" />}
-          variant={kpis.utilidadOperacional >= 0 ? "success" : "destructive"}
-        />
+        {!isOperador && (
+          <KPICard
+            title="Utilidad"
+            value={formatCurrency(kpis.utilidadOperacional)}
+            description={`Margen: ${kpis.margenPromedio.toFixed(1)}%`}
+            icon={<TrendingUp className="w-5 h-5" />}
+            variant={kpis.utilidadOperacional >= 0 ? "success" : "destructive"}
+          />
+        )}
         <KPICard
           title="Servicios"
           value={kpis.serviciosTotal.toString()}
@@ -171,13 +176,15 @@ export default function DashboardPage() {
 
       {/* KPIs secundarios */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <KPICard
-          title="Margen de Utilidad"
-          value={`${kpis.margenPromedio.toFixed(1)}%`}
-          description="Rentabilidad operacional"
-          icon={<Activity className="w-5 h-5" />}
-          variant={kpis.margenPromedio >= 20 ? "success" : kpis.margenPromedio >= 0 ? "warning" : "destructive"}
-        />
+        {!isOperador && (
+          <KPICard
+            title="Margen de Utilidad"
+            value={`${kpis.margenPromedio.toFixed(1)}%`}
+            description="Rentabilidad operacional"
+            icon={<Activity className="w-5 h-5" />}
+            variant={kpis.margenPromedio >= 20 ? "success" : kpis.margenPromedio >= 0 ? "warning" : "destructive"}
+          />
+        )}
         <KPICard
           title="Por Cobrar"
           value={formatCurrency(kpis.porCobrar)}
@@ -185,13 +192,15 @@ export default function DashboardPage() {
           icon={<AlertCircle className="w-5 h-5" />}
           variant={kpis.porCobrar > 0 ? "warning" : "success"}
         />
-        <KPICard
-          title="Ingresos Brutos"
-          value={formatCurrency(kpis.ingresosConIVA)}
-          description="Con IVA incluido"
-          icon={<DollarSign className="w-5 h-5" />}
-          variant="default"
-        />
+        {!isOperador && (
+          <KPICard
+            title="Ingresos Brutos"
+            value={formatCurrency(kpis.ingresosConIVA)}
+            description="Con IVA incluido"
+            icon={<DollarSign className="w-5 h-5" />}
+            variant="default"
+          />
+        )}
       </div>
     </div>
   )

@@ -8,15 +8,18 @@ import { Button } from "@/components/ui/button"
 import { RefreshCw, Receipt, Paintbrush, Wrench, Home, Users } from "lucide-react"
 import { useMonth } from "@/lib/month-context"
 import { api, type Gasto } from "@/lib/api-client"
+import { useAuth } from "@/lib/auth-context"
 
-const CATEGORIAS = [
-  { id: "Gastos de Pintura", label: "Pintura", icon: Paintbrush, color: "text-purple-400" },
-  { id: "Gastos Misceláneos", label: "Misceláneos", icon: Wrench, color: "text-blue-400" },
-  { id: "Gastos Fijos", label: "Fijos", icon: Home, color: "text-orange-400" },
-  { id: "Sueldos", label: "Sueldos", icon: Users, color: "text-green-400" },
+const ALL_CATEGORIAS = [
+  { id: "Gastos de Pintura", label: "Pintura", icon: Paintbrush, color: "text-purple-400", roles: ["admin", "supervisor", "operador"] },
+  { id: "Gastos Misceláneos", label: "Misceláneos", icon: Wrench, color: "text-blue-400", roles: ["admin", "supervisor", "operador"] },
+  { id: "Gastos Fijos", label: "Fijos", icon: Home, color: "text-orange-400", roles: ["admin", "supervisor"] },
+  { id: "Sueldos", label: "Sueldos", icon: Users, color: "text-green-400", roles: ["admin", "supervisor"] },
 ]
 
 export default function ExpensesPage() {
+  const { role } = useAuth()
+  const CATEGORIAS = ALL_CATEGORIAS.filter((c) => role && c.roles.includes(role))
   const [activeCategory, setActiveCategory] = useState("Gastos de Pintura")
   const [gastoAEditar, setGastoAEditar] = useState<Gasto | null>(null)
   const [gastos, setGastos] = useState<Gasto[]>([])
