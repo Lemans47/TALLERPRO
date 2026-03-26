@@ -28,12 +28,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
 
   const fetchRole = async (userId: string): Promise<Role> => {
-    const { data } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId)
-      .single()
-    return (data?.role as Role) || null
+    try {
+      const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000))
+      const query = supabase.from("user_roles").select("role").eq("user_id", userId).single()
+      const result = await Promise.race([query, timeout])
+      if (!result) return null
+      return ((result as any).data?.role as Role) || null
+    } catch {
+      return null
+    }
   }
 
   useEffect(() => {
