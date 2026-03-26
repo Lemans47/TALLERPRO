@@ -51,6 +51,8 @@ export async function GET(request: Request) {
         costos: presupuesto.costos || [],
         piezas_pintura: presupuesto.piezas_pintura || [],
         observaciones_checkboxes: presupuesto.observaciones_checkboxes || [],
+        fotos_ingreso: [],
+        fotos_entrega: [],
       }
 
       const servicio = await createServicio(servicioData)

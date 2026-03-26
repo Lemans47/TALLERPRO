@@ -18,6 +18,11 @@ function getSQL() {
 }
 
 // Types
+export interface FotoServicio {
+  url: string
+  publicId: string
+}
+
 export interface Servicio {
   id: string
   fecha_ingreso: string
@@ -41,6 +46,8 @@ export interface Servicio {
   monto_total: number
   monto_total_sin_iva: number
   observaciones_checkboxes: string[]
+  fotos_ingreso: FotoServicio[]
+  fotos_entrega: FotoServicio[]
   created_at: string
   updated_at: string
 }
@@ -104,6 +111,12 @@ export interface PiezaPintura {
 }
 
 // Servicios
+export async function getServicioById(id: string) {
+  const db = getSQL()
+  const data = await db`SELECT * FROM servicios WHERE id = ${id}`
+  return (data[0] as Servicio) || null
+}
+
 export async function getServicios() {
   const db = getSQL()
   const data = await db`
@@ -134,7 +147,8 @@ export async function createServicio(servicio: Omit<Servicio, "id" | "created_at
     INSERT INTO servicios (
       fecha_ingreso, patente, marca, modelo, kilometraje, año, cliente, telefono, observaciones,
       mano_obra_pintura, cobros, costos, piezas_pintura, estado, iva,
-      anticipo, saldo_pendiente, monto_total, monto_total_sin_iva, observaciones_checkboxes
+      anticipo, saldo_pendiente, monto_total, monto_total_sin_iva, observaciones_checkboxes,
+      fotos_ingreso, fotos_entrega
     ) VALUES (
       ${servicio.fecha_ingreso}, ${servicio.patente}, ${servicio.marca}, ${servicio.modelo},
       ${servicio.kilometraje || null}, ${servicio.año || null},
@@ -142,7 +156,8 @@ export async function createServicio(servicio: Omit<Servicio, "id" | "created_at
       ${servicio.mano_obra_pintura}, ${JSON.stringify(servicio.cobros)}, ${JSON.stringify(servicio.costos)},
       ${JSON.stringify(servicio.piezas_pintura)}, ${servicio.estado}, ${servicio.iva},
       ${servicio.anticipo}, ${servicio.saldo_pendiente}, ${servicio.monto_total},
-      ${servicio.monto_total_sin_iva}, ${JSON.stringify(servicio.observaciones_checkboxes)}
+      ${servicio.monto_total_sin_iva}, ${JSON.stringify(servicio.observaciones_checkboxes)},
+      ${JSON.stringify(servicio.fotos_ingreso || [])}, ${JSON.stringify(servicio.fotos_entrega || [])}
     ) RETURNING *
   `
   return data[0] as Servicio
@@ -172,6 +187,8 @@ export async function updateServicio(id: string, servicio: Partial<Servicio>) {
       monto_total = COALESCE(${servicio.monto_total}, monto_total),
       monto_total_sin_iva = COALESCE(${servicio.monto_total_sin_iva}, monto_total_sin_iva),
       observaciones_checkboxes = COALESCE(${servicio.observaciones_checkboxes ? JSON.stringify(servicio.observaciones_checkboxes) : null}::jsonb, observaciones_checkboxes),
+      fotos_ingreso = COALESCE(${servicio.fotos_ingreso ? JSON.stringify(servicio.fotos_ingreso) : null}::jsonb, fotos_ingreso),
+      fotos_entrega = COALESCE(${servicio.fotos_entrega ? JSON.stringify(servicio.fotos_entrega) : null}::jsonb, fotos_entrega),
       updated_at = NOW()
     WHERE id = ${id}
     RETURNING *
@@ -285,7 +302,8 @@ export async function convertPresupuestoToServicio(presupuestoId: string) {
     INSERT INTO servicios (
       fecha_ingreso, patente, marca, modelo, kilometraje, año, cliente, telefono, observaciones,
       mano_obra_pintura, cobros, costos, piezas_pintura, estado, iva,
-      anticipo, saldo_pendiente, monto_total, monto_total_sin_iva, observaciones_checkboxes
+      anticipo, saldo_pendiente, monto_total, monto_total_sin_iva, observaciones_checkboxes,
+      fotos_ingreso, fotos_entrega
     ) VALUES (
       CURRENT_DATE, ${presupuesto.patente}, ${presupuesto.marca}, ${presupuesto.modelo},
       ${presupuesto.kilometraje || null}, ${presupuesto.año || null},
@@ -293,7 +311,8 @@ export async function convertPresupuestoToServicio(presupuestoId: string) {
       ${presupuesto.mano_obra_pintura}, ${JSON.stringify(presupuesto.cobros)}, ${JSON.stringify(presupuesto.costos)},
       ${JSON.stringify(presupuesto.piezas_pintura)}, 'En Cola', ${presupuesto.iva},
       0, ${presupuesto.monto_total}, ${presupuesto.monto_total}, ${presupuesto.monto_total_sin_iva},
-      ${JSON.stringify(presupuesto.observaciones_checkboxes)}
+      ${JSON.stringify(presupuesto.observaciones_checkboxes)},
+      '[]'::jsonb, '[]'::jsonb
     ) RETURNING *
   `
 

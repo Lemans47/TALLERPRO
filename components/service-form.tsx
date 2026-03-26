@@ -34,8 +34,11 @@ import {
   Hammer,
   Check,
   ChevronsUpDown,
+  Camera,
+  Upload,
+  ImageIcon,
 } from "lucide-react"
-import { api, type Servicio, type Presupuesto, type PrecioPintura } from "@/lib/api-client"
+import { api, type Servicio, type Presupuesto, type PrecioPintura, type FotoServicio } from "@/lib/api-client"
 import { useToast } from "@/components/ui/use-toast" // Import useToast hook
 import { Badge } from "@/components/ui/badge"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
@@ -182,6 +185,9 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   const [activeTab, setActiveTab] = useState("cobros")
   const [activeCobroTab, setActiveCobroTab] = useState("pintura")
   const [activeCostoTab, setActiveCostoTab] = useState("pintura") // Added state for cost tab
+  const [fotosIngreso, setFotosIngreso] = useState<FotoServicio[]>([])
+  const [fotosEntrega, setFotosEntrega] = useState<FotoServicio[]>([])
+  const [uploadingFoto, setUploadingFoto] = useState(false)
 
   const [formData, setFormData] = useState({
     fecha_ingreso: new Date().toISOString().split("T")[0],
@@ -400,6 +406,13 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       }
       
       cargarPiezasSeleccionadas()
+
+      // Cargar fotos existentes
+      setFotosIngreso(servicioAEditar.fotos_ingreso || [])
+      setFotosEntrega(servicioAEditar.fotos_entrega || [])
+    } else {
+      setFotosIngreso([])
+      setFotosEntrega([])
     }
   }, [servicioAEditar])
 
@@ -441,7 +454,48 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       }
       return []
     })
+    setFotosIngreso([])
+    setFotosEntrega([])
     onClearEdit()
+  }
+
+  // Funciones para fotos
+  const handleUploadFoto = async (file: File, tipo: "ingreso" | "entrega") => {
+    const MAX = tipo === "ingreso" ? 5 : 2
+    const current = tipo === "ingreso" ? fotosIngreso : fotosEntrega
+    if (current.length >= MAX) {
+      toast({ title: "Límite alcanzado", description: `Máximo ${MAX} fotos de ${tipo}`, variant: "destructive" })
+      return
+    }
+    setUploadingFoto(true)
+    try {
+      const form = new FormData()
+      form.append("file", file)
+      form.append("folder", `tallerpro/${tipo}`)
+      const res = await fetch("/api/upload", { method: "POST", body: form })
+      if (!res.ok) throw new Error("Upload failed")
+      const { url, publicId } = await res.json()
+      const setter = tipo === "ingreso" ? setFotosIngreso : setFotosEntrega
+      setter((prev) => [...prev, { url, publicId }])
+    } catch {
+      toast({ title: "Error", description: "No se pudo subir la foto", variant: "destructive" })
+    } finally {
+      setUploadingFoto(false)
+    }
+  }
+
+  const handleDeleteFoto = async (publicId: string, tipo: "ingreso" | "entrega") => {
+    try {
+      await fetch("/api/upload", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ publicId }),
+      })
+      const setter = tipo === "ingreso" ? setFotosIngreso : setFotosEntrega
+      setter((prev) => prev.filter((f) => f.publicId !== publicId))
+    } catch {
+      toast({ title: "Error", description: "No se pudo eliminar la foto", variant: "destructive" })
+    }
   }
 
   // Funciones para manejar cobros
@@ -653,6 +707,8 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         monto_total_sin_iva: cobroTotal,
         monto_total: montoConIva,
         observaciones_checkboxes: [],
+        fotos_ingreso: fotosIngreso,
+        fotos_entrega: fotosEntrega,
       }
 
       console.log("[v0] servicioData prepared:", servicioData)
@@ -1227,9 +1283,115 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
           {/* Sección de Cobros y Costos Unificada */}
           <div className="space-y-4">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-1 bg-secondary/30">
+              <TabsList className="grid w-full grid-cols-2 bg-secondary/30">
                 <TabsTrigger value="cobros">Detalles de Trabajo</TabsTrigger>
+                <TabsTrigger value="fotos" className="flex items-center gap-1">
+                  <Camera className="w-3.5 h-3.5" />
+                  Fotos
+                  {(fotosIngreso.length + fotosEntrega.length) > 0 && (
+                    <span className="ml-1 text-xs bg-primary text-primary-foreground rounded-full px-1.5">
+                      {fotosIngreso.length + fotosEntrega.length}
+                    </span>
+                  )}
+                </TabsTrigger>
               </TabsList>
+
+              {/* Tab: Fotos */}
+              <TabsContent value="fotos" className="space-y-6 pt-2">
+                {/* Fotos de Ingreso */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <ImageIcon className="w-4 h-4 text-primary" />
+                      <h4 className="text-sm font-medium">Fotos de Ingreso</h4>
+                      <span className="text-xs text-muted-foreground">({fotosIngreso.length}/5)</span>
+                    </div>
+                    {fotosIngreso.length < 5 && (
+                      <label className={`cursor-pointer flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-primary/50 text-primary hover:bg-primary/10 transition-colors ${uploadingFoto ? "opacity-50 pointer-events-none" : ""}`}>
+                        <Upload className="w-3.5 h-3.5" />
+                        {uploadingFoto ? "Subiendo..." : "Agregar foto"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) handleUploadFoto(file, "ingreso")
+                            e.target.value = ""
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                  {fotosIngreso.length === 0 ? (
+                    <div className="text-center py-6 text-muted-foreground text-xs border border-dashed border-border rounded-lg bg-secondary/20">
+                      Sin fotos de ingreso. Máximo 5.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                      {fotosIngreso.map((foto) => (
+                        <div key={foto.publicId} className="relative group rounded-lg overflow-hidden border border-border aspect-square">
+                          <img src={foto.url} alt="Foto ingreso" className="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteFoto(foto.publicId, "ingreso")}
+                            className="absolute top-1 right-1 w-6 h-6 bg-destructive/90 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Fotos de Entrega */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <ImageIcon className="w-4 h-4 text-success" />
+                      <h4 className="text-sm font-medium">Fotos de Entrega</h4>
+                      <span className="text-xs text-muted-foreground">({fotosEntrega.length}/2)</span>
+                    </div>
+                    {fotosEntrega.length < 2 && (
+                      <label className={`cursor-pointer flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-success/50 text-success hover:bg-success/10 transition-colors ${uploadingFoto ? "opacity-50 pointer-events-none" : ""}`}>
+                        <Upload className="w-3.5 h-3.5" />
+                        {uploadingFoto ? "Subiendo..." : "Agregar foto"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) handleUploadFoto(file, "entrega")
+                            e.target.value = ""
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                  {fotosEntrega.length === 0 ? (
+                    <div className="text-center py-6 text-muted-foreground text-xs border border-dashed border-border rounded-lg bg-secondary/20">
+                      Sin fotos de entrega. Máximo 2.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                      {fotosEntrega.map((foto) => (
+                        <div key={foto.publicId} className="relative group rounded-lg overflow-hidden border border-border aspect-square">
+                          <img src={foto.url} alt="Foto entrega" className="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteFoto(foto.publicId, "entrega")}
+                            className="absolute top-1 right-1 w-6 h-6 bg-destructive/90 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
 
               {/* Tab: Detalles de Trabajo (Cobros + Costos unificados) */}
               <TabsContent value="cobros" className="space-y-4">

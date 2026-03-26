@@ -1,4 +1,4 @@
-import type { Servicio, Presupuesto, Gasto, PrecioPintura, PiezaPintura } from "./database"
+import type { Servicio, Presupuesto, Gasto, PrecioPintura, PiezaPintura, FotoServicio } from "./database"
 
 // Dashboard
 export async function fetchDashboardData(
@@ -171,7 +171,7 @@ export async function deletePiezaPinturaApi(id: string): Promise<void> {
   if (!res.ok) throw new Error("Error deleting pieza pintura")
 }
 
-export type { Servicio, Presupuesto, Gasto, PrecioPintura, PiezaPintura }
+export type { Servicio, Presupuesto, Gasto, PrecioPintura, PiezaPintura, FotoServicio }
 
 export const api = {
   dashboard: {
