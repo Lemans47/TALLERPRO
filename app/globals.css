@@ -1,0 +1,164 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: "Inter", "system-ui", "sans-serif";
+  --font-mono: "JetBrains Mono", "monospace";
+
+  /* Automotive Workshop - Mid-dark theme */
+  --color-background: #2d3748;
+  --color-foreground: #e2e8f0;
+
+  --color-card: #1e2a3c;
+  --color-card-foreground: #e2e8f0;
+
+  --color-popover: #1e2a3c;
+  --color-popover-foreground: #e2e8f0;
+
+  /* Amber/Orange - color automotriz */
+  --color-primary: #f59e0b;
+  --color-primary-foreground: #1a1a2e;
+
+  --color-secondary: #253040;
+  --color-secondary-foreground: #cbd5e1;
+
+  --color-muted: #253040;
+  --color-muted-foreground: #94a3b8;
+
+  --color-accent: #2d3f55;
+  --color-accent-foreground: #e2e8f0;
+
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #ffffff;
+
+  /* Success - Green */
+  --color-success: #22c55e;
+  --color-success-foreground: #ffffff;
+
+  /* Warning - Amber */
+  --color-warning: #f59e0b;
+  --color-warning-foreground: #1a1a2e;
+
+  /* Info - Blue */
+  --color-info: #3b82f6;
+  --color-info-foreground: #ffffff;
+
+  --color-border: #334155;
+  --color-input: #253040;
+  --color-ring: #f59e0b;
+
+  /* Chart colors */
+  --color-chart-1: #f59e0b;
+  --color-chart-2: #16a34a;
+  --color-chart-3: #2563eb;
+  --color-chart-4: #dc2626;
+  --color-chart-5: #7c3aed;
+
+  --radius-sm: 0.5rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+
+  /* Sidebar - Carbon dark */
+  --color-sidebar: #1e2530;
+  --color-sidebar-foreground: #f8fafc;
+  --color-sidebar-primary: #f59e0b;
+  --color-sidebar-primary-foreground: #1e2530;
+  --color-sidebar-accent: #2d3748;
+  --color-sidebar-accent-foreground: #f8fafc;
+  --color-sidebar-border: #2d3748;
+  --color-sidebar-ring: #f59e0b;
+
+  /* Animation utilities */
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+  --animate-fade-in: fade-in 0.2s ease-out;
+  --animate-fade-out: fade-out 0.2s ease-out;
+  --animate-zoom-in: zoom-in 0.2s ease-out;
+  --animate-zoom-out: zoom-out 0.2s ease-out;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #253040;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #4a5568;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* Card shadow */
+.card, [class*="rounded"][class*="border"] {
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.04);
+}
+
+/* Smooth transitions */
+.transition-smooth {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Animation keyframes (replacing tw-animate-css) */
+@keyframes accordion-down {
+  from { height: 0; opacity: 0; }
+  to { height: var(--radix-accordion-content-height); opacity: 1; }
+}
+@keyframes accordion-up {
+  from { height: var(--radix-accordion-content-height); opacity: 1; }
+  to { height: 0; opacity: 0; }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes slide-in-from-top {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(0); }
+}
+@keyframes slide-in-from-bottom {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes slide-in-from-left {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+@keyframes slide-in-from-right {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+@keyframes zoom-in {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+@keyframes zoom-out {
+  from { transform: scale(1); opacity: 1; }
+  to { transform: scale(0.95); opacity: 0; }
+}
+@keyframes spin-in {
+  from { transform: rotate(-180deg) scale(0.95); opacity: 0; }
+  to { transform: rotate(0deg) scale(1); opacity: 1; }
+}

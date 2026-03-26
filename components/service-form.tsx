@@ -1,0 +1,1700 @@
+"use client"
+
+import { useCallback, useEffect, useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import {
+  Save,
+  FileText,
+  X,
+  Car,
+  User,
+  Wrench,
+  DollarSign,
+  Paintbrush,
+  Plus,
+  Trash2,
+  Package,
+  Settings2,
+  Settings,
+  Hammer,
+  Check,
+  ChevronsUpDown,
+} from "lucide-react"
+import { api, type Servicio, type Presupuesto, type PrecioPintura } from "@/lib/api-client"
+import { useToast } from "@/components/ui/use-toast" // Import useToast hook
+import { Badge } from "@/components/ui/badge"
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { generatePresupuestoPDF, generateServicioPDF } from "@/lib/pdf-generator"
+
+interface ServiceFormProps {
+  servicioAEditar?: (Servicio & { isPresupuesto?: boolean }) | null
+  onClearEdit: () => void
+  onSaved: () => void
+}
+
+const ESTADOS = [
+  "En Cola",
+  "En Proceso",
+  "Esperando Repuestos",
+  "En Reparación",
+  "Control de Calidad",
+  "Listo para Entrega",
+  "Entregado",
+  "Por Cobrar",
+  "Cerrado/Pagado",
+]
+
+const CATEGORIAS_COBROS = [
+  { id: "pintura", label: "Piezas Pintura", icon: Paintbrush },
+  { id: "desabolladura", label: "Desabolladura", icon: Hammer },
+  { id: "mecanica", label: "Mecánica", icon: Settings2 },
+  { id: "repuestos", label: "Repuestos", icon: Package },
+  { id: "otros", label: "Otros", icon: DollarSign },
+]
+
+const CATEGORIAS_COSTOS = [
+  { id: "pintura", label: "Mano Obra Pintura", icon: Paintbrush },
+  { id: "desabolladura", label: "Desabolladura", icon: Hammer },
+  { id: "mecanica", label: "Mecánica", icon: Settings2 },
+  { id: "repuestos", label: "Repuestos", icon: Package },
+  { id: "otros", label: "Otros", icon: DollarSign },
+]
+
+interface ItemDetalle {
+  id: string
+  descripcion: string
+  monto: number
+}
+
+interface ItemsPorCategoria {
+  pintura: ItemDetalle[]
+  desabolladura: ItemDetalle[]
+  mecanica: ItemDetalle[]
+  repuestos: ItemDetalle[]
+  reparar: ItemDetalle[]
+  otros: ItemDetalle[]
+}
+
+interface PiezaPintura {
+  nombre: string
+  precio: number
+  seleccionada: boolean
+  cantidad_piezas?: number
+}
+
+const ItemsList = ({
+  items,
+  categoria,
+  onAdd,
+  onUpdate,
+  onRemove,
+}: {
+  items: ItemDetalle[]
+  categoria: keyof ItemsPorCategoria
+  onAdd: () => void
+  onUpdate: (id: string, field: "descripcion" | "monto", value: string | number) => void
+  onRemove: (id: string) => void
+}) => (
+  <div className="space-y-2">
+    {items.length === 0 ? (
+      <div className="text-center py-4 text-muted-foreground text-xs border border-dashed border-border rounded-lg bg-secondary/20">
+        Sin items. Clic en + para agregar.
+      </div>
+    ) : (
+      <div className="space-y-2">
+        {items.map((item, index) => (
+          <div key={item.id} className="flex gap-2 items-center p-2 bg-secondary/30 rounded-lg border border-border">
+            <span className="text-xs text-muted-foreground w-4">{index + 1}.</span>
+            <Input
+              value={item.descripcion}
+              onChange={(e) => onUpdate(item.id, "descripcion", e.target.value)}
+              placeholder="Descripción..."
+              className="flex-1 bg-background/50 text-sm h-8"
+            />
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-muted-foreground">$</span>
+              <Input
+                type="number"
+                value={item.monto || ""}
+                onChange={(e) => onUpdate(item.id, "monto", Number(e.target.value) || 0)}
+                placeholder="0"
+                className="w-24 bg-background/50 text-sm h-8 text-right"
+              />
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onRemove(item.id)}
+              className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        ))}
+      </div>
+    )}
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      onClick={onAdd}
+      className="w-full h-8 text-xs border-dashed bg-transparent"
+    >
+      <Plus className="w-3 h-3 mr-1" />
+      Agregar Item
+    </Button>
+  </div>
+)
+
+export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFormProps) {
+  const { toast } = useToast() // Declare useToast hook
+  const [loading, setLoading] = useState(false)
+  const [preciosPintura, setPreciosPintura] = useState<PrecioPintura[]>([])
+  const [piezasSeleccionadas, setPiezasSeleccionadas] = useState<PiezaPintura[]>([])
+
+  const [showPreciosModal, setShowPreciosModal] = useState(false)
+  const [showManoObraModal, setShowManoObraModal] = useState(false)
+  const [showMaterialesModal, setShowMaterialesModal] = useState(false)
+  const [manoObraConfig, setManoObraConfig] = useState(0)
+  const [materialesConfig, setMaterialesConfig] = useState(0)
+  const [precioGlobalPintura, setPrecioGlobalPintura] = useState(0)
+  const [preciosTemp, setPreciosTemp] = useState<{ precio: number }[]>([{ precio: 0 }])
+
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchValue, setSearchValue] = useState("")
+  const [showEditPiezasModal, setShowEditPiezasModal] = useState(false)
+  const [activeTab, setActiveTab] = useState("cobros")
+  const [activeCobroTab, setActiveCobroTab] = useState("pintura")
+  const [activeCostoTab, setActiveCostoTab] = useState("pintura") // Added state for cost tab
+
+  const [formData, setFormData] = useState({
+    fecha_ingreso: new Date().toISOString().split("T")[0],
+    patente: "",
+    marca: "",
+    modelo: "",
+    color: "",
+    kilometraje: undefined as number | undefined,
+    año: undefined as number | undefined,
+    cliente: "",
+    telefono: "",
+    observaciones: "",
+    estado: "En Cola",
+    iva: "sin",
+    anticipo: 0,
+  })
+
+  const [cobros, setCobros] = useState<ItemsPorCategoria>({
+    pintura: [],
+    desabolladura: [],
+    mecanica: [],
+    repuestos: [],
+    reparar: [],
+    otros: [],
+  })
+
+  const [costos, setCostos] = useState<ItemsPorCategoria>({
+    pintura: [],
+    desabolladura: [],
+    mecanica: [],
+    repuestos: [],
+    reparar: [],
+    otros: [],
+  })
+
+  // Cargar precios de pintura y mano de obra config al montar
+  useEffect(() => {
+    loadPreciosYPiezasPintura()
+    loadManoObraConfig()
+    loadMaterialesConfig()
+  }, [])
+
+  const loadPreciosYPiezasPintura = async () => {
+    try {
+      const [precio, piezas] = await Promise.all([api.precioPintura.get(), api.piezasPintura.getAll()])
+
+      // Guardar el precio global
+      const precioGlobal = precio?.precio_por_pieza || 0
+      setPrecioGlobalPintura(precioGlobal)
+      setPreciosTemp([{ precio: precioGlobal }])
+
+      // En modo edición, no sobrescribir las piezas — las carga cargarPiezasSeleccionadas
+      if (servicioAEditar) return
+
+      if (Array.isArray(piezas) && piezas.length > 0) {
+        const piezasConPrecio = piezas.map((p) => ({
+          nombre: p.nombre,
+          precio: precioGlobal,
+          cantidad_piezas: Number(p.cantidad_piezas) || 1,
+          seleccionada: false,
+        }))
+        setPiezasSeleccionadas(piezasConPrecio)
+      } else {
+        setPiezasSeleccionadas([])
+      }
+    } catch (error) {
+      console.error("Error loading piezas pintura:", error)
+      if (!servicioAEditar) setPiezasSeleccionadas([])
+    }
+  }
+
+  const loadManoObraConfig = () => {
+    // Cargar valor guardado de mano de obra (localStorage como config simple)
+    const saved = localStorage.getItem("mano_obra_pintura_default")
+    if (saved) {
+      setManoObraConfig(Number(saved))
+    }
+  }
+
+  const saveManoObraConfig = () => {
+    localStorage.setItem("mano_obra_pintura_default", manoObraConfig.toString())
+    toast({ title: "Valor de mano de obra guardado" })
+    setShowManoObraModal(false)
+  }
+
+  const loadMaterialesConfig = () => {
+    // Cargar valor guardado de materiales (localStorage como config simple)
+    const saved = localStorage.getItem("materiales_pintura_default")
+    if (saved) {
+      setMaterialesConfig(Number(saved))
+    }
+  }
+
+  const saveMaterialesConfig = () => {
+    localStorage.setItem("materiales_pintura_default", materialesConfig.toString())
+    toast({ title: "Valor de materiales guardado" })
+    setShowMaterialesModal(false)
+  }
+
+  const savePreciosPintura = async () => {
+    try {
+      const nuevoPrecio = preciosTemp[0]?.precio || 0
+      
+      if (nuevoPrecio <= 0) {
+        toast({
+          title: "Error",
+          description: "El precio debe ser mayor a 0",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Guardar el precio global
+      await api.precioPintura.update(nuevoPrecio)
+
+      // Actualizar las piezas seleccionadas con el nuevo precio
+      setPiezasSeleccionadas((prev) =>
+        prev.map((p) => ({ ...p, precio: nuevoPrecio })),
+      )
+
+      toast({ title: "Precio guardado", description: `Precio por pieza: $${nuevoPrecio.toLocaleString("es-CL")}` })
+      setShowPreciosModal(false)
+    } catch (error: any) {
+      console.error("[v0] Error saving precio pintura:", error)
+      toast({
+        title: "Error al guardar precio",
+        description: error.message,
+        variant: "destructive",
+      })
+    }
+  }
+
+  const addPiezaFromSearch = useCallback((precio: PrecioPintura) => {
+    setPiezasSeleccionadas((prev) => prev.map((p) => (p.nombre === precio.nombre ? { ...p, seleccionada: true } : p)))
+    setSearchOpen(false)
+    setSearchValue("")
+  }, [])
+
+  useEffect(() => {
+    if (servicioAEditar) {
+      setFormData({
+        fecha_ingreso: servicioAEditar.fecha_ingreso,
+        patente: servicioAEditar.patente,
+        marca: servicioAEditar.marca || "",
+        modelo: servicioAEditar.modelo || "",
+        color: servicioAEditar.color || "",
+        kilometraje: servicioAEditar.Kilometraje,
+        año: servicioAEditar.año,
+        cliente: servicioAEditar.cliente,
+        telefono: servicioAEditar.telefono || "",
+        observaciones: servicioAEditar.observaciones || "",
+        estado: servicioAEditar.estado || "En Cola",
+        iva: servicioAEditar.iva || "sin",
+        anticipo: Number(servicioAEditar.anticipo) || 0,
+      })
+
+      // Cargar cobros por categoría
+      const cobrosData = servicioAEditar.cobros || []
+      console.log("[v0] cobrosData from servicio:", cobrosData)
+      const newCobros: ItemsPorCategoria = {
+        pintura: [],
+        desabolladura: [],
+        mecanica: [],
+        repuestos: [],
+        reparar: [],
+        otros: [],
+      }
+      cobrosData.forEach((c: { categoria: string; descripcion: string; monto: number }) => {
+        const cat = c.categoria as keyof ItemsPorCategoria
+        if (cat in newCobros) {
+          newCobros[cat].push({ id: crypto.randomUUID(), descripcion: c.descripcion, monto: c.monto })
+        }
+      })
+      console.log("[v0] newCobros after mapping:", newCobros)
+      setCobros(newCobros)
+
+      // Cargar costos por categoría
+      const costosData = servicioAEditar.costos || []
+      console.log("[v0] costosData from servicio:", costosData)
+      const newCostos: ItemsPorCategoria = {
+        pintura: [],
+        desabolladura: [],
+        mecanica: [],
+        repuestos: [],
+        reparar: [],
+        otros: [],
+      }
+      costosData.forEach((c: { categoria?: string; descripcion: string; monto: number }) => {
+        const cat = (c.categoria || "otros") as keyof ItemsPorCategoria
+        if (cat in newCostos) {
+          newCostos[cat].push({ id: crypto.randomUUID(), descripcion: c.descripcion, monto: c.monto })
+        }
+      })
+      console.log("[v0] newCostos after mapping:", newCostos)
+      setCostos(newCostos)
+
+      // Cargar piezas de pintura seleccionadas
+      const cargarPiezasSeleccionadas = async () => {
+        try {
+          const [precio, piezas] = await Promise.all([api.precioPintura.get(), api.piezasPintura.getAll()])
+          const precioGlobal = precio?.precio_por_pieza || 0
+          const piezasData = servicioAEditar.piezas_pintura || []
+          
+          if (Array.isArray(piezas) && piezas.length > 0) {
+            const piezasConPrecio = piezas.map((p) => ({
+              nombre: p.nombre,
+              precio: precioGlobal,
+              cantidad_piezas: Number(p.cantidad_piezas) || 1,
+              seleccionada: piezasData.some((pd: { nombre: string }) => pd.nombre === p.nombre),
+            }))
+            setPiezasSeleccionadas(piezasConPrecio)
+          }
+        } catch (error) {
+          console.error("Error loading piezas for edit:", error)
+        }
+      }
+      
+      cargarPiezasSeleccionadas()
+    }
+  }, [servicioAEditar])
+
+  const resetForm = () => {
+    setFormData({
+      fecha_ingreso: new Date().toISOString().split("T")[0],
+      patente: "",
+      marca: "",
+      modelo: "",
+      color: "",
+      kilometraje: undefined,
+      año: undefined,
+      cliente: "",
+      telefono: "",
+      observaciones: "",
+      estado: "En Cola",
+      iva: "sin",
+      anticipo: 0,
+    })
+    setCobros({
+      pintura: [],
+      desabolladura: [],
+      mecanica: [],
+      repuestos: [],
+      reparar: [],
+      otros: [],
+    })
+    setCostos({
+      pintura: [],
+      desabolladura: [],
+      mecanica: [],
+      repuestos: [],
+      reparar: [],
+      otros: [],
+    })
+    setPiezasSeleccionadas((prev) => {
+      if (Array.isArray(prev) && prev.length > 0) {
+        return prev.map((p) => ({ ...p, seleccionada: false }))
+      }
+      return []
+    })
+    onClearEdit()
+  }
+
+  // Funciones para manejar cobros
+  const addItemCobro = useCallback((categoria: keyof ItemsPorCategoria) => {
+    const newId = crypto.randomUUID()
+    const newItem = { id: newId, descripcion: "", monto: 0 }
+
+    // Agregar en cobros
+    setCobros((prev) => ({
+      ...prev,
+      [categoria]: [...prev[categoria], newItem],
+    }))
+
+    // Agregar automáticamente en costos con el mismo ID
+    setCostos((prev) => ({
+      ...prev,
+      [categoria]: [...prev[categoria], { ...newItem }],
+    }))
+  }, [])
+
+  const updateItemCobro = useCallback(
+    (categoria: keyof ItemsPorCategoria, id: string, field: "descripcion" | "monto", value: string | number) => {
+      setCobros((prev) => ({
+        ...prev,
+        [categoria]: prev[categoria].map((item) => (item.id === id ? { ...item, [field]: value } : item)),
+      }))
+
+      if (field === "descripcion") {
+        setCostos((prev) => ({
+          ...prev,
+          [categoria]: prev[categoria].map((item) =>
+            item.id === id ? { ...item, descripcion: value as string } : item,
+          ),
+        }))
+      }
+    },
+    [],
+  )
+
+  const removeItemCobro = useCallback((categoria: keyof ItemsPorCategoria, id: string) => {
+    // Remover de cobros
+    setCobros((prev) => ({
+      ...prev,
+      [categoria]: prev[categoria].filter((item) => item.id !== id),
+    }))
+
+    setCostos((prev) => ({
+      ...prev,
+      [categoria]: prev[categoria].filter((item) => item.id !== id),
+    }))
+  }, [])
+
+  // Funciones para manejar costos
+  const addItemCosto = useCallback((categoria: keyof ItemsPorCategoria) => {
+    setCostos((prev) => ({
+      ...prev,
+      [categoria]: [...prev[categoria], { id: crypto.randomUUID(), descripcion: "", monto: 0 }],
+    }))
+  }, [])
+
+  const updateItemCosto = useCallback(
+    (categoria: keyof ItemsPorCategoria, id: string, field: "descripcion" | "monto", value: string | number) => {
+      setCostos((prev) => ({
+        ...prev,
+        [categoria]: prev[categoria].map((item) => (item.id === id ? { ...item, [field]: value } : item)),
+      }))
+    },
+    [],
+  )
+
+  const removeItemCosto = useCallback((categoria: keyof ItemsPorCategoria, id: string) => {
+    setCostos((prev) => ({
+      ...prev,
+      [categoria]: prev[categoria].filter((item) => item.id !== id),
+    }))
+  }, [])
+
+  const togglePiezaPintura = (precio: PrecioPintura, checked: boolean) => {
+    setPiezasSeleccionadas((prev) =>
+      prev.map((p) => (p.nombre === precio.nombre ? { ...p, seleccionada: checked } : p)),
+    )
+  }
+
+
+  // Calcular totales
+  const totalPiezasPintura = Array.isArray(piezasSeleccionadas)
+    ? piezasSeleccionadas
+        .filter((p) => p.seleccionada)
+        .reduce((sum, p) => sum + p.precio * (p.cantidad_piezas || 1), 0)
+    : 0
+
+  // Cantidad de piezas seleccionadas (suma de cantidad_piezas por pieza)
+  // Usar Number() para garantizar aritmética numérica (DB puede retornar strings para decimales)
+  const cantidadPiezasAuto = Array.isArray(piezasSeleccionadas)
+    ? piezasSeleccionadas
+        .filter((p) => p.seleccionada)
+        .reduce((sum, p) => sum + (Number(p.cantidad_piezas) || 1), 0)
+    : 0
+
+  // Costos de mano de obra y materiales calculados automáticamente por pieza
+  const autoCostoManoObra = cantidadPiezasAuto * (Number(manoObraConfig) || 0)
+  const autoCostoMateriales = cantidadPiezasAuto * (Number(materialesConfig) || 0)
+
+  const totalCobros = Object.values(cobros)
+    .flat()
+    .reduce((sum, item) => sum + (Number(item.monto) || 0), 0)
+
+  // Para costos: excluir items auto-gestionados de pintura (mano de obra y materiales)
+  // para evitar doble conteo con los valores auto-calculados
+  const isAutoItem = (desc: string | null | undefined) => {
+    if (!desc) return false
+    const d = desc.toLowerCase()
+    return d.includes("mano de obra") || d.includes("materiales pintura")
+  }
+  const costosManualPintura = costos.pintura
+    .filter((item) => !isAutoItem(item.descripcion))
+    .reduce((sum, item) => sum + (Number(item.monto) || 0), 0)
+  const costosOtros = [...costos.desabolladura, ...costos.mecanica, ...costos.repuestos, ...costos.reparar, ...costos.otros]
+    .reduce((sum, item) => sum + (Number(item.monto) || 0), 0)
+
+  const totalCostos = costosManualPintura + costosOtros + autoCostoManoObra + autoCostoMateriales
+
+  const cobroTotal = totalPiezasPintura + totalCobros
+  const montoConIva = formData.iva === "con" ? Math.round(cobroTotal * 1.19) : cobroTotal
+  const utilidad = cobroTotal - totalCostos
+
+  const handleSubmit = async () => {
+    console.log("[v0] handleSubmit called")
+    if (!formData.patente || !formData.cliente) {
+      console.log("[v0] Validation failed: patente or cliente missing")
+      toast({ title: "Error", description: "Patente y cliente son requeridos", variant: "destructive" })
+      return
+    }
+
+    setLoading(true)
+    try {
+      console.log("[v0] Starting handleSubmit with formData:", formData)
+      // Convertir cobros por categoría a array con descripción
+      const cobrosArray: { categoria: string; descripcion: string; monto: number }[] = []
+      Object.entries(cobros).forEach(([categoria, items]) => {
+        items.forEach((item) => {
+          if (item.monto > 0 || item.descripcion) {
+            cobrosArray.push({ categoria, descripcion: item.descripcion || categoria, monto: item.monto })
+          }
+        })
+      })
+
+      // Convertir costos por categoría a array con descripción
+      // Para pintura: excluir items auto-gestionados (se recalculan abajo)
+      const costosArray: { categoria: string; descripcion: string; monto: number }[] = []
+      Object.entries(costos).forEach(([categoria, items]) => {
+        items.forEach((item) => {
+          if (item.monto > 0 || item.descripcion) {
+            if (categoria === "pintura" && isAutoItem(item.descripcion)) return
+            costosArray.push({ categoria, descripcion: item.descripcion || categoria, monto: item.monto })
+          }
+        })
+      })
+      // Agregar costos auto-calculados de pintura basados en piezas seleccionadas
+      const cantidadPiezasSave = piezasSeleccionadas
+        .filter((p) => p.seleccionada)
+        .reduce((sum, p) => sum + (Number(p.cantidad_piezas) || 1), 0)
+      if (manoObraConfig > 0 && cantidadPiezasSave > 0) {
+        costosArray.push({
+          categoria: "pintura",
+          descripcion: `Mano de Obra Pintura (${cantidadPiezasSave} pieza${cantidadPiezasSave !== 1 ? "s" : ""})`,
+          monto: cantidadPiezasSave * manoObraConfig,
+        })
+      }
+      if (materialesConfig > 0 && cantidadPiezasSave > 0) {
+        costosArray.push({
+          categoria: "pintura",
+          descripcion: `Materiales Pintura (${cantidadPiezasSave} pieza${cantidadPiezasSave !== 1 ? "s" : ""})`,
+          monto: cantidadPiezasSave * materialesConfig,
+        })
+      }
+
+      const piezasPinturaArray = piezasSeleccionadas
+        .filter((p) => p.seleccionada)
+        .map((p) => ({
+          nombre: p.nombre,
+          cantidad: p.cantidad_piezas || 1,
+          precio: p.precio * (p.cantidad_piezas || 1),
+        }))
+
+      const anticipoExistente = (servicioAEditar && !servicioAEditar.isPresupuesto)
+        ? Number(servicioAEditar.anticipo) || 0
+        : 0
+      const saldoPendiente = Math.max(0, montoConIva - anticipoExistente)
+
+      const servicioData = {
+        fecha_ingreso: formData.fecha_ingreso,
+        patente: formData.patente.toUpperCase(),
+        marca: formData.marca,
+        modelo: formData.modelo,
+        color: formData.color,
+        kilometraje: formData.kilometraje,
+        año: formData.año,
+        cliente: formData.cliente,
+        telefono: formData.telefono,
+        observaciones: formData.observaciones,
+        mano_obra_pintura: 0,
+        cobros: cobrosArray,
+        costos: costosArray,
+        piezas_pintura: piezasPinturaArray,
+        iva: formData.iva,
+        anticipo: anticipoExistente,
+        saldo_pendiente: saldoPendiente,
+        monto_total_sin_iva: cobroTotal,
+        monto_total: montoConIva,
+        observaciones_checkboxes: [],
+      }
+
+      console.log("[v0] servicioData prepared:", servicioData)
+
+      if (servicioAEditar && !servicioAEditar.isPresupuesto && servicioAEditar.id) {
+        console.log("[v0] Updating existing servicio:", servicioAEditar.id)
+        await api.servicios.update(servicioAEditar.id, servicioData)
+        toast({ title: "Servicio actualizado" })
+      } else {
+        console.log("[v0] Creating new servicio")
+        const newServicio = await api.servicios.create(
+          servicioData as Omit<Servicio, "id" | "created_at" | "updated_at">,
+        )
+        console.log("[v0] Servicio created:", newServicio)
+        toast({ title: "Servicio guardado" })
+        if (newServicio) {
+          console.log("[v0] Generating PDF")
+          generateServicioPDF(newServicio)
+        }
+      }
+      console.log("[v0] Calling onSaved")
+      onSaved()
+      resetForm()
+    } catch (error) {
+      console.error("[v0] Error saving:", error)
+      toast({ title: "Error", description: "No se pudo guardar", variant: "destructive" })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handlePresupuesto = async () => {
+    console.log("[v0] handlePresupuesto called")
+    if (!formData.patente || !formData.cliente) {
+      console.log("[v0] Validation failed: patente or cliente missing")
+      toast({ title: "Error", description: "Patente y cliente son requeridos", variant: "destructive" })
+      return
+    }
+
+    setLoading(true)
+    try {
+      console.log("[v0] Starting handlePresupuesto with formData:", formData)
+      // Convertir cobros por categoría a array con descripción
+      const cobrosArray: { categoria: string; descripcion: string; monto: number }[] = []
+      Object.entries(cobros).forEach(([categoria, items]) => {
+        items.forEach((item) => {
+          if (item.monto > 0 || item.descripcion) {
+            cobrosArray.push({ categoria, descripcion: item.descripcion || categoria, monto: item.monto })
+          }
+        })
+      })
+
+      // Convertir costos por categoría a array con descripción
+      // Para pintura: excluir items auto-gestionados (se recalculan abajo)
+      const costosArray: { categoria: string; descripcion: string; monto: number }[] = []
+      Object.entries(costos).forEach(([categoria, items]) => {
+        items.forEach((item) => {
+          if (item.monto > 0 || item.descripcion) {
+            if (categoria === "pintura" && isAutoItem(item.descripcion)) return
+            costosArray.push({ categoria, descripcion: item.descripcion || categoria, monto: item.monto })
+          }
+        })
+      })
+      const cantidadPiezasSaveP = piezasSeleccionadas
+        .filter((p) => p.seleccionada)
+        .reduce((sum, p) => sum + (Number(p.cantidad_piezas) || 1), 0)
+      if (manoObraConfig > 0 && cantidadPiezasSaveP > 0) {
+        costosArray.push({
+          categoria: "pintura",
+          descripcion: `Mano de Obra Pintura (${cantidadPiezasSaveP} pieza${cantidadPiezasSaveP !== 1 ? "s" : ""})`,
+          monto: cantidadPiezasSaveP * manoObraConfig,
+        })
+      }
+      if (materialesConfig > 0 && cantidadPiezasSaveP > 0) {
+        costosArray.push({
+          categoria: "pintura",
+          descripcion: `Materiales Pintura (${cantidadPiezasSaveP} pieza${cantidadPiezasSaveP !== 1 ? "s" : ""})`,
+          monto: cantidadPiezasSaveP * materialesConfig,
+        })
+      }
+
+      const piezasPinturaArray = piezasSeleccionadas
+        .filter((p) => p.seleccionada)
+        .map((p) => ({
+          nombre: p.nombre,
+          cantidad: p.cantidad_piezas || 1,
+          precio: p.precio * (p.cantidad_piezas || 1),
+        }))
+
+      const presupuestoData = {
+        fecha_ingreso: formData.fecha_ingreso,
+        patente: formData.patente.toUpperCase(),
+        marca: formData.marca,
+        modelo: formData.modelo,
+        color: formData.color,
+        kilometraje: formData.kilometraje,
+        año: formData.año,
+        cliente: formData.cliente,
+        telefono: formData.telefono,
+        observaciones: formData.observaciones,
+        mano_obra_pintura: 0, // Ya no se usa aquí, está en costos
+        cobros: cobrosArray,
+        costos: costosArray,
+        piezas_pintura: piezasPinturaArray,
+        iva: formData.iva,
+        monto_total: montoConIva,
+        monto_total_sin_iva: cobroTotal,
+        observaciones_checkboxes: [],
+      }
+
+      console.log("[v0] presupuestoData prepared:", presupuestoData)
+
+      const newPresupuesto = await api.presupuestos.create(
+        presupuestoData as Omit<Presupuesto, "id" | "created_at" | "updated_at">,
+      )
+      console.log("[v0] Presupuesto created:", newPresupuesto)
+      toast({ title: "Presupuesto creado" })
+      if (newPresupuesto) {
+        console.log("[v0] Generating PDF")
+        generatePresupuestoPDF(newPresupuesto)
+      }
+      console.log("[v0] Calling onSaved")
+      onSaved()
+      resetForm()
+    } catch (error) {
+      console.error("[v0] Error saving presupuesto:", error)
+      toast({ title: "Error", description: "No se pudo guardar el presupuesto", variant: "destructive" })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <TooltipProvider>
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-border bg-gradient-to-r from-primary/10 to-transparent">
+          <h3 className="font-semibold text-lg flex items-center gap-2">
+            {servicioAEditar ? (
+              servicioAEditar.isPresupuesto ? (
+                <>
+                  <FileText className="w-5 h-5 text-warning" />
+                  Editar Presupuesto
+                </>
+              ) : (
+                <>
+                  <Wrench className="w-5 h-5 text-primary" />
+                  Editar Servicio
+                </>
+              )
+            ) : (
+              <>
+                <Wrench className="w-5 h-5 text-primary" />
+                Nuevo Servicio / Presupuesto
+              </>
+            )}
+          </h3>
+          <div className="flex items-center gap-2">
+            <Dialog open={showEditPiezasModal} onOpenChange={setShowEditPiezasModal}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 text-xs bg-transparent">
+                  <Paintbrush className="w-3.5 h-3.5 mr-1" />
+                  Pintura
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-card border-border max-w-2xl max-h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Configurar Piezas de Pintura</DialogTitle>
+                  <DialogDescription>
+                    Edita la cantidad de piezas para cada elemento. El precio se calcula automáticamente.
+                  </DialogDescription>
+                </DialogHeader>
+                
+                {/* Botón para configurar precio global */}
+                <div className="p-4 bg-primary/10 rounded-lg border border-primary/30 mb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">Precio Global por Pieza</p>
+                      <p className="text-xs text-muted-foreground">Configure el precio base multiplicado por cantidad</p>
+                    </div>
+                    <Button
+                      onClick={() => {
+                        setShowPreciosModal(true)
+                        setShowEditPiezasModal(false)
+                      }}
+                      className="h-8 text-xs"
+                    >
+                      Configurar
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Lista de piezas */}
+                <div className="grid grid-cols-1 gap-3 mt-4">
+                  {piezasSeleccionadas.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <p className="text-sm">No hay piezas de pintura configuradas</p>
+                      <p className="text-xs mt-2">Ve a Configuración para agregar piezas</p>
+                    </div>
+                  ) : (
+                    piezasSeleccionadas.map((pieza) => {
+                      const isSelected = pieza.seleccionada
+                      return (
+                        <div
+                          key={pieza.nombre}
+                          className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
+                            isSelected
+                              ? "bg-primary/10 border-primary/30"
+                              : "bg-secondary/10 border-border hover:bg-secondary/20"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 flex-1">
+                            <Checkbox
+                              id={`edit-pieza-${pieza.nombre}`}
+                              checked={isSelected}
+                              onCheckedChange={(checked) => {
+                                setPiezasSeleccionadas((prev) =>
+                                  prev.map((p) =>
+                                    p.nombre === pieza.nombre ? { ...p, seleccionada: checked as boolean } : p,
+                                  ),
+                                )
+                              }}
+                            />
+                            <Label
+                              htmlFor={`edit-pieza-${pieza.nombre}`}
+                              className="text-sm cursor-pointer flex-1"
+                            >
+                              {pieza.nombre}
+                            </Label>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Label className="text-xs text-muted-foreground whitespace-nowrap">Cantidad:</Label>
+                            <Input
+                              type="number"
+                              step="0.1"
+                              min="0.1"
+                              value={pieza.cantidad_piezas || 1}
+                              onChange={(e) => {
+                                setPiezasSeleccionadas((prev) =>
+                                  prev.map((p) =>
+                                    p.nombre === pieza.nombre
+                                      ? { ...p, cantidad_piezas: Number(e.target.value) || 1 }
+                                      : p,
+                                  ),
+                                )
+                              }}
+                              className="w-20 h-8 text-right text-sm"
+                              disabled={!isSelected}
+                            />
+                          </div>
+                          <span className="text-sm font-medium text-success ml-3 tabular-nums min-w-fit">
+                            ${(pieza.precio * (pieza.cantidad_piezas || 1)).toLocaleString("es-CL")}
+                          </span>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-primary/10 rounded-lg mt-4">
+                  <span className="font-semibold">Total Pintura</span>
+                  <span className="text-lg font-bold text-success tabular-nums">
+                    ${totalPiezasPintura.toLocaleString("es-CL")}
+                  </span>
+                </div>
+                <div className="flex justify-end gap-2 mt-4">
+                  <Button onClick={() => setShowEditPiezasModal(false)}>Cerrar</Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={showPreciosModal} onOpenChange={setShowPreciosModal}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 text-xs bg-transparent">
+                  <Paintbrush className="w-3.5 h-3.5 mr-1" />
+                  Precios Pintura
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-card border-border max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Configurar Precio Global de Pintura</DialogTitle>
+                  <DialogDescription>
+                    Define el precio por pieza. Este valor se multiplicará por la cantidad de piezas de cada elemento.
+                  </DialogDescription>
+                </DialogHeader>
+                
+                <div className="space-y-4 mt-6">
+                  <div>
+                    <Label className="text-sm font-medium mb-2 block">Precio por Pieza</Label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg font-medium">$</span>
+                      <Input
+                        type="number"
+                        step="1000"
+                        value={preciosTemp[0]?.precio || ""}
+                        onChange={(e) => {
+                          setPreciosTemp((prev) => [
+                            {
+                              ...prev[0],
+                              precio: Number(e.target.value) || 0,
+                            },
+                          ])
+                        }}
+                        placeholder="90000"
+                        className="flex-1 text-lg text-right"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Ejemplo: Si estableces $90.000 y el Capot tiene 2 piezas, el total será $180.000
+                    </p>
+                  </div>
+
+                  <div className="p-3 bg-secondary/30 rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-2">Piezas Configuradas:</p>
+                    <div className="space-y-1 max-h-40 overflow-y-auto">
+                      {piezasSeleccionadas.map((pieza) => (
+                        <div key={pieza.nombre} className="flex justify-between text-sm">
+                          <span>{pieza.nombre}:</span>
+                          <span className="font-medium">{pieza.cantidad_piezas || 1} piezas</span>
+                        </div>
+                      ))}
+                      {piezasSeleccionadas.length === 0 && (
+                        <p className="text-xs text-muted-foreground italic">Sin piezas configuradas</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 mt-6">
+                  <Button variant="outline" onClick={() => setShowPreciosModal(false)}>
+                    Cancelar
+                  </Button>
+                  <Button onClick={savePreciosPintura}>Guardar Precio</Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={showManoObraModal} onOpenChange={setShowManoObraModal}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 text-xs bg-transparent">
+                  <Settings className="w-3.5 h-3.5 mr-1" />
+                  Mano Obra
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-card border-border">
+                <DialogHeader>
+                  <DialogTitle>Configurar Mano de Obra de Pintura</DialogTitle>
+                  <DialogDescription>
+                    Define el valor por defecto de mano de obra. Se agregará automáticamente a costos.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 mt-4">
+                  <div className="flex items-center gap-2">
+                    <Label>Valor por defecto:</Label>
+                    <div className="flex items-center gap-1">
+                      <span className="text-muted-foreground">$</span>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={manoObraConfig || ""}
+                        onChange={(e) => setManoObraConfig(Number(e.target.value) || 0)}
+                        className="w-32"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 mt-4">
+                  <Button variant="outline" onClick={() => setShowManoObraModal(false)}>
+                    Cancelar
+                  </Button>
+                  <Button onClick={saveManoObraConfig}>Guardar</Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={showMaterialesModal} onOpenChange={setShowMaterialesModal}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 text-xs bg-transparent">
+                  <Settings className="w-3.5 h-3.5 mr-1" />
+                  Materiales
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-card border-border">
+                <DialogHeader>
+                  <DialogTitle>Configurar Costo de Materiales de Pintura</DialogTitle>
+                  <DialogDescription>
+                    Define el valor por defecto de materiales. Se agregará automáticamente a costos.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 mt-4">
+                  <div className="flex items-center gap-2">
+                    <Label>Valor por defecto:</Label>
+                    <div className="flex items-center gap-1">
+                      <span className="text-muted-foreground">$</span>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={materialesConfig || ""}
+                        onChange={(e) => setMaterialesConfig(Number(e.target.value) || 0)}
+                        className="w-32"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 mt-4">
+                  <Button variant="outline" onClick={() => setShowMaterialesModal(false)}>
+                    Cancelar
+                  </Button>
+                  <Button onClick={saveMaterialesConfig}>Guardar</Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            {servicioAEditar && (
+              <Button variant="ghost" size="icon" onClick={resetForm} className="h-8 w-8 hover:bg-secondary">
+                <X className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <div className="p-4 space-y-6">
+          {/* Grid de 2 columnas para datos básicos */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Columna 1: Datos del Cliente y Vehículo */}
+            <div className="space-y-4">
+              {/* Vehicle Info */}
+              <div className="space-y-3 p-4 rounded-lg border border-border bg-secondary/20">
+                <h4 className="font-medium text-sm flex items-center gap-2">
+                  <Car className="w-4 h-4 text-primary" />
+                  Vehículo
+                </h4>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Patente *</Label>
+                    <Input
+                      value={formData.patente}
+                      onChange={(e) => setFormData({ ...formData, patente: e.target.value.toUpperCase() })}
+                      placeholder="ABCD12"
+                      className="uppercase bg-background/50 h-9"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Marca</Label>
+                    <Input
+                      value={formData.marca}
+                      onChange={(e) => setFormData({ ...formData, marca: e.target.value })}
+                      placeholder="Toyota"
+                      className="bg-background/50 h-9"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Modelo</Label>
+                    <Input
+                      value={formData.modelo}
+                      onChange={(e) => setFormData({ ...formData, modelo: e.target.value })}
+                      placeholder="Corolla"
+                      className="bg-background/50 h-9"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Kilometraje</Label>
+                    <Input
+                      type="number"
+                      value={formData.kilometraje || ""}
+                      onChange={(e) =>
+                        setFormData({ ...formData, kilometraje: e.target.value ? Number(e.target.value) : undefined })
+                      }
+                      placeholder="50000"
+                      className="bg-background/50 h-9"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Año</Label>
+                    <Input
+                      type="number"
+                      value={formData.año || ""}
+                      onChange={(e) =>
+                        setFormData({ ...formData, año: e.target.value ? Number(e.target.value) : undefined })
+                      }
+                      placeholder="2020"
+                      className="bg-background/50 h-9"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Color</Label>
+                    <Input
+                      value={formData.color}
+                      onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                      placeholder="Blanco"
+                      className="bg-background/50 h-9"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Client Info */}
+              <div className="space-y-3 p-4 rounded-lg border border-border bg-secondary/20">
+                <h4 className="font-medium text-sm flex items-center gap-2">
+                  <User className="w-4 h-4 text-primary" />
+                  Cliente
+                </h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Nombre *</Label>
+                    <Input
+                      value={formData.cliente}
+                      onChange={(e) => setFormData({ ...formData, cliente: e.target.value })}
+                      placeholder="Juan Pérez"
+                      className="bg-background/50 h-9"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Teléfono</Label>
+                    <Input
+                      value={formData.telefono}
+                      onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
+                      placeholder="+56 9 1234 5678"
+                      className="bg-background/50 h-9"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Columna 2: Estado y Observaciones */}
+            <div className="space-y-4">
+              <div className="space-y-3 p-4 rounded-lg border border-border bg-secondary/20">
+                <h4 className="font-medium text-sm flex items-center gap-2">
+                  <Wrench className="w-4 h-4 text-primary" />
+                  Detalles del Servicio
+                </h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Fecha Ingreso</Label>
+                    <Input
+                      type="date"
+                      value={formData.fecha_ingreso}
+                      onChange={(e) => setFormData({ ...formData, fecha_ingreso: e.target.value })}
+                      className="bg-background/50 h-9"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Estado</Label>
+                    <Select value={formData.estado} onValueChange={(v) => setFormData({ ...formData, estado: v })}>
+                      <SelectTrigger className="bg-background/50 h-9">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-card border-border">
+                        {ESTADOS.map((estado) => (
+                          <SelectItem key={estado} value={estado}>
+                            {estado}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Observaciones</Label>
+                  <Textarea
+                    value={formData.observaciones}
+                    onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
+                    placeholder="Notas adicionales..."
+                    className="bg-background/30 min-h-[80px] resize-none"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Sección de Cobros y Costos Unificada */}
+          <div className="space-y-4">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-1 bg-secondary/30">
+                <TabsTrigger value="cobros">Detalles de Trabajo</TabsTrigger>
+              </TabsList>
+
+              {/* Tab: Detalles de Trabajo (Cobros + Costos unificados) */}
+              <TabsContent value="cobros" className="space-y-4">
+                <Tabs value={activeCobroTab} onValueChange={setActiveCobroTab}>
+                  <TabsList className="grid w-full grid-cols-6 bg-secondary/20">
+                    <TabsTrigger value="pintura">Pintura</TabsTrigger>
+                    <TabsTrigger value="desabolladura">Desabolladura</TabsTrigger>
+                    <TabsTrigger value="mecanica">Mecánica</TabsTrigger>
+                    <TabsTrigger value="repuestos">Repuestos</TabsTrigger>
+                    <TabsTrigger value="reparar">Reparar</TabsTrigger>
+                    <TabsTrigger value="otros">Otros</TabsTrigger>
+                  </TabsList>
+
+                  {/* Tab Pintura - Con Piezas de Pintura */}
+                  <TabsContent value="pintura" className="space-y-4">
+                    <div className="space-y-3">
+                      {/* Search Combobox */}
+                      <div className="space-y-2 p-3 rounded-lg border border-border bg-background/30">
+                        <Label className="text-xs font-medium flex items-center gap-1">
+                          <Paintbrush className="w-3 h-3" />
+                          Buscar y Agregar Piezas
+                        </Label>
+                        <Popover open={searchOpen} onOpenChange={setSearchOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={searchOpen}
+                              className="w-full justify-between bg-transparent"
+                            >
+                              {searchValue
+                                ? piezasSeleccionadas.find((p) => p.nombre === searchValue)?.nombre
+                                : "Seleccionar pieza de pintura..."}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-full p-0" align="start">
+                            <Command>
+                              <CommandInput placeholder="Buscar pieza..." />
+                              <CommandList>
+                                <CommandEmpty>No se encontraron piezas.</CommandEmpty>
+                                <CommandGroup>
+                                  {piezasSeleccionadas
+                                    .filter((pieza) => !pieza.seleccionada)
+                                    .map((pieza) => (
+                                      <CommandItem
+                                        key={pieza.nombre}
+                                        value={pieza.nombre}
+                                        onSelect={() => {
+                                          setPiezasSeleccionadas((prev) =>
+                                            prev.map((p) =>
+                                              p.nombre === pieza.nombre ? { ...p, seleccionada: true } : p
+                                            )
+                                          )
+                                          setSearchOpen(false)
+                                          setSearchValue("")
+                                        }}
+                                      >
+                                        <Check
+                                          className={`mr-2 h-4 w-4 ${
+                                            searchValue === pieza.nombre ? "opacity-100" : "opacity-0"
+                                          }`}
+                                        />
+                                        <span className="flex-1">{pieza.nombre}</span>
+                                        <span className="text-xs text-muted-foreground ml-2 tabular-nums">
+                                          ${(pieza.precio * (pieza.cantidad_piezas || 1)).toLocaleString("es-CL")}
+                                        </span>
+                                      </CommandItem>
+                                    ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+
+                      {/* Selected Pieces List */}
+                      <div className="space-y-2 p-3 rounded-lg border border-border bg-background/30">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs font-medium flex items-center gap-1">
+                            <Paintbrush className="w-3 h-3" />
+                            Piezas Seleccionadas
+                          </Label>
+                          <span className="text-sm font-semibold text-success tabular-nums">
+                            ${totalPiezasPintura.toLocaleString("es-CL")}
+                          </span>
+                        </div>
+                        <div className="space-y-2 max-h-[250px] overflow-y-auto pr-2">
+                          {piezasSeleccionadas.filter((p) => p.seleccionada).length === 0 ? (
+                            <p className="text-xs text-muted-foreground text-center py-4">
+                              No hay piezas seleccionadas
+                            </p>
+                          ) : (
+                            piezasSeleccionadas
+                              .filter((p) => p.seleccionada)
+                              .map((pieza) => (
+                                <div
+                                  key={pieza.nombre}
+                                  className="flex items-center justify-between p-2 bg-secondary/20 hover:bg-secondary/40 rounded transition-colors"
+                                >
+                                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6 hover:bg-destructive/20 hover:text-destructive"
+                                      onClick={() => {
+                                        setPiezasSeleccionadas((prev) =>
+                                          prev.map((p) =>
+                                            p.nombre === pieza.nombre ? { ...p, seleccionada: false } : p
+                                          )
+                                        )
+                                      }}
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </Button>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span className="text-xs truncate flex-1">{pieza.nombre}</span>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>{pieza.nombre}</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </div>
+                                  <span className="text-xs font-medium text-success ml-2 tabular-nums">
+                                    ${(pieza.precio * (pieza.cantidad_piezas || 1)).toLocaleString("es-CL")}
+                                  </span>
+                                </div>
+                              ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Tabla unificada de Cobros y Costos para Pintura */}
+                    <div className="overflow-x-auto border border-border rounded-lg">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-secondary/40 border-b border-border">
+                            <th className="text-left p-3 font-semibold">Descripción</th>
+                            <th className="text-right p-3 font-semibold">Cobrado Cliente</th>
+                            <th className="text-right p-3 font-semibold">Costo Taller</th>
+                            <th className="text-right p-3 font-semibold">Utilidad</th>
+                            <th className="text-center p-3 font-semibold w-12">Acción</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {cobros.pintura.length === 0 ? (
+                            <tr>
+                              <td colSpan={5} className="text-center p-4 text-muted-foreground text-xs">
+                                Sin items adicionales. Usa el botón + para agregar.
+                              </td>
+                            </tr>
+                          ) : (
+                            cobros.pintura.map((itemCobro, index) => {
+                              const itemCosto = costos.pintura[index]
+                              const cobro = Number(itemCobro.monto) || 0
+                              const costo = itemCosto ? Number(itemCosto.monto) || 0 : 0
+                              const utilidad = cobro - costo
+                              return (
+                                <tr key={itemCobro.id} className="border-b border-border hover:bg-secondary/20 transition-colors">
+                                  <td className="p-3">
+                                    <Input
+                                      value={itemCobro.descripcion}
+                                      onChange={(e) => updateItemCobro("pintura", itemCobro.id, "descripcion", e.target.value)}
+                                      placeholder="Descripción..."
+                                      className="bg-background/50 text-xs h-8 border-0"
+                                    />
+                                  </td>
+                                  <td className="p-3 text-right">
+                                    <div className="flex items-center justify-end gap-1">
+                                      <span className="text-muted-foreground text-xs">$</span>
+                                      <Input
+                                        type="number"
+                                        value={itemCobro.monto || ""}
+                                        onChange={(e) => updateItemCobro("pintura", itemCobro.id, "monto", Number(e.target.value) || 0)}
+                                        placeholder="0"
+                                        className="bg-background/50 text-xs h-8 border-0 text-right w-32"
+                                      />
+                                    </div>
+                                  </td>
+                                  <td className="p-3 text-right">
+                                    <div className="flex items-center justify-end gap-1">
+                                      <span className="text-muted-foreground text-xs">$</span>
+                                      <Input
+                                        type="number"
+                                        value={itemCosto?.monto || ""}
+                                        onChange={(e) => updateItemCosto("pintura", itemCosto?.id || crypto.randomUUID(), "monto", Number(e.target.value) || 0)}
+                                        placeholder="0"
+                                        className="bg-background/50 text-xs h-8 border-0 text-right w-32"
+                                      />
+                                    </div>
+                                  </td>
+                                  <td className={`p-3 text-right font-semibold ${utilidad >= 0 ? "text-success" : "text-destructive"}`}>
+                                    ${utilidad.toLocaleString("es-CL")}
+                                  </td>
+                                  <td className="p-3 text-center">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => removeItemCobro("pintura", itemCobro.id)}
+                                      className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </Button>
+                                  </td>
+                                </tr>
+                              )
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Botón para agregar item */}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => addItemCobro("pintura")}
+                      className="w-full h-8 text-xs border-dashed bg-transparent"
+                    >
+                      <Plus className="w-3 h-3 mr-1" />
+                      Agregar Item Adicional
+                    </Button>
+
+                    {/* Totales */}
+                    {(() => {
+                      const cobrosPintura = cobros.pintura.reduce((sum, item) => sum + (Number(item.monto) || 0), 0)
+                      // Costos manuales (excluir auto-gestionados para evitar doble conteo)
+                      const costosManual = costos.pintura
+                        .filter((item) => !isAutoItem(item.descripcion))
+                        .reduce((sum, item) => sum + (Number(item.monto) || 0), 0)
+                      const costosPintura = costosManual + autoCostoManoObra + autoCostoMateriales
+                      const totalCobradoPintura = totalPiezasPintura + cobrosPintura
+                      const utilidadPintura = totalCobradoPintura - costosPintura
+                      return (
+                        <div className="space-y-2">
+                          {/* Detalle de costos auto-calculados */}
+                          {(autoCostoManoObra > 0 || autoCostoMateriales > 0) && (
+                            <div className="text-xs text-muted-foreground px-3 space-y-0.5">
+                              {autoCostoManoObra > 0 && (
+                                <div className="flex justify-between">
+                                  <span>Mano de Obra ({cantidadPiezasAuto} piezas × ${manoObraConfig.toLocaleString("es-CL")})</span>
+                                  <span className="text-warning">${autoCostoManoObra.toLocaleString("es-CL")}</span>
+                                </div>
+                              )}
+                              {autoCostoMateriales > 0 && (
+                                <div className="flex justify-between">
+                                  <span>Materiales ({cantidadPiezasAuto} piezas × ${materialesConfig.toLocaleString("es-CL")})</span>
+                                  <span className="text-warning">${autoCostoMateriales.toLocaleString("es-CL")}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          <div className="grid grid-cols-3 gap-2 p-3 rounded-lg bg-secondary/20 border border-border">
+                            <div>
+                              <p className="text-xs text-muted-foreground">Total Cobrado</p>
+                              <p className="text-lg font-bold text-success">
+                                ${totalCobradoPintura.toLocaleString("es-CL")}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Total Costo</p>
+                              <p className="text-lg font-bold text-warning">
+                                ${costosPintura.toLocaleString("es-CL")}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Utilidad</p>
+                              <p className={`text-lg font-bold ${utilidadPintura >= 0 ? "text-info" : "text-destructive"}`}>
+                                ${utilidadPintura.toLocaleString("es-CL")}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })()}
+                  </TabsContent>
+
+                  {/* Tabs para otras categorías - Con Textarea para descripción */}
+                  {["desabolladura", "mecanica", "repuestos", "reparar", "otros"].map((categoria) => (
+                    <TabsContent key={categoria} value={categoria} className="space-y-3">
+                      {/* Tabla unificada de Cobros y Costos */}
+                      <div className="overflow-x-auto border border-border rounded-lg">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="bg-secondary/40 border-b border-border">
+                              <th className="text-left p-3 font-semibold">Descripción</th>
+                              <th className="text-right p-3 font-semibold">Cobrado Cliente</th>
+                              <th className="text-right p-3 font-semibold">Costo Taller</th>
+                              <th className="text-right p-3 font-semibold">Utilidad</th>
+                              <th className="text-center p-3 font-semibold w-12">Acción</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {cobros[categoria as keyof ItemsPorCategoria].length === 0 ? (
+                              <tr>
+                                <td colSpan={5} className="text-center p-4 text-muted-foreground text-xs">
+                                  Sin items. Usa el botón + para agregar.
+                                </td>
+                              </tr>
+                            ) : (
+                              cobros[categoria as keyof ItemsPorCategoria].map((itemCobro, index) => {
+                                const itemCosto = costos[categoria as keyof ItemsPorCategoria][index]
+                                const cobro = Number(itemCobro.monto) || 0
+                                const costo = itemCosto ? Number(itemCosto.monto) || 0 : 0
+                                const utilidad = cobro - costo
+                                return (
+                                  <tr key={itemCobro.id} className="border-b border-border hover:bg-secondary/20 transition-colors">
+                                    <td className="p-3 min-w-[300px]">
+                                      <Textarea
+                                        value={itemCobro.descripcion}
+                                        onChange={(e) => updateItemCobro(categoria as keyof ItemsPorCategoria, itemCobro.id, "descripcion", e.target.value)}
+                                        placeholder="Descripción..."
+                                        className="bg-background/50 text-xs border-0 resize-none min-h-[60px]"
+                                      />
+                                    </td>
+                                    <td className="p-3 text-right">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span className="text-muted-foreground text-xs">$</span>
+                                        <Input
+                                          type="number"
+                                          value={itemCobro.monto || ""}
+                                          onChange={(e) => updateItemCobro(categoria as keyof ItemsPorCategoria, itemCobro.id, "monto", Number(e.target.value) || 0)}
+                                          placeholder="0"
+                                          className="bg-background/50 text-xs h-8 border-0 text-right w-32"
+                                        />
+                                      </div>
+                                    </td>
+                                    <td className="p-3 text-right">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span className="text-muted-foreground text-xs">$</span>
+                                        <Input
+                                          type="number"
+                                          value={itemCosto?.monto || ""}
+                                          onChange={(e) => updateItemCosto(categoria as keyof ItemsPorCategoria, itemCosto?.id || crypto.randomUUID(), "monto", Number(e.target.value) || 0)}
+                                          placeholder="0"
+                                          className="bg-background/50 text-xs h-8 border-0 text-right w-32"
+                                        />
+                                      </div>
+                                    </td>
+                                    <td className={`p-3 text-right font-semibold ${utilidad >= 0 ? "text-success" : "text-destructive"}`}>
+                                      ${utilidad.toLocaleString("es-CL")}
+                                    </td>
+                                    <td className="p-3 text-center">
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => removeItemCobro(categoria as keyof ItemsPorCategoria, itemCobro.id)}
+                                        className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </Button>
+                                    </td>
+                                  </tr>
+                                )
+                              })
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Botón para agregar item */}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => addItemCobro(categoria as keyof ItemsPorCategoria)}
+                        className="w-full h-8 text-xs border-dashed bg-transparent"
+                      >
+                        <Plus className="w-3 h-3 mr-1" />
+                        Agregar Item
+                      </Button>
+
+                      {/* Totales por categoría */}
+                      <div className="grid grid-cols-3 gap-2 p-3 rounded-lg bg-secondary/20 border border-border">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Total Cobrado</p>
+                          <p className="text-lg font-bold text-success">
+                            ${Object.values(cobros[categoria as keyof ItemsPorCategoria]).reduce((sum, item) => sum + (Number(item.monto) || 0), 0).toLocaleString("es-CL")}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Total Costo</p>
+                          <p className="text-lg font-bold text-warning">
+                            ${Object.values(costos[categoria as keyof ItemsPorCategoria]).reduce((sum, item) => sum + (Number(item.monto) || 0), 0).toLocaleString("es-CL")}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Utilidad</p>
+                          <p className={`text-lg font-bold ${(Object.values(cobros[categoria as keyof ItemsPorCategoria]).reduce((sum, item) => sum + (Number(item.monto) || 0), 0) - Object.values(costos[categoria as keyof ItemsPorCategoria]).reduce((sum, item) => sum + (Number(item.monto) || 0), 0)) >= 0 ? "text-info" : "text-destructive"}`}>
+                            ${(Object.values(cobros[categoria as keyof ItemsPorCategoria]).reduce((sum, item) => sum + (Number(item.monto) || 0), 0) - Object.values(costos[categoria as keyof ItemsPorCategoria]).reduce((sum, item) => sum + (Number(item.monto) || 0), 0)).toLocaleString("es-CL")}
+                          </p>
+                        </div>
+                      </div>
+                    </TabsContent>
+                  ))}
+                </Tabs>
+              </TabsContent>
+            </Tabs>
+          </div>
+
+          {/* Resumen y Totales */}
+          <div className="p-4 rounded-lg border border-border bg-gradient-to-r from-primary/5 to-info/5">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">IVA</Label>
+                <Select value={formData.iva} onValueChange={(v) => setFormData({ ...formData, iva: v })}>
+                  <SelectTrigger className="bg-background/50 h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card border-border">
+                    <SelectItem value="sin">Sin IVA</SelectItem>
+                    <SelectItem value="con">Con IVA (19%)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Anticipo / Abono</Label>
+                <Input
+                  type="number"
+                  value={formData.anticipo || ""}
+                  onChange={(e) => setFormData({ ...formData, anticipo: Number(e.target.value) || 0 })}
+                  placeholder="0"
+                  className="bg-background/50 h-9"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Saldo Pendiente</Label>
+                <div className={`text-lg font-bold ${montoConIva - (formData.anticipo || 0) <= 0 ? "text-success" : "text-warning"}`}>
+                  ${Math.max(0, montoConIva - (formData.anticipo || 0)).toLocaleString("es-CL")}
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Total a Cobrar</Label>
+                <div className="text-xl font-bold text-success">${montoConIva.toLocaleString("es-CL")}</div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Utilidad Estimada</Label>
+                <div className={`text-xl font-bold ${utilidad >= 0 ? "text-info" : "text-destructive"}`}>
+                  ${utilidad.toLocaleString("es-CL")}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Botones de Acción */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button
+              onClick={handlePresupuesto}
+              variant="outline"
+              disabled={loading}
+              className="flex-1 h-11 border-warning text-warning hover:bg-warning/10 bg-transparent"
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              {servicioAEditar?.isPresupuesto ? "Actualizar Presupuesto" : "Crear Presupuesto"}
+            </Button>
+            <Button onClick={handleSubmit} disabled={loading} className="flex-1 h-11 bg-primary hover:bg-primary/90">
+              <Save className="w-4 h-4 mr-2" />
+              {servicioAEditar && !servicioAEditar.isPresupuesto ? "Actualizar Servicio" : "Guardar Servicio"}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </TooltipProvider>
+  )
+}
