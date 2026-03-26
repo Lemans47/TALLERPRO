@@ -28,6 +28,11 @@ function ShellContent({ children }: { children: React.ReactNode }) {
     )
   }
 
+  if (!user && pathname !== "/login") {
+    router.push("/login")
+    return null
+  }
+
   return (
     <div className="flex min-h-screen bg-background">
       <SidebarNav />
