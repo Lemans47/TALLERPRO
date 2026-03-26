@@ -471,14 +471,19 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
     try {
       const form = new FormData()
       form.append("file", file)
+      form.append("upload_preset", "tallerpro")
       form.append("folder", `tallerpro/${tipo}`)
-      const res = await fetch("/api/upload", { method: "POST", body: form })
-      if (!res.ok) throw new Error("Upload failed")
-      const { url, publicId } = await res.json()
+      // Upload directo a Cloudinary desde el navegador (unsigned preset)
+      const res = await fetch("https://api.cloudinary.com/v1_1/dzjtujwor/image/upload", {
+        method: "POST",
+        body: form,
+      })
+      const data = await res.json()
+      if (!res.ok || data.error) throw new Error(data.error?.message || "Upload failed")
       const setter = tipo === "ingreso" ? setFotosIngreso : setFotosEntrega
-      setter((prev) => [...prev, { url, publicId }])
-    } catch {
-      toast({ title: "Error", description: "No se pudo subir la foto", variant: "destructive" })
+      setter((prev) => [...prev, { url: data.secure_url, publicId: data.public_id }])
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "No se pudo subir la foto", variant: "destructive" })
     } finally {
       setUploadingFoto(false)
     }
