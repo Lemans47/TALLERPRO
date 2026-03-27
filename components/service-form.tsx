@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -189,6 +189,9 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   const [fotosIngreso, setFotosIngreso] = useState<FotoServicio[]>([])
   const [fotosEntrega, setFotosEntrega] = useState<FotoServicio[]>([])
   const [uploadingFoto, setUploadingFoto] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<{ patente?: boolean; cliente?: boolean }>({})
+  const patenteRef = useRef<HTMLInputElement>(null)
+  const clienteRef = useRef<HTMLInputElement>(null)
 
   const [formData, setFormData] = useState({
     fecha_ingreso: new Date().toISOString().split("T")[0],
@@ -628,13 +631,24 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   const montoConIva = formData.iva === "con" ? Math.round(cobroTotal * 1.19) : cobroTotal
   const utilidad = cobroTotal - totalCostos
 
+  const validateRequiredFields = () => {
+    const errors: { patente?: boolean; cliente?: boolean } = {}
+    if (!formData.patente) errors.patente = true
+    if (!formData.cliente) errors.cliente = true
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors)
+      const firstRef = errors.patente ? patenteRef : clienteRef
+      firstRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })
+      firstRef.current?.focus()
+      return false
+    }
+    setFieldErrors({})
+    return true
+  }
+
   const handleSubmit = async () => {
     console.log("[v0] handleSubmit called")
-    if (!formData.patente || !formData.cliente) {
-      console.log("[v0] Validation failed: patente or cliente missing")
-      toast({ title: "Error", description: "Patente y cliente son requeridos", variant: "destructive" })
-      return
-    }
+    if (!validateRequiredFields()) return
 
     setLoading(true)
     try {
@@ -748,11 +762,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
 
   const handlePresupuesto = async () => {
     console.log("[v0] handlePresupuesto called")
-    if (!formData.patente || !formData.cliente) {
-      console.log("[v0] Validation failed: patente or cliente missing")
-      toast({ title: "Error", description: "Patente y cliente son requeridos", variant: "destructive" })
-      return
-    }
+    if (!validateRequiredFields()) return
 
     setLoading(true)
     try {
@@ -1149,13 +1159,18 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                 </h4>
                 <div className="grid grid-cols-3 gap-3">
                   <div className="space-y-1">
-                    <Label className="text-xs">Patente *</Label>
+                    <Label className={`text-xs ${fieldErrors.patente ? "text-destructive" : ""}`}>Patente *</Label>
                     <Input
+                      ref={patenteRef}
                       value={formData.patente}
-                      onChange={(e) => setFormData({ ...formData, patente: e.target.value.toUpperCase() })}
+                      onChange={(e) => {
+                        setFormData({ ...formData, patente: e.target.value.toUpperCase() })
+                        if (fieldErrors.patente) setFieldErrors((prev) => ({ ...prev, patente: false }))
+                      }}
                       placeholder="ABCD12"
-                      className="uppercase bg-background/50 h-9"
+                      className={`uppercase bg-background/50 h-9 ${fieldErrors.patente ? "border-destructive ring-1 ring-destructive" : ""}`}
                     />
+                    {fieldErrors.patente && <p className="text-xs text-destructive">Requerido</p>}
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Marca</Label>
@@ -1219,13 +1234,18 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                 </h4>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <Label className="text-xs">Nombre *</Label>
+                    <Label className={`text-xs ${fieldErrors.cliente ? "text-destructive" : ""}`}>Nombre *</Label>
                     <Input
+                      ref={clienteRef}
                       value={formData.cliente}
-                      onChange={(e) => setFormData({ ...formData, cliente: e.target.value })}
+                      onChange={(e) => {
+                        setFormData({ ...formData, cliente: e.target.value })
+                        if (fieldErrors.cliente) setFieldErrors((prev) => ({ ...prev, cliente: false }))
+                      }}
                       placeholder="Juan Pérez"
-                      className="bg-background/50 h-9"
+                      className={`bg-background/50 h-9 ${fieldErrors.cliente ? "border-destructive ring-1 ring-destructive" : ""}`}
                     />
+                    {fieldErrors.cliente && <p className="text-xs text-destructive">Requerido</p>}
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Teléfono</Label>
