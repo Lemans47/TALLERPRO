@@ -340,7 +340,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         marca: servicioAEditar.marca || "",
         modelo: servicioAEditar.modelo || "",
         color: servicioAEditar.color || "",
-        kilometraje: servicioAEditar.Kilometraje,
+        kilometraje: servicioAEditar.kilometraje,
         año: servicioAEditar.año,
         cliente: servicioAEditar.cliente,
         telefono: servicioAEditar.telefono || "",
