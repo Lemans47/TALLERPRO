@@ -192,6 +192,8 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   const [fieldErrors, setFieldErrors] = useState<{ patente?: boolean; cliente?: boolean }>({})
   const patenteRef = useRef<HTMLInputElement>(null)
   const clienteRef = useRef<HTMLInputElement>(null)
+  const [patenteSugerencias, setPatenteSugerencias] = useState<any[]>([])
+  const [mostrarSugerencias, setMostrarSugerencias] = useState(false)
 
   const [formData, setFormData] = useState({
     fecha_ingreso: new Date().toISOString().split("T")[0],
@@ -644,6 +646,33 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
     }
     setFieldErrors({})
     return true
+  }
+
+  const buscarPatente = async (valor: string) => {
+    if (valor.length < 3) { setPatenteSugerencias([]); setMostrarSugerencias(false); return }
+    try {
+      const res = await fetch(`/api/buscar-patente?q=${encodeURIComponent(valor)}`)
+      const data = await res.json()
+      setPatenteSugerencias(data)
+      setMostrarSugerencias(data.length > 0)
+    } catch { setPatenteSugerencias([]) }
+  }
+
+  const seleccionarSugerencia = (s: any) => {
+    setFormData((prev) => ({
+      ...prev,
+      patente: s.patente,
+      marca: s.marca || prev.marca,
+      modelo: s.modelo || prev.modelo,
+      color: s.color || prev.color,
+      año: s.año ? Number(s.año) : prev.año,
+      kilometraje: s.kilometraje ? Number(s.kilometraje) : prev.kilometraje,
+      cliente: s.cliente || prev.cliente,
+      telefono: s.telefono || prev.telefono,
+    }))
+    setPatenteSugerencias([])
+    setMostrarSugerencias(false)
+    if (fieldErrors.patente) setFieldErrors((prev) => ({ ...prev, patente: false }))
   }
 
   const handleSubmit = async () => {
@@ -1158,19 +1187,42 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                   Vehículo
                 </h4>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  <div className="space-y-1">
+                  <div className="space-y-1 relative">
                     <Label className={`text-xs ${fieldErrors.patente ? "text-destructive" : ""}`}>Patente *</Label>
                     <Input
                       ref={patenteRef}
                       value={formData.patente}
                       onChange={(e) => {
-                        setFormData({ ...formData, patente: e.target.value.toUpperCase() })
+                        const val = e.target.value.toUpperCase()
+                        setFormData({ ...formData, patente: val })
                         if (fieldErrors.patente) setFieldErrors((prev) => ({ ...prev, patente: false }))
+                        buscarPatente(val)
                       }}
+                      onBlur={() => setTimeout(() => setMostrarSugerencias(false), 150)}
+                      onFocus={() => patenteSugerencias.length > 0 && setMostrarSugerencias(true)}
                       placeholder="ABCD12"
+                      autoComplete="off"
                       className={`uppercase bg-background/50 h-9 ${fieldErrors.patente ? "border-destructive ring-1 ring-destructive" : ""}`}
                     />
                     {fieldErrors.patente && <p className="text-xs text-destructive">Requerido</p>}
+                    {mostrarSugerencias && patenteSugerencias.length > 0 && (
+                      <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-card border border-border rounded-lg shadow-lg overflow-hidden">
+                        {patenteSugerencias.map((s) => (
+                          <button
+                            key={s.patente}
+                            type="button"
+                            onClick={() => seleccionarSugerencia(s)}
+                            className="w-full text-left px-3 py-2.5 hover:bg-secondary/50 transition-colors border-b border-border last:border-0"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-sm uppercase">{s.patente}</span>
+                              <span className="text-xs text-muted-foreground">{s.marca} {s.modelo}</span>
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-0.5">{s.cliente} · {s.telefono}</div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Marca</Label>
