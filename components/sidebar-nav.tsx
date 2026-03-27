@@ -25,11 +25,11 @@ const roleLabel: Record<string, string> = {
 export function SidebarNav() {
   const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
-  const { user, role, signOut } = useAuth()
+  const { user, role, loading, signOut } = useAuth()
 
-  const navItems = allNavItems.filter((item) =>
-    role ? item.roles.includes(role) : false
-  )
+  const navItems = loading
+    ? allNavItems // mientras carga, mostrar todos (no se puede actuar igual)
+    : allNavItems.filter((item) => role ? item.roles.includes(role) : false)
 
   const NavItem = ({ item, onClick }: { item: typeof allNavItems[0]; onClick?: () => void }) => {
     const Icon = item.icon
