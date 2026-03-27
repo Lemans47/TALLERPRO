@@ -1157,7 +1157,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                   <Car className="w-4 h-4 text-primary" />
                   Vehículo
                 </h4>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="space-y-1">
                     <Label className={`text-xs ${fieldErrors.patente ? "text-destructive" : ""}`}>Patente *</Label>
                     <Input
@@ -1232,7 +1232,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                   <User className="w-4 h-4 text-primary" />
                   Cliente
                 </h4>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label className={`text-xs ${fieldErrors.cliente ? "text-destructive" : ""}`}>Nombre *</Label>
                     <Input
@@ -1267,7 +1267,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                   <Wrench className="w-4 h-4 text-primary" />
                   Detalles del Servicio
                 </h4>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs">Fecha Ingreso</Label>
                     <Input
@@ -1422,13 +1422,13 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
               {/* Tab: Detalles de Trabajo (Cobros + Costos unificados) */}
               <TabsContent value="cobros" className="space-y-4">
                 <Tabs value={activeCobroTab} onValueChange={setActiveCobroTab}>
-                  <TabsList className="grid w-full grid-cols-6 bg-secondary/20">
-                    <TabsTrigger value="pintura">Pintura</TabsTrigger>
-                    <TabsTrigger value="desabolladura">Desabolladura</TabsTrigger>
-                    <TabsTrigger value="mecanica">Mecánica</TabsTrigger>
-                    <TabsTrigger value="repuestos">Repuestos</TabsTrigger>
-                    <TabsTrigger value="reparar">Reparar</TabsTrigger>
-                    <TabsTrigger value="otros">Otros</TabsTrigger>
+                  <TabsList className="flex w-full overflow-x-auto bg-secondary/20 h-auto flex-wrap sm:flex-nowrap">
+                    <TabsTrigger value="pintura" className="flex-1 min-w-[80px] text-xs py-2">Pintura</TabsTrigger>
+                    <TabsTrigger value="desabolladura" className="flex-1 min-w-[80px] text-xs py-2">Desabolladura</TabsTrigger>
+                    <TabsTrigger value="mecanica" className="flex-1 min-w-[80px] text-xs py-2">Mecánica</TabsTrigger>
+                    <TabsTrigger value="repuestos" className="flex-1 min-w-[80px] text-xs py-2">Repuestos</TabsTrigger>
+                    <TabsTrigger value="reparar" className="flex-1 min-w-[80px] text-xs py-2">Reparar</TabsTrigger>
+                    <TabsTrigger value="otros" className="flex-1 min-w-[80px] text-xs py-2">Otros</TabsTrigger>
                   </TabsList>
 
                   {/* Tab Pintura - Con Piezas de Pintura */}

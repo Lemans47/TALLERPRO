@@ -188,7 +188,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
         <div className="divide-y divide-border">
           {serviciosFiltrados.map((servicio) => (
             <div key={servicio.id} className="p-4 hover:bg-secondary/30 transition-colors">
-              <div className="flex flex-col lg:flex-row lg:items-start gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                 {/* Info */}
                 <div className="flex-1 space-y-3">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -238,9 +238,9 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                 </div>
 
                 {/* Actions */}
-                <div className="flex flex-row lg:flex-col gap-2 lg:w-[150px]">
+                <div className="flex flex-row sm:flex-col gap-2 sm:w-[150px]">
                   <Select value={servicio.estado} onValueChange={(v) => handleEstadoChange(servicio.id, v)}>
-                    <SelectTrigger className="h-9 text-xs bg-secondary/50 border-border">
+                    <SelectTrigger className="h-11 text-xs bg-secondary/50 border-border w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-card border-border">
@@ -256,7 +256,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-9 w-9 bg-transparent border-border hover:bg-secondary"
+                      className="h-11 w-11 bg-transparent border-border hover:bg-secondary"
                       onClick={() => onEditServicio(servicio)}
                     >
                       <Edit className="w-4 h-4" />
@@ -264,7 +264,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-9 w-9 bg-transparent border-border hover:bg-secondary"
+                      className="h-11 w-11 bg-transparent border-border hover:bg-secondary"
                       onClick={() => generarPDFPresupuesto(servicio)}
                       title="Generar PDF presupuesto"
                     >
@@ -273,7 +273,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-9 w-9 border-destructive/30 text-destructive bg-destructive/5 hover:bg-destructive/10"
+                      className="h-11 w-11 border-destructive/30 text-destructive bg-destructive/5 hover:bg-destructive/10"
                       onClick={() => handleDelete(servicio)}
                     >
                       <Trash2 className="w-4 h-4" />
