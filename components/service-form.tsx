@@ -861,8 +861,8 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
     <TooltipProvider>
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-border bg-gradient-to-r from-primary/10 to-transparent">
-          <h3 className="font-semibold text-lg flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border-b border-border bg-gradient-to-r from-primary/10 to-transparent">
+          <h3 className="font-semibold text-base flex items-center gap-2">
             {servicioAEditar ? (
               servicioAEditar.isPresupuesto ? (
                 <>
@@ -882,7 +882,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
               </>
             )}
           </h3>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Dialog open={showEditPiezasModal} onOpenChange={setShowEditPiezasModal}>
               <DialogTrigger asChild>
                 <Button variant="outline" size="sm" className="h-8 text-xs bg-transparent">
@@ -1157,7 +1157,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                   <Car className="w-4 h-4 text-primary" />
                   Vehículo
                 </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   <div className="space-y-1">
                     <Label className={`text-xs ${fieldErrors.patente ? "text-destructive" : ""}`}>Patente *</Label>
                     <Input
@@ -1422,13 +1422,13 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
               {/* Tab: Detalles de Trabajo (Cobros + Costos unificados) */}
               <TabsContent value="cobros" className="space-y-4">
                 <Tabs value={activeCobroTab} onValueChange={setActiveCobroTab}>
-                  <TabsList className="flex w-full overflow-x-auto bg-secondary/20 h-auto flex-wrap sm:flex-nowrap">
-                    <TabsTrigger value="pintura" className="flex-1 min-w-[80px] text-xs py-2">Pintura</TabsTrigger>
-                    <TabsTrigger value="desabolladura" className="flex-1 min-w-[80px] text-xs py-2">Desabolladura</TabsTrigger>
-                    <TabsTrigger value="mecanica" className="flex-1 min-w-[80px] text-xs py-2">Mecánica</TabsTrigger>
-                    <TabsTrigger value="repuestos" className="flex-1 min-w-[80px] text-xs py-2">Repuestos</TabsTrigger>
-                    <TabsTrigger value="reparar" className="flex-1 min-w-[80px] text-xs py-2">Reparar</TabsTrigger>
-                    <TabsTrigger value="otros" className="flex-1 min-w-[80px] text-xs py-2">Otros</TabsTrigger>
+                  <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 bg-secondary/20 h-auto">
+                    <TabsTrigger value="pintura" className="text-xs py-2">Pintura</TabsTrigger>
+                    <TabsTrigger value="desabolladura" className="text-xs py-2">Desabolladura</TabsTrigger>
+                    <TabsTrigger value="mecanica" className="text-xs py-2">Mecánica</TabsTrigger>
+                    <TabsTrigger value="repuestos" className="text-xs py-2">Repuestos</TabsTrigger>
+                    <TabsTrigger value="reparar" className="text-xs py-2">Reparar</TabsTrigger>
+                    <TabsTrigger value="otros" className="text-xs py-2">Otros</TabsTrigger>
                   </TabsList>
 
                   {/* Tab Pintura - Con Piezas de Pintura */}
