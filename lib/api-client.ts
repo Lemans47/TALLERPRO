@@ -1,4 +1,4 @@
-import type { Servicio, Presupuesto, Gasto, PrecioPintura, PiezaPintura, FotoServicio } from "./database"
+import type { Servicio, Presupuesto, Gasto, PrecioPintura, PiezaPintura, FotoServicio, Cliente, Vehiculo } from "./database"
 
 // Dashboard
 export async function fetchDashboardData(
@@ -171,9 +171,54 @@ export async function deletePiezaPinturaApi(id: string): Promise<void> {
   if (!res.ok) throw new Error("Error deleting pieza pintura")
 }
 
-export type { Servicio, Presupuesto, Gasto, PrecioPintura, PiezaPintura, FotoServicio }
+// Clientes
+export async function fetchClientes(): Promise<Cliente[]> {
+  const res = await fetch("/api/clientes")
+  if (!res.ok) throw new Error("Error fetching clientes")
+  return res.json()
+}
+
+export async function fetchVehiculosConCliente(): Promise<(Vehiculo & { cliente?: Cliente })[]> {
+  const res = await fetch("/api/clientes?withVehiculos=1")
+  if (!res.ok) throw new Error("Error fetching vehiculos")
+  return res.json()
+}
+
+export async function createClienteApi(data: Partial<Cliente>): Promise<Cliente> {
+  const res = await fetch("/api/clientes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) throw new Error("Error creating cliente")
+  return res.json()
+}
+
+export async function updateClienteApi(id: string, data: Partial<Cliente>): Promise<Cliente> {
+  const res = await fetch("/api/clientes", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, ...data }),
+  })
+  if (!res.ok) throw new Error("Error updating cliente")
+  return res.json()
+}
+
+export async function deleteClienteApi(id: string): Promise<void> {
+  const res = await fetch(`/api/clientes?id=${id}`, { method: "DELETE" })
+  if (!res.ok) throw new Error("Error deleting cliente")
+}
+
+export type { Servicio, Presupuesto, Gasto, PrecioPintura, PiezaPintura, FotoServicio, Cliente, Vehiculo }
 
 export const api = {
+  clientes: {
+    getAll: fetchClientes,
+    getVehiculosConCliente: fetchVehiculosConCliente,
+    create: createClienteApi,
+    update: updateClienteApi,
+    delete: deleteClienteApi,
+  },
   dashboard: {
     getData: fetchDashboardData,
   },

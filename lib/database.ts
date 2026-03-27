@@ -602,6 +602,145 @@ export async function deletePiezaPintura(id: string) {
   }
 }
 
+// ─── Clientes ───────────────────────────────────────────────────────────────
+
+export interface Cliente {
+  id: string
+  nombre: string
+  telefono?: string
+  email?: string
+  notas?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface Vehiculo {
+  id: string
+  patente: string
+  marca?: string
+  modelo?: string
+  color?: string
+  año?: number
+  cliente_id?: string
+  created_at: string
+  updated_at: string
+}
+
+export async function getClientes() {
+  const db = getSQL()
+  const data = await db`SELECT * FROM clientes ORDER BY nombre ASC`
+  return data as Cliente[]
+}
+
+export async function getClienteById(id: string) {
+  const db = getSQL()
+  const data = await db`SELECT * FROM clientes WHERE id = ${id}`
+  return (data[0] as Cliente) || null
+}
+
+export async function createCliente(cliente: Omit<Cliente, "id" | "created_at" | "updated_at">) {
+  const db = getSQL()
+  const data = await db`
+    INSERT INTO clientes (nombre, telefono, email, notas)
+    VALUES (${cliente.nombre}, ${cliente.telefono || null}, ${cliente.email || null}, ${cliente.notas || null})
+    RETURNING *
+  `
+  return data[0] as Cliente
+}
+
+export async function updateCliente(id: string, cliente: Partial<Cliente>) {
+  const db = getSQL()
+  const data = await db`
+    UPDATE clientes SET
+      nombre = COALESCE(${cliente.nombre}, nombre),
+      telefono = COALESCE(${cliente.telefono}, telefono),
+      email = COALESCE(${cliente.email}, email),
+      notas = COALESCE(${cliente.notas}, notas),
+      updated_at = NOW()
+    WHERE id = ${id}
+    RETURNING *
+  `
+  return data[0] as Cliente
+}
+
+export async function deleteCliente(id: string) {
+  const db = getSQL()
+  await db`DELETE FROM clientes WHERE id = ${id}`
+}
+
+export async function upsertClienteYVehiculo(
+  nombre: string,
+  telefono: string,
+  patente: string,
+  vehiculoData: { marca?: string; modelo?: string; color?: string; año?: number }
+) {
+  const db = getSQL()
+
+  // Buscar o crear cliente por nombre+telefono
+  let clienteRows = await db`
+    SELECT * FROM clientes WHERE nombre = ${nombre} AND telefono = ${telefono} LIMIT 1
+  `
+  let cliente: Cliente
+  if (clienteRows.length > 0) {
+    cliente = clienteRows[0] as Cliente
+    // Actualizar telefono si cambió
+    if (telefono && cliente.telefono !== telefono) {
+      await db`UPDATE clientes SET telefono = ${telefono}, updated_at = NOW() WHERE id = ${cliente.id}`
+    }
+  } else {
+    const created = await db`
+      INSERT INTO clientes (nombre, telefono) VALUES (${nombre}, ${telefono || null}) RETURNING *
+    `
+    cliente = created[0] as Cliente
+  }
+
+  // Buscar o crear vehículo por patente
+  const vehiculoRows = await db`SELECT * FROM vehiculos WHERE patente = ${patente.toUpperCase()} LIMIT 1`
+  if (vehiculoRows.length > 0) {
+    await db`
+      UPDATE vehiculos SET
+        marca = COALESCE(${vehiculoData.marca || null}, marca),
+        modelo = COALESCE(${vehiculoData.modelo || null}, modelo),
+        color = COALESCE(${vehiculoData.color || null}, color),
+        año = COALESCE(${vehiculoData.año || null}, año),
+        cliente_id = ${cliente.id},
+        updated_at = NOW()
+      WHERE patente = ${patente.toUpperCase()}
+    `
+  } else {
+    await db`
+      INSERT INTO vehiculos (patente, marca, modelo, color, año, cliente_id)
+      VALUES (${patente.toUpperCase()}, ${vehiculoData.marca || null}, ${vehiculoData.modelo || null},
+              ${vehiculoData.color || null}, ${vehiculoData.año || null}, ${cliente.id})
+    `
+  }
+
+  return cliente
+}
+
+export async function getVehiculosConCliente() {
+  const db = getSQL()
+  const data = await db`
+    SELECT v.*, c.nombre as cliente_nombre, c.telefono as cliente_telefono, c.email as cliente_email
+    FROM vehiculos v
+    LEFT JOIN clientes c ON v.cliente_id = c.id
+    ORDER BY v.patente ASC
+  `
+  return data
+}
+
+export async function getClienteConVehiculos(clienteId: string) {
+  const db = getSQL()
+  const [clienteData, vehiculosData] = await Promise.all([
+    db`SELECT * FROM clientes WHERE id = ${clienteId}`,
+    db`SELECT * FROM vehiculos WHERE cliente_id = ${clienteId} ORDER BY patente ASC`,
+  ])
+  return {
+    cliente: (clienteData[0] as Cliente) || null,
+    vehiculos: vehiculosData as Vehiculo[],
+  }
+}
+
 export async function deletePrecioPintura(id: string) {
   const db = getSQL()
   await db`DELETE FROM precios_pintura WHERE id = ${id}`

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getServicios, getServiciosByMonth, createServicio, updateServicio, deleteServicio, getServicioById } from "@/lib/database"
+import { getServicios, getServiciosByMonth, createServicio, updateServicio, deleteServicio, getServicioById, upsertClienteYVehiculo } from "@/lib/database"
 import crypto from "crypto"
 
 const CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME
@@ -42,6 +42,12 @@ export async function POST(request: Request) {
   try {
     const data = await request.json()
     const servicio = await createServicio(data)
+    // Sincronizar cliente y vehículo en sus tablas
+    if (servicio.cliente && servicio.patente) {
+      await upsertClienteYVehiculo(servicio.cliente, servicio.telefono || "", servicio.patente, {
+        marca: servicio.marca, modelo: servicio.modelo, color: servicio.color, año: servicio.año ? Number(servicio.año) : undefined,
+      }).catch(() => {}) // no bloquear si falla
+    }
     return NextResponse.json(servicio)
   } catch (error) {
     console.error("Servicios POST error:", error)
@@ -54,6 +60,12 @@ export async function PUT(request: Request) {
     const data = await request.json()
     const { id, ...updateData } = data
     const servicio = await updateServicio(id, updateData)
+    // Sincronizar cliente y vehículo en sus tablas
+    if (servicio.cliente && servicio.patente) {
+      await upsertClienteYVehiculo(servicio.cliente, servicio.telefono || "", servicio.patente, {
+        marca: servicio.marca, modelo: servicio.modelo, color: servicio.color, año: servicio.año ? Number(servicio.año) : undefined,
+      }).catch(() => {})
+    }
     return NextResponse.json(servicio)
   } catch (error) {
     console.error("Servicios PUT error:", error)
