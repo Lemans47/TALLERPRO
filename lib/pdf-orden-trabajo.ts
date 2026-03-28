@@ -172,15 +172,11 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
     grouped[cat].forEach((desc) => displayRows.push({ type: "item", desc }))
   })
 
-  const CAT_H = 7    // category header row height
-  const ITEM_H = 5.5 // item row height
-  const MIN_BLANK = 6 // minimum blank rows to leave at the end
+  const CAT_H = 7
+  const ITEM_H = 5.5
+  const MIN_BLANK = 6
 
-  function getRowH(row: DisplayRow) {
-    return row.type === "category" ? CAT_H : ITEM_H
-  }
-
-  // Table header
+  // ── Table header ──
   checkPageBreak(8)
   doc.setFillColor(220, 230, 255)
   doc.rect(ML, y, CW, 7, "FD")
@@ -189,77 +185,93 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
   doc.text("DESCRIPCION DEL TRABAJO A REALIZAR", ML + 2, y + 5)
   y += 7
 
-  // Draw rows with page-break support
-  const drawnSegments: { startY: number; endY: number; page: number }[] = []
-  let segStart = y
-  let segPage = pageNum
+  // ── PRE-CALCULATE all row positions (no drawing yet) ──
+  type PlacedRow = {
+    type: "category" | "item" | "blank"
+    label?: string
+    desc?: string
+    ry: number
+    rh: number
+    pg: number
+  }
+  const placed: PlacedRow[] = []
+  let cy = y
+  let cp = pageNum
 
-  function closeSeg() {
-    drawnSegments.push({ startY: segStart, endY: y, page: segPage })
+  function placeRow(type: PlacedRow["type"], rh: number, label?: string, desc?: string) {
+    if (cy + rh > PAGE_H - BOTTOM_MARGIN) {
+      doc.addPage()
+      cp++
+      cy = drawPageHeader(cp)
+      // new table header on continuation page
+      doc.setFillColor(220, 230, 255)
+      doc.rect(ML, cy, CW, 7, "FD")
+      doc.setDrawColor(0, 0, 0)
+      black(); bold(); doc.setFontSize(8)
+      doc.text("DESCRIPCION DEL TRABAJO A REALIZAR (cont.)", ML + 2, cy + 5)
+      cy += 7
+    }
+    placed.push({ type, label, desc, ry: cy, rh, pg: cp })
+    cy += rh
   }
 
   displayRows.forEach((row) => {
-    const rHeight = getRowH(row)
-    checkPageBreak(rHeight)
+    placeRow(row.type, row.type === "category" ? CAT_H : ITEM_H,
+      row.type === "category" ? row.label : undefined,
+      row.type === "item" ? row.desc : undefined)
+  })
+  for (let i = 0; i < MIN_BLANK; i++) placeRow("blank", ITEM_H)
 
-    if (pageNum !== segPage) {
-      closeSeg()
-      segStart = y
-      segPage = pageNum
-    }
+  y = cy
+  pageNum = cp
 
-    const ry = y
-
-    // Background for category
-    if (row.type === "category") {
+  // ── PASS 1: fills ──
+  const savedPg = doc.getCurrentPageInfo().pageNumber
+  placed.forEach((r) => {
+    doc.setPage(r.pg)
+    if (r.type === "category") {
       doc.setFillColor(240, 240, 240)
-      doc.rect(ML, ry, CW, rHeight, "F")
-      // Redraw top border since fill covered previous row's separator
-      doc.setDrawColor(100, 100, 100)
-      doc.setLineWidth(0.4)
-      doc.line(ML, ry, MR, ry)
-      doc.setLineWidth(0.3)
+      doc.rect(ML, r.ry, CW, r.rh, "F")
     }
+  })
 
-    // Separator line at bottom of row
-    doc.setDrawColor(180, 180, 180)
-    doc.line(ML, ry + rHeight, MR, ry + rHeight)
+  // ── PASS 2: all horizontal lines ──
+  placed.forEach((r) => {
+    doc.setPage(r.pg)
+    const isCategory = r.type === "category"
+    doc.setDrawColor(isCategory ? 80 : 200, isCategory ? 80 : 200, isCategory ? 80 : 200)
+    doc.setLineWidth(isCategory ? 0.4 : 0.2)
+    doc.line(ML, r.ry, MR, r.ry)           // top
+    doc.line(ML, r.ry + r.rh, MR, r.ry + r.rh) // bottom
+  })
 
-    // Text (drawn last so nothing covers it)
+  // ── PASS 3: text ──
+  placed.forEach((r) => {
+    if (r.type === "blank") return
+    doc.setPage(r.pg)
     black()
-    if (row.type === "category") {
+    if (r.type === "category") {
       bold(); doc.setFontSize(8)
-      doc.text(`[ ${up(row.label)} ]`, ML + 2, ry + rHeight - 2)
+      doc.text(`[ ${up(r.label!)} ]`, ML + 2, r.ry + r.rh - 2)
     } else {
       normal(); doc.setFontSize(8)
-      doc.text(up(row.desc).substring(0, 90), ML + 6, ry + rHeight - 1.5)
+      doc.text(up(r.desc!).substring(0, 90), ML + 6, r.ry + r.rh - 1.5)
     }
-
-    y += rHeight
   })
 
-  // Blank rows at end
-  for (let i = 0; i < MIN_BLANK; i++) {
-    checkPageBreak(ITEM_H)
-    if (pageNum !== segPage) { closeSeg(); segStart = y; segPage = pageNum }
-    doc.setDrawColor(200, 200, 200)
-    doc.line(ML, y + ITEM_H, MR, y + ITEM_H)
-    y += ITEM_H
-  }
-
-  closeSeg()
-
-  // Draw outer borders per segment
-  drawnSegments.forEach((seg) => {
-    const savedPage = doc.getCurrentPageInfo().pageNumber
-    doc.setPage(seg.page)
-    doc.setDrawColor(0, 0, 0)
-    doc.setLineWidth(0.4)
-    doc.rect(ML, seg.startY, CW, seg.endY - seg.startY)
+  // ── Outer border per page ──
+  const pages = [...new Set(placed.map((r) => r.pg))]
+  pages.forEach((pg) => {
+    doc.setPage(pg)
+    const rows = placed.filter((r) => r.pg === pg)
+    const top = rows[0].ry
+    const bottom = rows[rows.length - 1].ry + rows[rows.length - 1].rh
+    doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.4)
+    doc.rect(ML, top, CW, bottom - top)
     doc.setLineWidth(0.3)
-    doc.setPage(savedPage)
   })
 
+  doc.setPage(savedPg)
   y += 5
 
   // ─── SIGNATURES ───────────────────────────────────────────────────

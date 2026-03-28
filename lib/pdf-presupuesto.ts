@@ -180,88 +180,96 @@ export async function generarPDFPresupuesto(servicio: Servicio) {
   doc.text("VALOR", ML + DESC_W + MONTO_W / 2, y + 5, { align: "center" })
   y += 7
 
-  // ─── DRAW ROWS WITH MULTI-PAGE SUPPORT ────────────────────────────
-  const segments: { startY: number; endY: number; page: number }[] = []
-  let segStart = y; let segPage = pageNum
+  // ─── PRE-CALCULATE all row positions ──────────────────────────────
+  type PlacedRow = {
+    type: "category" | "item" | "blank"
+    label?: string
+    desc?: string
+    monto?: number
+    ry: number
+    rh: number
+    pg: number
+  }
+  const placed: PlacedRow[] = []
+  let cy = y; let cp = pageNum
 
-  function closeSeg() {
-    segments.push({ startY: segStart, endY: y, page: segPage })
+  function placeRow(type: PlacedRow["type"], rh: number, label?: string, desc?: string, monto?: number) {
+    if (cy + rh > PAGE_H - 15) {
+      doc.addPage(); cp++; cy = drawPageHeader(cp)
+      doc.setFillColor(220, 230, 255)
+      doc.rect(ML, cy, DESC_W, 7, "FD")
+      doc.rect(ML + DESC_W, cy, MONTO_W, 7, "FD")
+      doc.setDrawColor(0, 0, 0)
+      black(); bold(); doc.setFontSize(8)
+      doc.text("DESCRIPCION (cont.)", ML + 2, cy + 5)
+      doc.text("VALOR", ML + DESC_W + MONTO_W / 2, cy + 5, { align: "center" })
+      cy += 7
+    }
+    placed.push({ type, label, desc, monto, ry: cy, rh, pg: cp })
+    cy += rh
   }
 
   displayRows.forEach((row) => {
-    const rHeight = row.type === "category" ? CAT_H : ITEM_H
-    checkPageBreak(rHeight)
+    placeRow(row.type, row.type === "category" ? CAT_H : ITEM_H,
+      row.type === "category" ? row.label : undefined,
+      row.type === "item" ? row.desc : undefined,
+      row.type === "item" ? row.monto : undefined)
+  })
+  for (let i = 0; i < MIN_BLANK; i++) placeRow("blank", ITEM_H)
 
-    if (pageNum !== segPage) {
-      closeSeg(); segStart = y; segPage = pageNum
+  y = cy; pageNum = cp
 
-      // Repeat column headers on new page
-      doc.setFillColor(220, 230, 255)
-      doc.rect(ML, y, DESC_W, 7, "FD")
-      doc.rect(ML + DESC_W, y, MONTO_W, 7, "FD")
-      doc.setDrawColor(0, 0, 0)
-      black(); bold(); doc.setFontSize(8)
-      doc.text("DESCRIPCION", ML + 2, y + 5)
-      doc.text("VALOR", ML + DESC_W + MONTO_W / 2, y + 5, { align: "center" })
-      y += 7
-      segStart = y
-    }
-
-    const ry = y
-
-    // Background for category rows
-    if (row.type === "category") {
+  // ─── PASS 1: fills ────────────────────────────────────────────────
+  const savedPg = doc.getCurrentPageInfo().pageNumber
+  placed.forEach((r) => {
+    doc.setPage(r.pg)
+    if (r.type === "category") {
       doc.setFillColor(240, 240, 240)
-      doc.rect(ML, ry, CW, rHeight, "F")
-      // Redraw top border since fill covered previous row's separator
-      doc.setDrawColor(100, 100, 100)
-      doc.setLineWidth(0.4)
-      doc.line(ML, ry, MR, ry)
-      doc.setLineWidth(0.3)
+      doc.rect(ML, r.ry, CW, r.rh, "F")
     }
+  })
 
-    // Row separator
-    doc.setDrawColor(180, 180, 180)
-    doc.line(ML, ry + rHeight, MR, ry + rHeight)
+  // ─── PASS 2: lines ────────────────────────────────────────────────
+  placed.forEach((r) => {
+    doc.setPage(r.pg)
+    const isCat = r.type === "category"
+    doc.setDrawColor(isCat ? 80 : 200, isCat ? 80 : 200, isCat ? 80 : 200)
+    doc.setLineWidth(isCat ? 0.4 : 0.2)
+    doc.line(ML, r.ry, MR, r.ry)
+    doc.line(ML, r.ry + r.rh, MR, r.ry + r.rh)
+  })
 
-    // Text (drawn last)
+  // ─── PASS 3: text ─────────────────────────────────────────────────
+  placed.forEach((r) => {
+    if (r.type === "blank") return
+    doc.setPage(r.pg)
     black()
-    if (row.type === "category") {
+    if (r.type === "category") {
       bold(); doc.setFontSize(8)
-      doc.text(up(row.label) + ":", ML + 1.5, ry + rHeight - 2)
+      doc.text(up(r.label!) + ":", ML + 1.5, r.ry + r.rh - 2)
     } else {
       normal(); doc.setFontSize(8)
-      doc.text(up(row.desc).substring(0, 72), ML + 5, ry + rHeight - 1.5)
-      if (row.monto > 0) {
-        doc.text(fmt(row.monto), MR - 1, ry + rHeight - 1.5, { align: "right" })
+      doc.text(up(r.desc!).substring(0, 72), ML + 5, r.ry + r.rh - 1.5)
+      if ((r.monto || 0) > 0) {
+        doc.text(fmt(r.monto!), MR - 1, r.ry + r.rh - 1.5, { align: "right" })
       }
     }
-
-    y += rHeight
   })
 
-  // Blank rows
-  for (let i = 0; i < MIN_BLANK; i++) {
-    checkPageBreak(ITEM_H)
-    if (pageNum !== segPage) { closeSeg(); segStart = y; segPage = pageNum }
-    doc.setDrawColor(200, 200, 200)
-    doc.line(ML, y + ITEM_H, MR, y + ITEM_H)
-    y += ITEM_H
-  }
-
-  closeSeg()
-
-  // Draw outer borders + vertical divider per segment
-  segments.forEach((seg) => {
-    const cur = doc.getCurrentPageInfo().pageNumber
-    doc.setPage(seg.page)
+  // ─── Outer border + vertical divider per page ─────────────────────
+  const pages = [...new Set(placed.map((r) => r.pg))]
+  pages.forEach((pg) => {
+    doc.setPage(pg)
+    const rows = placed.filter((r) => r.pg === pg)
+    const top = rows[0].ry
+    const bottom = rows[rows.length - 1].ry + rows[rows.length - 1].rh
     doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.4)
-    doc.rect(ML, seg.startY, CW, seg.endY - seg.startY)
-    doc.line(ML + DESC_W, seg.startY, ML + DESC_W, seg.endY)
+    doc.rect(ML, top, CW, bottom - top)
+    doc.line(ML + DESC_W, top, ML + DESC_W, bottom)
     doc.setLineWidth(0.3)
-    doc.setPage(cur)
   })
 
+  doc.setPage(savedPg)
   y += 2
 
   // ─── TOTALS + SIGNATURES ──────────────────────────────────────────
