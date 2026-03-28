@@ -3,14 +3,15 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { api, type Servicio } from "@/lib/api-client"
-import { FileText, Trash2, Edit, DollarSign, Calendar, User, Car, Wrench } from "lucide-react"
+import { FileText, Trash2, Edit, Calendar, User, Car, Wrench, ClipboardList } from "lucide-react"
 import { generarPDFPresupuesto } from "@/lib/pdf-presupuesto"
+import { generarOrdenTrabajo } from "@/lib/pdf-orden-trabajo"
 
 interface ServicesTableProps {
   servicios: Servicio[]
@@ -260,6 +261,15 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                       onClick={() => onEditServicio(servicio)}
                     >
                       <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-11 w-11 bg-transparent border-border hover:bg-secondary"
+                      onClick={() => generarOrdenTrabajo(servicio)}
+                      title="Imprimir orden de trabajo"
+                    >
+                      <ClipboardList className="w-4 h-4" />
                     </Button>
                     <Button
                       variant="outline"
