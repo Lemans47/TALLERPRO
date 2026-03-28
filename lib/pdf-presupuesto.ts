@@ -301,16 +301,31 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   y += 2
 
   // ─── TOTALS + SIGNATURES ──────────────────────────────────────────
-  const TOTALS_H = 6 * 3 + 12 + 2 + 10 + 4 // totals + signature rows + notes
-  checkPageBreak(TOTALS_H)
-
   const trh = 6
+  const catRows = soloTotales ? categoryOrder.length : 0
+  const TOTALS_H = trh * catRows + 6 * 3 + 12 + 2 + 10 + 4
+  checkPageBreak(TOTALS_H)
   const subtotalVal = Number(servicio.monto_total_sin_iva) || 0
   const totalVal = Number(servicio.monto_total) || 0
   const ivaVal = totalVal - subtotalVal
   const labelX = ML + DESC_W
   const labelW = 28
   const valW = MONTO_W - labelW
+
+  // Category breakdown rows (solo totales mode only)
+  if (soloTotales) {
+    doc.setDrawColor(0, 0, 0)
+    categoryOrder.forEach((cat) => {
+      const catTotal = grouped[cat].reduce((acc, item) => acc + item.monto, 0)
+      doc.rect(ML, y, DESC_W, trh)
+      doc.rect(labelX, y, labelW, trh)
+      doc.rect(labelX + labelW, y, valW, trh)
+      bold(); doc.setFontSize(8)
+      doc.text(up(cat), ML + 2, y + 4)
+      normal(); doc.text(fmt(catTotal), labelX + labelW + 1, y + 4)
+      y += trh
+    })
+  }
 
   // Row 1 — FIRMA CLIENTE / SUB-TOTAL
   doc.setDrawColor(0, 0, 0)
