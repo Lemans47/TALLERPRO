@@ -191,14 +191,14 @@ export default function ClientesPage() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {cliente.telefono && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Phone className="w-3.5 h-3.5 shrink-0" />
+                    <div className="flex items-center gap-2 text-sm">
+                      <Phone className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
                       <span>{cliente.telefono}</span>
                     </div>
                   )}
                   {cliente.email && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Mail className="w-3.5 h-3.5 shrink-0" />
+                    <div className="flex items-center gap-2 text-sm">
+                      <Mail className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
                       <span className="truncate">{cliente.email}</span>
                     </div>
                   )}
@@ -209,7 +209,7 @@ export default function ClientesPage() {
                   {/* Vehículos */}
                   {vehs.length > 0 && (
                     <div className="pt-2 border-t border-border space-y-1.5">
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      <p className="text-xs font-medium uppercase tracking-wide">
                         Vehículos ({vehs.length})
                       </p>
                       {vehs.map((v) => (
@@ -218,7 +218,7 @@ export default function ClientesPage() {
                           <span className="font-mono font-semibold text-xs bg-muted px-1.5 py-0.5 rounded">
                             {v.patente}
                           </span>
-                          <span className="text-muted-foreground text-xs truncate">
+                          <span className="text-xs truncate">
                             {[v.marca, v.modelo, v.color].filter(Boolean).join(" ")}
                             {v.año ? ` (${v.año})` : ""}
                           </span>

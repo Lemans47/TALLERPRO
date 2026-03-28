@@ -340,7 +340,7 @@ export default function ConfiguracionPage() {
                       key={pieza.id}
                       className="flex items-center gap-3 p-3 bg-secondary/30 rounded-lg border border-border"
                     >
-                      <span className="flex-1 font-medium text-sm">{pieza.nombre}</span>
+                      <span className="flex-1 font-medium text-sm text-foreground">{pieza.nombre}</span>
                       <div className="flex items-center gap-2">
                         <Label className="text-xs text-muted-foreground">Cantidad:</Label>
                         <Input
