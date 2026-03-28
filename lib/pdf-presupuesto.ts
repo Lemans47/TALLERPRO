@@ -277,7 +277,8 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     } else {
       normal(); doc.setFontSize(8)
       doc.text(up(r.desc!).substring(0, 72), ML + 5, r.ry + r.rh - 1.5)
-      if ((r.monto || 0) > 0) {
+      // In detail mode prices are shown only on subtotal rows, not individual items
+      if ((r.monto || 0) > 0 && soloTotales) {
         doc.text(fmt(r.monto!), MR - 1, r.ry + r.rh - 1.5, { align: "right" })
       }
     }
