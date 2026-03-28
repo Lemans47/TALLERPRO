@@ -207,27 +207,24 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
     const ry = y
 
     if (row.type === "category") {
-      // 1. Fill
-      doc.setFillColor(235, 235, 235)
-      doc.rect(ML, ry, CW, rh, "F")
-      // 2. Strong top border to clearly separate from previous row
-      doc.setDrawColor(60, 60, 60); doc.setLineWidth(0.5)
+      // Thick dark separator — visually separates from previous row, no fill
+      doc.setDrawColor(30, 30, 30); doc.setLineWidth(0.8)
       doc.line(ML, ry, MR, ry)
       doc.setLineWidth(0.3)
-      // 3. Bottom border
-      doc.setDrawColor(150, 150, 150)
+      // Bottom separator
+      doc.setDrawColor(30, 30, 30)
       doc.line(ML, ry + rh, MR, ry + rh)
-      // 4. Text — centered in row
-      black(); bold(); doc.setFontSize(8.5)
-      doc.text(`[ ${up(row.label)} ]`, ML + 3, ry + rh * 0.65)
+      // Text
+      black(); bold(); doc.setFontSize(9)
+      doc.text(up(row.label), ML + 3, ry + rh - 3)
     } else {
-      // Bottom border only
-      doc.setDrawColor(200, 200, 200); doc.setLineWidth(0.2)
+      // Light bottom separator
+      doc.setDrawColor(180, 180, 180); doc.setLineWidth(0.2)
       doc.line(ML, ry + rh, MR, ry + rh)
       doc.setLineWidth(0.3)
-      // Text — centered in row
+      // Text
       black(); normal(); doc.setFontSize(8)
-      doc.text(up(row.desc).substring(0, 90), ML + 6, ry + rh * 0.65)
+      doc.text(up(row.desc).substring(0, 90), ML + 6, ry + rh - 3)
     }
 
     y += rh
