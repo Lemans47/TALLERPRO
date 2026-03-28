@@ -24,7 +24,7 @@ const MONTO_W = 48
 const DESC_W = CW - MONTO_W
 const PAGE_H = 297
 
-export async function generarPDFPresupuesto(servicio: Servicio) {
+export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = false) {
   const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" })
 
   const logoBase64 = await loadImageAsBase64("/car-logo.png")
@@ -161,8 +161,14 @@ export async function generarPDFPresupuesto(servicio: Servicio) {
 
   const displayRows: DisplayRow[] = []
   categoryOrder.forEach((cat) => {
-    displayRows.push({ type: "category", label: cat })
-    grouped[cat].forEach((item) => displayRows.push({ type: "item", desc: item.descripcion, monto: item.monto }))
+    if (soloTotales) {
+      // One row per category: name + sum of all items
+      const total = grouped[cat].reduce((acc, item) => acc + item.monto, 0)
+      displayRows.push({ type: "item", desc: cat, monto: total })
+    } else {
+      displayRows.push({ type: "category", label: cat })
+      grouped[cat].forEach((item) => displayRows.push({ type: "item", desc: item.descripcion, monto: item.monto }))
+    }
   })
 
   const CAT_H = 7

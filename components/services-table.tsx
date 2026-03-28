@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { api, type Servicio } from "@/lib/api-client"
-import { FileText, Trash2, Edit, Calendar, User, Car, Wrench, ClipboardList } from "lucide-react"
+import { FileText, Trash2, Edit, Calendar, User, Car, Wrench, ClipboardList, List, AlignJustify } from "lucide-react"
 import { generarPDFPresupuesto } from "@/lib/pdf-presupuesto"
 import { generarOrdenTrabajo } from "@/lib/pdf-orden-trabajo"
 
@@ -38,6 +38,8 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
   const [montoPago, setMontoPago] = useState("")
   const [dialogOpen, setDialogOpen] = useState(false)
   const [servicioSeleccionado, setServicioSeleccionado] = useState<Servicio | null>(null)
+  const [pdfDialogOpen, setPdfDialogOpen] = useState(false)
+  const [servicioParaPdf, setServicioParaPdf] = useState<Servicio | null>(null)
 
   const handleEstadoChange = async (id: string, nuevoEstado: string) => {
     try {
@@ -120,6 +122,34 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
 
   return (
     <>
+      {/* PDF format picker dialog */}
+      <Dialog open={pdfDialogOpen} onOpenChange={setPdfDialogOpen}>
+        <DialogContent className="bg-card border-border max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Generar Presupuesto PDF</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">Elige el formato del presupuesto:</p>
+          <div className="grid grid-cols-2 gap-3 pt-1">
+            <button
+              className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-colors text-left"
+              onClick={() => { generarPDFPresupuesto(servicioParaPdf!, false); setPdfDialogOpen(false) }}
+            >
+              <AlignJustify className="w-6 h-6 text-primary" />
+              <span className="font-semibold text-sm">Con detalle</span>
+              <span className="text-xs text-muted-foreground text-center">Cada item por separado con su valor</span>
+            </button>
+            <button
+              className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-colors text-left"
+              onClick={() => { generarPDFPresupuesto(servicioParaPdf!, true); setPdfDialogOpen(false) }}
+            >
+              <List className="w-6 h-6 text-primary" />
+              <span className="font-semibold text-sm">Solo totales</span>
+              <span className="text-xs text-muted-foreground text-center">Un total por categoría, sin detalles</span>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="bg-card border-border">
           <DialogHeader>
@@ -281,7 +311,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                       variant="outline"
                       size="icon"
                       className="h-9 w-9 bg-transparent border-border hover:bg-secondary"
-                      onClick={() => generarPDFPresupuesto(servicio)}
+                      onClick={() => { setServicioParaPdf(servicio); setPdfDialogOpen(true) }}
                       title="PDF presupuesto"
                     >
                       <FileText className="w-3.5 h-3.5" />
