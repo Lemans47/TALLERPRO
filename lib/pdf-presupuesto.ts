@@ -272,7 +272,6 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
       doc.text(up(r.label!) + ":", ML + 1.5, r.ry + r.rh - 2)
     } else if (r.type === "subtotal") {
       bold(); doc.setFontSize(8)
-      doc.text("TOTAL " + up(r.label!), ML + 5, r.ry + r.rh - 1.5)
       doc.text(fmt(r.monto!), MR - 1, r.ry + r.rh - 1.5, { align: "right" })
     } else {
       normal(); doc.setFontSize(8)
