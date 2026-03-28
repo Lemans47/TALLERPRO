@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState } from "react"
+import { createContext, useContext, useEffect, useRef, useState } from "react"
 import { createClient } from "@/lib/supabase"
 import type { User } from "@supabase/supabase-js"
 
@@ -24,19 +24,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [role, setRole] = useState<Role>(null)
   const [loading, setLoading] = useState(true)
+  // Track which userId already has its role loaded to avoid wiping it on token refresh
+  const roleLoadedForRef = useRef<string | null>(null)
 
   const supabase = createClient()
 
   const fetchRole = async (userId: string): Promise<Role> => {
-    try {
-      const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000))
-      const query = supabase.from("user_roles").select("role").eq("user_id", userId).single()
-      const result = await Promise.race([query, timeout])
-      if (!result) return null
-      return ((result as any).data?.role as Role) || null
-    } catch {
-      return null
+    // Retry up to 3 times before giving up
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000))
+        const query = supabase.from("user_roles").select("role").eq("user_id", userId).single()
+        const result = await Promise.race([query, timeout])
+        if (!result) continue
+        const r = ((result as any).data?.role as Role) || null
+        if (r) return r
+      } catch {
+        // retry
+      }
     }
+    return null
   }
 
   useEffect(() => {
@@ -45,7 +52,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data: { session } } = await supabase.auth.getSession()
         if (session?.user) {
           setUser(session.user)
-          setRole(await fetchRole(session.user.id))
+          const r = await fetchRole(session.user.id)
+          if (r) {
+            roleLoadedForRef.current = session.user.id
+            setRole(r)
+          }
         }
       } catch (e) {
         console.error("Auth init error:", e)
@@ -59,10 +70,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
         setUser(session.user)
-        setRole(await fetchRole(session.user.id))
+        // Don't re-fetch role on token refresh if we already have it for this user
+        if (roleLoadedForRef.current !== session.user.id) {
+          const r = await fetchRole(session.user.id)
+          if (r) {
+            roleLoadedForRef.current = session.user.id
+            setRole(r)
+          }
+        }
       } else {
         setUser(null)
         setRole(null)
+        roleLoadedForRef.current = null
       }
     })
 
