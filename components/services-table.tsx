@@ -199,6 +199,11 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                     <span className="text-sm text-muted-foreground">
                       {servicio.marca} {servicio.modelo}
                     </span>
+                    {servicio.numero_ot && (
+                      <span className="text-xs font-mono text-muted-foreground border border-border rounded px-1.5 py-0.5">
+                        OT-{String(servicio.numero_ot).padStart(4, "0")}
+                      </span>
+                    )}
                   </div>
 
                   <div className="flex flex-wrap items-center gap-4 text-sm">
