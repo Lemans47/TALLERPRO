@@ -166,8 +166,9 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   categoryOrder.forEach((cat) => {
     const total = grouped[cat].reduce((acc, item) => acc + item.monto, 0)
     if (soloTotales) {
-      // One row per category: name + sum
-      displayRows.push({ type: "item", desc: cat, monto: total })
+      // Category + items, no prices
+      displayRows.push({ type: "category", label: cat })
+      grouped[cat].forEach((item) => displayRows.push({ type: "item", desc: item.descripcion, monto: 0 }))
     } else {
       displayRows.push({ type: "category", label: cat })
       grouped[cat].forEach((item) => displayRows.push({ type: "item", desc: item.descripcion, monto: item.monto }))
