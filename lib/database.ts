@@ -48,6 +48,7 @@ export interface Servicio {
   observaciones_checkboxes: string[]
   fotos_ingreso: FotoServicio[]
   fotos_entrega: FotoServicio[]
+  numero_ot?: number
   created_at: string
   updated_at: string
 }
