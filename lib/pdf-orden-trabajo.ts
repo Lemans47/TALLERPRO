@@ -214,6 +214,11 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
     if (row.type === "category") {
       doc.setFillColor(240, 240, 240)
       doc.rect(ML, ry, CW, rHeight, "F")
+      // Redraw top border since fill covered previous row's separator
+      doc.setDrawColor(100, 100, 100)
+      doc.setLineWidth(0.4)
+      doc.line(ML, ry, MR, ry)
+      doc.setLineWidth(0.3)
     }
 
     // Separator line at bottom of row
@@ -255,45 +260,7 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
     doc.setPage(savedPage)
   })
 
-  y += 3
-
-  // ─── CONDITION CHECKBOXES ─────────────────────────────────────────
-  const allConditions = [
-    "Parabrisas roto", "Antena", "Tapiz rasgado", "Espejo retrovisor",
-    "Calefaccion", "Radio", "Encendedor", "Alfombras",
-    "Rueda de repuesto", "Herramientas", "Extintor", "Gato",
-  ]
-  const checkboxes = servicio.observaciones_checkboxes || []
-  const condCols = 3
-  const condW = CW / condCols
-  const condH = 5
-  const condRows = Math.ceil(allConditions.length / condCols)
-
-  checkPageBreak(8 + condRows * condH)
-  black(); bold(); doc.setFontSize(7.5)
-  doc.text("CONDICION DEL VEHICULO AL INGRESO:", ML, y + 4)
-  y += 7
-
-  allConditions.forEach((cond, i) => {
-    const col = i % condCols
-    const row = Math.floor(i / condCols)
-    const cx = ML + col * condW
-    const crY = y + row * condH
-    const checked = checkboxes.includes(cond)
-
-    doc.setLineWidth(0.2); doc.setDrawColor(80, 80, 80)
-    doc.rect(cx + 1, crY + 0.5, 3.5, 3.5)
-    if (checked) {
-      bold(); doc.setTextColor(200, 50, 50); doc.setFontSize(8)
-      doc.text("X", cx + 1.5, crY + 3.5)
-      black()
-    }
-    normal(); doc.setFontSize(7)
-    doc.setTextColor(checked ? 200 : 60, checked ? 50 : 60, checked ? 50 : 60)
-    doc.text(cond, cx + 6, crY + 3.5)
-    black()
-  })
-  y += condRows * condH + 4
+  y += 5
 
   // ─── SIGNATURES ───────────────────────────────────────────────────
   checkPageBreak(20)

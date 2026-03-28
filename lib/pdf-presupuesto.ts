@@ -213,6 +213,11 @@ export async function generarPDFPresupuesto(servicio: Servicio) {
     if (row.type === "category") {
       doc.setFillColor(240, 240, 240)
       doc.rect(ML, ry, CW, rHeight, "F")
+      // Redraw top border since fill covered previous row's separator
+      doc.setDrawColor(100, 100, 100)
+      doc.setLineWidth(0.4)
+      doc.line(ML, ry, MR, ry)
+      doc.setLineWidth(0.3)
     }
 
     // Row separator
