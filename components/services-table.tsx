@@ -239,9 +239,9 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                 </div>
 
                 {/* Actions */}
-                <div className="flex flex-row sm:flex-col gap-2 sm:w-[150px]">
+                <div className="flex flex-row sm:flex-col gap-2 sm:w-[160px]">
                   <Select value={servicio.estado} onValueChange={(v) => handleEstadoChange(servicio.id, v)}>
-                    <SelectTrigger className="h-11 text-xs bg-secondary/50 border-border w-full">
+                    <SelectTrigger className="h-9 text-xs bg-secondary/50 border-border w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-card border-border">
@@ -253,40 +253,42 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                     </SelectContent>
                   </Select>
 
-                  <div className="flex gap-1.5">
+                  <div className="flex gap-1">
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-11 w-11 bg-transparent border-border hover:bg-secondary"
+                      className="h-9 w-9 bg-transparent border-border hover:bg-secondary"
                       onClick={() => onEditServicio(servicio)}
+                      title="Editar"
                     >
-                      <Edit className="w-4 h-4" />
+                      <Edit className="w-3.5 h-3.5" />
                     </Button>
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-11 w-11 bg-transparent border-border hover:bg-secondary"
+                      className="h-9 w-9 bg-transparent border-border hover:bg-secondary"
                       onClick={() => generarOrdenTrabajo(servicio)}
-                      title="Imprimir orden de trabajo"
+                      title="Orden de trabajo"
                     >
-                      <ClipboardList className="w-4 h-4" />
+                      <ClipboardList className="w-3.5 h-3.5" />
                     </Button>
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-11 w-11 bg-transparent border-border hover:bg-secondary"
+                      className="h-9 w-9 bg-transparent border-border hover:bg-secondary"
                       onClick={() => generarPDFPresupuesto(servicio)}
-                      title="Generar PDF presupuesto"
+                      title="PDF presupuesto"
                     >
-                      <FileText className="w-4 h-4" />
+                      <FileText className="w-3.5 h-3.5" />
                     </Button>
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-11 w-11 border-destructive/30 text-destructive bg-destructive/5 hover:bg-destructive/10"
+                      className="h-9 w-9 border-destructive/30 text-destructive bg-destructive/5 hover:bg-destructive/10"
                       onClick={() => handleDelete(servicio)}
+                      title="Eliminar"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                   </div>
                 </div>
