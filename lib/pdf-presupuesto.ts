@@ -142,7 +142,10 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   y += vehicleH + 1
 
   // ─── BUILD DISPLAY ROWS ───────────────────────────────────────────
-  type DisplayRow = { type: "category"; label: string } | { type: "item"; desc: string; monto: number }
+  type DisplayRow =
+    | { type: "category"; label: string }
+    | { type: "item"; desc: string; monto: number }
+    | { type: "subtotal"; label: string; monto: number }
 
   const cobros = servicio.cobros || []
   const piezas = servicio.piezas_pintura || []
@@ -161,13 +164,17 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
 
   const displayRows: DisplayRow[] = []
   categoryOrder.forEach((cat) => {
+    const total = grouped[cat].reduce((acc, item) => acc + item.monto, 0)
     if (soloTotales) {
-      // One row per category: name + sum of all items
-      const total = grouped[cat].reduce((acc, item) => acc + item.monto, 0)
+      // One row per category: name + sum
       displayRows.push({ type: "item", desc: cat, monto: total })
     } else {
       displayRows.push({ type: "category", label: cat })
       grouped[cat].forEach((item) => displayRows.push({ type: "item", desc: item.descripcion, monto: item.monto }))
+      // Subtotal row after items (only if category has more than 1 item or has a total)
+      if (total > 0) {
+        displayRows.push({ type: "subtotal", label: cat, monto: total })
+      }
     }
   })
 
@@ -187,8 +194,9 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   y += 7
 
   // ─── PRE-CALCULATE all row positions ──────────────────────────────
+  const SUBTOTAL_H = 6
   type PlacedRow = {
-    type: "category" | "item" | "blank"
+    type: "category" | "item" | "subtotal" | "blank"
     label?: string
     desc?: string
     monto?: number
@@ -216,10 +224,13 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   }
 
   displayRows.forEach((row) => {
-    placeRow(row.type, row.type === "category" ? CAT_H : ITEM_H,
-      row.type === "category" ? row.label : undefined,
-      row.type === "item" ? row.desc : undefined,
-      row.type === "item" ? row.monto : undefined)
+    if (row.type === "category") {
+      placeRow("category", CAT_H, row.label)
+    } else if (row.type === "subtotal") {
+      placeRow("subtotal", SUBTOTAL_H, row.label, undefined, row.monto)
+    } else {
+      placeRow("item", ITEM_H, undefined, row.desc, row.monto)
+    }
   })
   for (let i = 0; i < MIN_BLANK; i++) placeRow("blank", ITEM_H)
 
@@ -232,6 +243,9 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     if (r.type === "category") {
       doc.setFillColor(240, 240, 240)
       doc.rect(ML, r.ry, CW, r.rh, "F")
+    } else if (r.type === "subtotal") {
+      doc.setFillColor(230, 236, 255)
+      doc.rect(ML, r.ry, CW, r.rh, "F")
     }
   })
 
@@ -239,8 +253,11 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   placed.forEach((r) => {
     doc.setPage(r.pg)
     const isCat = r.type === "category"
-    doc.setDrawColor(isCat ? 80 : 200, isCat ? 80 : 200, isCat ? 80 : 200)
-    doc.setLineWidth(isCat ? 0.4 : 0.2)
+    const isSubtotal = r.type === "subtotal"
+    const lw = isCat || isSubtotal ? 0.4 : 0.2
+    const col = isCat || isSubtotal ? 80 : 200
+    doc.setDrawColor(col, col, col)
+    doc.setLineWidth(lw)
     doc.line(ML, r.ry, MR, r.ry)
     doc.line(ML, r.ry + r.rh, MR, r.ry + r.rh)
   })
@@ -253,6 +270,10 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     if (r.type === "category") {
       bold(); doc.setFontSize(8)
       doc.text(up(r.label!) + ":", ML + 1.5, r.ry + r.rh - 2)
+    } else if (r.type === "subtotal") {
+      bold(); doc.setFontSize(8)
+      doc.text("TOTAL " + up(r.label!), ML + 5, r.ry + r.rh - 1.5)
+      doc.text(fmt(r.monto!), MR - 1, r.ry + r.rh - 1.5, { align: "right" })
     } else {
       normal(); doc.setFontSize(8)
       doc.text(up(r.desc!).substring(0, 72), ML + 5, r.ry + r.rh - 1.5)
