@@ -32,31 +32,31 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     doc.setFillColor(235, 235, 235)
     doc.roundedRect(lx, ly, lw, lh, 2, 2, "F")
 
-    // Orange left/right border strips
-    doc.setFillColor(200, 0, 0)
+    // Black left/right border strips
+    doc.setFillColor(20, 20, 20)
     doc.roundedRect(lx, ly, 1.2, lh, 1, 1, "F")
     doc.roundedRect(lx + lw - 1.2, ly, 1.2, lh, 1, 1, "F")
 
     // ── Circular emblem ──
     const ro = 11.5, rm = 9.5, ri = 8.0
 
-    // Outer dark ring
-    doc.setFillColor(60, 60, 60)
-    doc.circle(cx, cy, ro, "F")
-    // Orange outer ring stroke
-    doc.setDrawColor(200, 0, 0); doc.setLineWidth(1.8)
-    doc.circle(cx, cy, ro, "S")
-    // Mid dark ring
-    doc.setFillColor(50, 50, 50)
-    doc.circle(cx, cy, rm, "F")
-    // Orange fill center
-    doc.setFillColor(180, 0, 0)
-    doc.circle(cx, cy, ri, "F")
-    // Lighter orange top half highlight
-    doc.setFillColor(220, 30, 30)
-    doc.circle(cx, cy - 1.5, ri * 0.65, "F")
-    // Re-blend center with mid orange
+    // Outer ring — now RED
     doc.setFillColor(200, 0, 0)
+    doc.circle(cx, cy, ro, "F")
+    // Black outer ring stroke
+    doc.setDrawColor(20, 20, 20); doc.setLineWidth(1.8)
+    doc.circle(cx, cy, ro, "S")
+    // Mid ring — darker red
+    doc.setFillColor(160, 0, 0)
+    doc.circle(cx, cy, rm, "F")
+    // Center fill — black
+    doc.setFillColor(20, 20, 20)
+    doc.circle(cx, cy, ri, "F")
+    // Highlight — dark gray
+    doc.setFillColor(40, 40, 40)
+    doc.circle(cx, cy - 1.5, ri * 0.65, "F")
+    // Re-blend — black
+    doc.setFillColor(20, 20, 20)
     doc.circle(cx, cy, ri * 0.5, "F")
 
     // RS text in emblem
@@ -65,18 +65,18 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     doc.setFontSize(11)
     doc.text("RS", cx, cy + 3.8, { align: "center" })
 
-    // ── Center: AUTOMOTORA RS branding — centered between emblem and contact ──
-    const contactW = 60  // width reserved for contact block on right
+    // ── Center: AUTOMOTORA RS branding ──
+    const contactW = 60
     const emblemRight = cx + ro + 4
     const contactLeft = lx + lw - contactW
     const tcx = (emblemRight + contactLeft) / 2
 
-    doc.setTextColor(200, 0, 0)
+    doc.setTextColor(20, 20, 20)
     doc.setFont("helvetica", "normal")
     doc.setFontSize(7)
     doc.text("A U T O M O T O R A", tcx, ly + 8, { align: "center" })
 
-    doc.setTextColor(200, 0, 0)
+    doc.setTextColor(20, 20, 20)
     doc.setFont("helvetica", "bold")
     doc.setFontSize(22)
     doc.text("RS", tcx, ly + 21, { align: "center" })
@@ -100,7 +100,7 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     doc.setFontSize(6.5)
     doc.text("FRANKLIN 605", rx, ly + 17, { align: "right" })
     doc.text("FONO +569 91390267", rx, ly + 23, { align: "right" })
-    doc.setTextColor(180, 0, 0)
+    doc.setTextColor(20, 20, 20)
     doc.setFontSize(6)
     doc.text("RUT 76.858.081-2", rx, ly + 30, { align: "right" })
 
