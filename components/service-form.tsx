@@ -402,12 +402,15 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
           const piezasData = servicioAEditar.piezas_pintura || []
           
           if (Array.isArray(piezas) && piezas.length > 0) {
-            const piezasConPrecio = piezas.map((p) => ({
-              nombre: p.nombre,
-              precio: precioGlobal,
-              cantidad_piezas: Number(p.cantidad_piezas) || 1,
-              seleccionada: piezasData.some((pd: { nombre: string }) => pd.nombre === p.nombre),
-            }))
+            const piezasConPrecio = piezas.map((p) => {
+              const saved = piezasData.find((pd: { nombre: string; cantidad: number }) => pd.nombre === p.nombre)
+              return {
+                nombre: p.nombre,
+                precio: precioGlobal,
+                cantidad_piezas: saved ? Number(saved.cantidad) || 1 : Number(p.cantidad_piezas) || 1,
+                seleccionada: !!saved,
+              }
+            })
             setPiezasSeleccionadas(piezasConPrecio)
           }
         } catch (error) {
