@@ -22,21 +22,21 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
 
     doc.setFillColor(235, 235, 235)
     doc.roundedRect(lx, ly, lw, lh, 2, 2, "F")
-    doc.setFillColor(255, 140, 0)
+    doc.setFillColor(200, 0, 0)
     doc.roundedRect(lx, ly, 1.2, lh, 1, 1, "F")
     doc.roundedRect(lx + lw - 1.2, ly, 1.2, lh, 1, 1, "F")
 
     doc.setFillColor(60, 60, 60)
     doc.circle(cx, cy, ro, "F")
-    doc.setDrawColor(255, 140, 0); doc.setLineWidth(1.8)
+    doc.setDrawColor(200, 0, 0); doc.setLineWidth(1.8)
     doc.circle(cx, cy, ro, "S")
     doc.setFillColor(50, 50, 50)
     doc.circle(cx, cy, rm, "F")
-    doc.setFillColor(230, 92, 0)
+    doc.setFillColor(180, 0, 0)
     doc.circle(cx, cy, ri, "F")
-    doc.setFillColor(255, 150, 20)
+    doc.setFillColor(220, 30, 30)
     doc.circle(cx, cy - 1.5, ri * 0.65, "F")
-    doc.setFillColor(255, 130, 0)
+    doc.setFillColor(200, 0, 0)
     doc.circle(cx, cy, ri * 0.5, "F")
     doc.setTextColor(255, 255, 255)
     doc.setFont("helvetica", "bold"); doc.setFontSize(11)
@@ -47,7 +47,7 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
     const contactLeft = lx + lw - contactW
     const tcx = (emblemRight + contactLeft) / 2
 
-    doc.setTextColor(255, 140, 0)
+    doc.setTextColor(200, 0, 0)
     doc.setFont("helvetica", "normal"); doc.setFontSize(7)
     doc.text("A U T O M O T O R A", tcx, ly + 8, { align: "center" })
     doc.setFont("helvetica", "bold"); doc.setFontSize(22)
@@ -65,7 +65,7 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
     doc.setFont("helvetica", "normal"); doc.setFontSize(6.5)
     doc.text("FRANKLIN 605", rx, ly + 17, { align: "right" })
     doc.text("FONO +569 91390267", rx, ly + 23, { align: "right" })
-    doc.setTextColor(200, 120, 0); doc.setFontSize(6)
+    doc.setTextColor(180, 0, 0); doc.setFontSize(6)
     doc.text("RUT 76.858.081-2", rx, ly + 30, { align: "right" })
 
     doc.setDrawColor(0, 0, 0); doc.setTextColor(0, 0, 0); doc.setLineWidth(0.3)

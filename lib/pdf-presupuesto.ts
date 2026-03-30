@@ -33,7 +33,7 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     doc.roundedRect(lx, ly, lw, lh, 2, 2, "F")
 
     // Orange left/right border strips
-    doc.setFillColor(255, 140, 0)
+    doc.setFillColor(200, 0, 0)
     doc.roundedRect(lx, ly, 1.2, lh, 1, 1, "F")
     doc.roundedRect(lx + lw - 1.2, ly, 1.2, lh, 1, 1, "F")
 
@@ -44,19 +44,19 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     doc.setFillColor(60, 60, 60)
     doc.circle(cx, cy, ro, "F")
     // Orange outer ring stroke
-    doc.setDrawColor(255, 140, 0); doc.setLineWidth(1.8)
+    doc.setDrawColor(200, 0, 0); doc.setLineWidth(1.8)
     doc.circle(cx, cy, ro, "S")
     // Mid dark ring
     doc.setFillColor(50, 50, 50)
     doc.circle(cx, cy, rm, "F")
     // Orange fill center
-    doc.setFillColor(230, 92, 0)
+    doc.setFillColor(180, 0, 0)
     doc.circle(cx, cy, ri, "F")
     // Lighter orange top half highlight
-    doc.setFillColor(255, 150, 20)
+    doc.setFillColor(220, 30, 30)
     doc.circle(cx, cy - 1.5, ri * 0.65, "F")
     // Re-blend center with mid orange
-    doc.setFillColor(255, 130, 0)
+    doc.setFillColor(200, 0, 0)
     doc.circle(cx, cy, ri * 0.5, "F")
 
     // RS text in emblem
@@ -71,12 +71,12 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     const contactLeft = lx + lw - contactW
     const tcx = (emblemRight + contactLeft) / 2
 
-    doc.setTextColor(255, 140, 0)
+    doc.setTextColor(200, 0, 0)
     doc.setFont("helvetica", "normal")
     doc.setFontSize(7)
     doc.text("A U T O M O T O R A", tcx, ly + 8, { align: "center" })
 
-    doc.setTextColor(255, 140, 0)
+    doc.setTextColor(200, 0, 0)
     doc.setFont("helvetica", "bold")
     doc.setFontSize(22)
     doc.text("RS", tcx, ly + 21, { align: "center" })
@@ -100,7 +100,7 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     doc.setFontSize(6.5)
     doc.text("FRANKLIN 605", rx, ly + 17, { align: "right" })
     doc.text("FONO +569 91390267", rx, ly + 23, { align: "right" })
-    doc.setTextColor(200, 120, 0)
+    doc.setTextColor(180, 0, 0)
     doc.setFontSize(6)
     doc.text("RUT 76.858.081-2", rx, ly + 30, { align: "right" })
 
