@@ -1,50 +1,6 @@
 import jsPDF from "jspdf"
 import type { Servicio } from "@/lib/database"
 
-async function loadImageAsBase64(url: string): Promise<string | null> {
-  try {
-    const res = await fetch(url)
-    if (!res.ok) return null
-
-    // SVG → render on canvas → PNG base64
-    if (url.endsWith(".svg")) {
-      const svgText = await res.text()
-      // Parse explicit dimensions from SVG attributes
-      const wMatch = svgText.match(/\bwidth="(\d+)"/)
-      const hMatch = svgText.match(/\bheight="(\d+)"/)
-      const svgW = wMatch ? parseInt(wMatch[1]) : 560
-      const svgH = hMatch ? parseInt(hMatch[1]) : 220
-      // Use data URI (avoids blob URL cross-origin issues with SVG filters)
-      const dataUri = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgText)
-      return new Promise((resolve) => {
-        const img = new Image()
-        img.onload = () => {
-          const canvas = document.createElement("canvas")
-          const scale = 2 // higher resolution for better PDF quality
-          canvas.width = svgW * scale
-          canvas.height = svgH * scale
-          const ctx = canvas.getContext("2d")!
-          ctx.scale(scale, scale)
-          ctx.drawImage(img, 0, 0, svgW, svgH)
-          resolve(canvas.toDataURL("image/png"))
-        }
-        img.onerror = () => resolve(null)
-        img.src = dataUri
-      })
-    }
-
-    const blob = await res.blob()
-    return new Promise((resolve) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(reader.result as string)
-      reader.onerror = () => resolve(null)
-      reader.readAsDataURL(blob)
-    })
-  } catch {
-    return null
-  }
-}
-
 const ML = 10
 const MR = 200
 const CW = MR - ML
@@ -54,8 +10,6 @@ const PAGE_H = 297
 
 export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = false) {
   const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" })
-
-  const logoBase64 = await loadImageAsBase64("/logo-taller.svg")
 
   const bold = () => doc.setFont("helvetica", "bold")
   const normal = () => doc.setFont("helvetica", "normal")
@@ -69,18 +23,83 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     return (!yr || !m || !d) ? raw : `${d}-${m}-${yr}`
   })()
 
+  // ─── DRAW LOGO (jsPDF primitives, no image needed) ────────────────
+  function drawLogo() {
+    const lx = ML, ly = 8, lw = 52, lh = 30
+    const cx = lx + 15, cy = ly + lh / 2
+
+    // Dark background
+    doc.setFillColor(17, 17, 17)
+    doc.roundedRect(lx, ly, lw, lh, 2, 2, "F")
+
+    // Orange left/right border strips
+    doc.setFillColor(255, 140, 0)
+    doc.roundedRect(lx, ly, 1.2, lh, 1, 1, "F")
+    doc.roundedRect(lx + lw - 1.2, ly, 1.2, lh, 1, 1, "F")
+
+    // ── Circular emblem ──
+    const ro = 11.5, rm = 9.5, ri = 8.0
+
+    // Outer dark ring
+    doc.setFillColor(26, 26, 26)
+    doc.circle(cx, cy, ro, "F")
+    // Orange outer ring stroke (arc segments top + bottom)
+    doc.setDrawColor(255, 140, 0); doc.setLineWidth(1.8)
+    doc.circle(cx, cy, ro, "S")
+    // Mid dark ring
+    doc.setFillColor(20, 20, 20)
+    doc.circle(cx, cy, rm, "F")
+    // Orange fill center
+    doc.setFillColor(230, 92, 0)
+    doc.circle(cx, cy, ri, "F")
+    // Lighter orange top half highlight
+    doc.setFillColor(255, 150, 20)
+    doc.circle(cx, cy - 1.5, ri * 0.65, "F")
+    // Re-blend center with mid orange
+    doc.setFillColor(255, 130, 0)
+    doc.circle(cx, cy, ri * 0.5, "F")
+
+    // RS text in emblem
+    doc.setTextColor(255, 255, 255)
+    doc.setFont("helvetica", "bold")
+    doc.setFontSize(11)
+    doc.text("RS", cx, cy + 3.8, { align: "center" })
+
+    // ── Right text ──
+    const tx = cx + ro + 3.5
+
+    // AUTOMOTORA (orange, spaced)
+    doc.setTextColor(255, 140, 0)
+    doc.setFont("helvetica", "normal")
+    doc.setFontSize(4.2)
+    doc.text("A U T O M O T O R A", tx, ly + 8)
+
+    // RS large white
+    doc.setTextColor(255, 255, 255)
+    doc.setFont("helvetica", "bold")
+    doc.setFontSize(15)
+    doc.text("RS", tx, ly + 21)
+
+    // DESABOLLADURA & PINTURA
+    doc.setTextColor(120, 120, 120)
+    doc.setFont("helvetica", "normal")
+    doc.setFontSize(3.2)
+    doc.text("DESABOLLADURA & PINTURA", tx, ly + 25.5)
+
+    // CALIDAD · PRECISION · CONFIANZA
+    doc.setTextColor(75, 75, 75)
+    doc.setFontSize(2.8)
+    doc.text("CALIDAD  \u00B7  PRECISION  \u00B7  CONFIANZA", tx, ly + 29)
+
+    // Reset colors
+    doc.setDrawColor(0, 0, 0)
+    doc.setTextColor(0, 0, 0)
+    doc.setLineWidth(0.3)
+  }
+
   // ─── DRAW PAGE HEADER ─────────────────────────────────────────────
   function drawPageHeader(pageNum: number): number {
-    if (logoBase64) {
-      doc.addImage(logoBase64, "PNG", ML, 10, 45, 28)
-    } else {
-      doc.setDrawColor(180, 180, 180)
-      doc.setFillColor(240, 240, 240)
-      doc.roundedRect(ML, 10, 45, 28, 2, 2, "FD")
-      doc.setFontSize(7); doc.setTextColor(150, 150, 150)
-      doc.text("Automotora RS", ML + 8, 26)
-      doc.setDrawColor(0, 0, 0)
-    }
+    drawLogo()
 
     black(); bold(); doc.setFontSize(7)
     doc.text("AUTOMOTORA - SERVICIO INTEGRAL", ML, 43)
