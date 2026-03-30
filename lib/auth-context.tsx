@@ -30,10 +30,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
 
   const fetchRole = async (userId: string): Promise<Role> => {
-    // Retry up to 3 times before giving up
-    for (let attempt = 0; attempt < 3; attempt++) {
+    // Retry up to 2 times with a short timeout
+    for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000))
+        const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000))
         const query = supabase.from("user_roles").select("role").eq("user_id", userId).single()
         const result = await Promise.race([query, timeout])
         if (!result) continue
@@ -46,21 +46,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return null
   }
 
+  const loadRoleInBackground = (userId: string) => {
+    fetchRole(userId).then((r) => {
+      if (r) {
+        roleLoadedForRef.current = userId
+        setRole(r)
+      }
+    })
+  }
+
   useEffect(() => {
     const initAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
         if (session?.user) {
           setUser(session.user)
-          const r = await fetchRole(session.user.id)
-          if (r) {
-            roleLoadedForRef.current = session.user.id
-            setRole(r)
-          }
+          // Don't block loading on role fetch — load role in background
+          loadRoleInBackground(session.user.id)
         }
       } catch (e) {
         console.error("Auth init error:", e)
       } finally {
+        // Release loading immediately after session check, not after role fetch
         setLoading(false)
       }
     }
@@ -70,13 +77,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
         setUser(session.user)
-        // Don't re-fetch role on token refresh if we already have it for this user
         if (roleLoadedForRef.current !== session.user.id) {
-          const r = await fetchRole(session.user.id)
-          if (r) {
-            roleLoadedForRef.current = session.user.id
-            setRole(r)
-          }
+          loadRoleInBackground(session.user.id)
         }
       } else {
         setUser(null)
