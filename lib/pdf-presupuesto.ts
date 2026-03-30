@@ -13,7 +13,7 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
 
   const bold = () => doc.setFont("helvetica", "bold")
   const normal = () => doc.setFont("helvetica", "normal")
-  const black = () => doc.setTextColor(0, 0, 0)
+  const black = () => doc.setTextColor(70, 70, 70)
   const up = (s: string) => (s || "").toUpperCase()
   const fmt = (n: number) => (n > 0 ? `$${n.toLocaleString("es-CL")}` : "-")
 
@@ -94,7 +94,7 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     doc.text("CALIDAD  \u00B7  PRECISION  \u00B7  CONFIANZA", tcx, ly + 31, { align: "center" })
 
     // Reset colors
-    doc.setDrawColor(0, 0, 0)
+    doc.setDrawColor(160, 160, 160)
     doc.setTextColor(0, 0, 0)
     doc.setLineWidth(0.3)
   }
@@ -120,7 +120,7 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     // Date box — only page 1
     if (pageNum === 1) {
       const dX = MR - 55; const dY = 53
-      doc.setLineWidth(0.3); doc.setDrawColor(0, 0, 0)
+      doc.setLineWidth(0.3); doc.setDrawColor(160, 160, 160)
       doc.rect(dX, dY, 22, 6); doc.rect(dX + 22, dY, 33, 6)
       bold(); doc.setFontSize(8); doc.text("FECHA", dX + 2, dY + 4)
       normal(); doc.text(fechaStr, dX + 24, dY + 4)
@@ -144,7 +144,7 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   // ─── CLIENT INFO (page 1 only) ────────────────────────────────────
   const rh = 6
   const MID = ML + CW * 0.57
-  doc.setLineWidth(0.3); doc.setDrawColor(0, 0, 0)
+  doc.setLineWidth(0.3); doc.setDrawColor(160, 160, 160)
   doc.rect(ML, y, CW, rh * 4)
   for (let i = 1; i < 4; i++) doc.line(ML, y + rh * i, MR, y + rh * i)
   doc.line(MID, y + rh, MID, y + rh * 3)
@@ -233,7 +233,7 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   doc.setFillColor(220, 230, 255)
   doc.rect(ML, y, DESC_W, 7, "FD")
   doc.rect(ML + DESC_W, y, MONTO_W, 7, "FD")
-  doc.setDrawColor(0, 0, 0)
+  doc.setDrawColor(160, 160, 160)
   black(); bold(); doc.setFontSize(8)
   doc.text("DESCRIPCION", ML + 2, y + 5)
   doc.text("VALOR", ML + DESC_W + MONTO_W / 2, y + 5, { align: "center" })
@@ -259,7 +259,7 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
       doc.setFillColor(220, 230, 255)
       doc.rect(ML, cy, DESC_W, 7, "FD")
       doc.rect(ML + DESC_W, cy, MONTO_W, 7, "FD")
-      doc.setDrawColor(0, 0, 0)
+      doc.setDrawColor(160, 160, 160)
       black(); bold(); doc.setFontSize(8)
       doc.text("DESCRIPCION (cont.)", ML + 2, cy + 5)
       doc.text("VALOR", ML + DESC_W + MONTO_W / 2, cy + 5, { align: "center" })
@@ -336,7 +336,7 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     const rows = placed.filter((r) => r.pg === pg)
     const top = rows[0].ry
     const bottom = rows[rows.length - 1].ry + rows[rows.length - 1].rh
-    doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.4)
+    doc.setDrawColor(160, 160, 160); doc.setLineWidth(0.4)
     doc.rect(ML, top, CW, bottom - top)
     doc.line(ML + DESC_W, top, ML + DESC_W, bottom)
     doc.setLineWidth(0.3)
@@ -362,7 +362,7 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   const valW = MONTO_W - labelW
 
   // Row 1 — FIRMA CLIENTE / SUB-TOTAL
-  doc.setDrawColor(0, 0, 0)
+  doc.setDrawColor(160, 160, 160)
   doc.rect(ML, y, DESC_W, trh)
   doc.rect(labelX, y, labelW, trh)
   doc.rect(labelX + labelW, y, valW, trh)
