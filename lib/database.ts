@@ -240,12 +240,12 @@ export async function createPresupuesto(presupuesto: Omit<Presupuesto, "id" | "c
   const db = getSQL()
   const data = await db`
     INSERT INTO presupuestos (
-      fecha_ingreso, patente, marca, modelo, kilometraje, año, cliente, telefono, observaciones,
+      fecha_ingreso, patente, marca, modelo, color, kilometraje, año, cliente, telefono, observaciones,
       mano_obra_pintura, cobros, costos, piezas_pintura, iva,
       monto_total, monto_total_sin_iva, observaciones_checkboxes
     ) VALUES (
       ${presupuesto.fecha_ingreso}, ${presupuesto.patente}, ${presupuesto.marca}, ${presupuesto.modelo},
-      ${presupuesto.kilometraje || null}, ${presupuesto.año || null},
+      ${presupuesto.color || null}, ${presupuesto.kilometraje || null}, ${presupuesto.año || null},
       ${presupuesto.cliente}, ${presupuesto.telefono}, ${presupuesto.observaciones},
       ${presupuesto.mano_obra_pintura}, ${JSON.stringify(presupuesto.cobros)}, ${JSON.stringify(presupuesto.costos)},
       ${JSON.stringify(presupuesto.piezas_pintura)}, ${presupuesto.iva},
