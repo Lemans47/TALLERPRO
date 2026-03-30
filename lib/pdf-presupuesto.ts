@@ -25,7 +25,7 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
 
   // ─── DRAW LOGO (jsPDF primitives, no image needed) ────────────────
   function drawLogo() {
-    const lx = ML, ly = 8, lw = 52, lh = 30
+    const lx = ML, ly = 8, lw = 115, lh = 30
     const cx = lx + 15, cy = ly + lh / 2
 
     // Dark background
@@ -100,9 +100,6 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   // ─── DRAW PAGE HEADER ─────────────────────────────────────────────
   function drawPageHeader(pageNum: number): number {
     drawLogo()
-
-    black(); bold(); doc.setFontSize(7)
-    doc.text("AUTOMOTORA - SERVICIO INTEGRAL", ML, 43)
 
     doc.setTextColor(30, 80, 180); doc.setFontSize(22); bold()
     doc.text("Automotora RS", MR, 19, { align: "right" })
