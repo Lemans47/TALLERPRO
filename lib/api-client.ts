@@ -233,24 +233,24 @@ export async function deleteEmpleadoApi(id: string) {
   if (!res.ok) throw new Error("Error deleting empleado")
 }
 
-export async function fetchPagosEmpleados(year: number, month: number) {
+export async function fetchAbonosEmpleados(year: number, month: number) {
   const res = await fetch(`/api/pagos-empleados?year=${year}&month=${month}`)
-  if (!res.ok) throw new Error("Error fetching pagos")
+  if (!res.ok) throw new Error("Error fetching abonos")
   return res.json()
 }
 
-export async function upsertPagoEmpleadoApi(data: object) {
+export async function createAbonoApi(data: object) {
   const res = await fetch("/api/pagos-empleados", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) })
-  if (!res.ok) throw new Error("Error saving pago")
+  if (!res.ok) throw new Error("Error creating abono")
   return res.json()
 }
 
-export async function deletePagoEmpleadoApi(id: string) {
+export async function deleteAbonoApi(id: string) {
   const res = await fetch(`/api/pagos-empleados?id=${id}`, { method: "DELETE" })
-  if (!res.ok) throw new Error("Error deleting pago")
+  if (!res.ok) throw new Error("Error deleting abono")
 }
 
-export type { Servicio, Presupuesto, Gasto, PrecioPintura, PiezaPintura, FotoServicio, Cliente, Vehiculo, Empleado, PagoEmpleado } from "./database"
+export type { Servicio, Presupuesto, Gasto, PrecioPintura, PiezaPintura, FotoServicio, Cliente, Vehiculo, Empleado, AbonoEmpleado } from "./database"
 
 export const api = {
   empleados: {
@@ -259,10 +259,10 @@ export const api = {
     update: updateEmpleadoApi,
     delete: deleteEmpleadoApi,
   },
-  pagosEmpleados: {
-    getByMonth: fetchPagosEmpleados,
-    upsert: upsertPagoEmpleadoApi,
-    delete: deletePagoEmpleadoApi,
+  abonos: {
+    getByMonth: fetchAbonosEmpleados,
+    create: createAbonoApi,
+    delete: deleteAbonoApi,
   },
   clientes: {
     getAll: fetchClientes,

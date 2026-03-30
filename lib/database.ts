@@ -438,17 +438,15 @@ export interface Empleado {
   created_at: string
 }
 
-export interface PagoEmpleado {
+export interface AbonoEmpleado {
   id: string
   empleado_id: string
   mes: number
   año: number
   monto: number
-  pagado: boolean
-  fecha_pago?: string
+  fecha: string
   notas?: string
   created_at: string
-  // joined
   empleado_nombre?: string
   empleado_cargo?: string
 }
@@ -473,11 +471,11 @@ export async function updateEmpleado(id: string, e: Partial<Empleado>) {
   const db = getSQL()
   const data = await db`
     UPDATE empleados SET
-      nombre     = COALESCE(${e.nombre ?? null}, nombre),
-      rut        = COALESCE(${e.rut ?? null}, rut),
-      cargo      = COALESCE(${e.cargo ?? null}, cargo),
+      nombre      = COALESCE(${e.nombre ?? null}, nombre),
+      rut         = COALESCE(${e.rut ?? null}, rut),
+      cargo       = COALESCE(${e.cargo ?? null}, cargo),
       sueldo_base = COALESCE(${e.sueldo_base ?? null}, sueldo_base),
-      activo     = COALESCE(${e.activo ?? null}, activo)
+      activo      = COALESCE(${e.activo ?? null}, activo)
     WHERE id = ${id}
     RETURNING *
   `
@@ -489,39 +487,31 @@ export async function deleteEmpleado(id: string) {
   await db`DELETE FROM empleados WHERE id = ${id}`
 }
 
-export async function getPagosEmpleadosByMonth(year: number, month: number) {
+export async function getAbonosByMonth(year: number, month: number) {
   const db = getSQL()
   const data = await db`
-    SELECT p.*, e.nombre AS empleado_nombre, e.cargo AS empleado_cargo
-    FROM pagos_empleados p
-    JOIN empleados e ON e.id = p.empleado_id
-    WHERE p.año = ${year} AND p.mes = ${month}
-    ORDER BY e.nombre ASC
+    SELECT a.*, e.nombre AS empleado_nombre, e.cargo AS empleado_cargo
+    FROM abonos_empleados a
+    JOIN empleados e ON e.id = a.empleado_id
+    WHERE a.año = ${year} AND a.mes = ${month}
+    ORDER BY a.fecha ASC, a.created_at ASC
   `
-  return data as PagoEmpleado[]
+  return data as AbonoEmpleado[]
 }
 
-export async function upsertPagoEmpleado(p: {
-  empleado_id: string; mes: number; año: number; monto: number; pagado?: boolean; fecha_pago?: string | null; notas?: string
-}) {
+export async function createAbono(a: { empleado_id: string; mes: number; año: number; monto: number; fecha: string; notas?: string }) {
   const db = getSQL()
   const data = await db`
-    INSERT INTO pagos_empleados (empleado_id, mes, año, monto, pagado, fecha_pago, notas)
-    VALUES (${p.empleado_id}, ${p.mes}, ${p.año}, ${p.monto}, ${p.pagado ?? false}, ${p.fecha_pago ?? null}, ${p.notas ?? null})
-    ON CONFLICT (empleado_id, mes, año)
-    DO UPDATE SET
-      monto      = EXCLUDED.monto,
-      pagado     = EXCLUDED.pagado,
-      fecha_pago = EXCLUDED.fecha_pago,
-      notas      = EXCLUDED.notas
+    INSERT INTO abonos_empleados (empleado_id, mes, año, monto, fecha, notas)
+    VALUES (${a.empleado_id}, ${a.mes}, ${a.año}, ${a.monto}, ${a.fecha}, ${a.notas ?? null})
     RETURNING *
   `
-  return data[0] as PagoEmpleado
+  return data[0] as AbonoEmpleado
 }
 
-export async function deletePagoEmpleado(id: string) {
+export async function deleteAbono(id: string) {
   const db = getSQL()
-  await db`DELETE FROM pagos_empleados WHERE id = ${id}`
+  await db`DELETE FROM abonos_empleados WHERE id = ${id}`
 }
 
 // Dashboard KPIs

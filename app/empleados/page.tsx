@@ -4,14 +4,13 @@ import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/lib/auth-context"
 import { useMonth } from "@/lib/month-context"
-import { api, type Empleado, type PagoEmpleado } from "@/lib/api-client"
-import { Users, Plus, Pencil, Trash2, RefreshCw, CheckCircle, Clock, DollarSign } from "lucide-react"
+import { api, type Empleado, type AbonoEmpleado } from "@/lib/api-client"
+import { Users, Plus, Pencil, Trash2, RefreshCw, ChevronDown, ChevronUp, CheckCircle } from "lucide-react"
 
 const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"]
 
@@ -22,8 +21,9 @@ export default function EmpleadosPage() {
   const [year, month] = selectedMonth.split("-").map(Number)
 
   const [empleados, setEmpleados] = useState<Empleado[]>([])
-  const [pagos, setPagos] = useState<PagoEmpleado[]>([])
+  const [abonos, setAbonos] = useState<AbonoEmpleado[]>([])
   const [loading, setLoading] = useState(true)
+  const [expanded, setExpanded] = useState<string | null>(null)
 
   // Dialog empleado
   const [empDialog, setEmpDialog] = useState(false)
@@ -31,25 +31,29 @@ export default function EmpleadosPage() {
   const [empForm, setEmpForm] = useState({ nombre: "", rut: "", cargo: "", sueldo_base: "" })
   const [guardando, setGuardando] = useState(false)
 
-  // Dialog pago
-  const [pagoDialog, setPagoDialog] = useState(false)
-  const [pagoEmpleado, setPagoEmpleado] = useState<Empleado | null>(null)
-  const [pagoMonto, setPagoMonto] = useState("")
-  const [pagoNota, setPagoNota] = useState("")
+  // Dialog abono
+  const [abonoDialog, setAbonoDialog] = useState(false)
+  const [abonoEmpleado, setAbonoEmpleado] = useState<Empleado | null>(null)
+  const [abonoMonto, setAbonoMonto] = useState("")
+  const [abonoFecha, setAbonoFecha] = useState(new Date().toISOString().split("T")[0])
+  const [abonoNota, setAbonoNota] = useState("")
 
   const canEdit = role === "admin" || role === "supervisor"
 
   const cargar = useCallback(async () => {
     setLoading(true)
     try {
-      const [e, p] = await Promise.all([api.empleados.getAll(), api.pagosEmpleados.getByMonth(year, month)])
+      const [e, a] = await Promise.all([api.empleados.getAll(), api.abonos.getByMonth(year, month)])
       setEmpleados(e)
-      setPagos(p)
+      setAbonos(a)
     } catch { toast({ title: "Error al cargar datos", variant: "destructive" }) }
     finally { setLoading(false) }
   }, [year, month])
 
   useEffect(() => { cargar() }, [cargar])
+
+  const abonosPorEmpleado = (id: string) => abonos.filter(a => a.empleado_id === id)
+  const totalAbonado = (id: string) => abonosPorEmpleado(id).reduce((s, a) => s + Number(a.monto), 0)
 
   // ── Empleados CRUD ──────────────────────────────────────────────
   const abrirNuevoEmp = () => {
@@ -79,7 +83,7 @@ export default function EmpleadosPage() {
   }
 
   const eliminarEmp = async (id: string) => {
-    if (!confirm("¿Eliminar empleado? Se eliminarán también sus registros de pago.")) return
+    if (!confirm("¿Eliminar empleado? Se eliminarán también sus abonos.")) return
     try {
       await api.empleados.delete(id)
       await cargar()
@@ -94,50 +98,50 @@ export default function EmpleadosPage() {
     } catch { toast({ title: "Error", variant: "destructive" }) }
   }
 
-  // ── Pagos ───────────────────────────────────────────────────────
-  const abrirPago = (emp: Empleado) => {
-    const existing = pagos.find(p => p.empleado_id === emp.id)
-    setPagoEmpleado(emp)
-    setPagoMonto(existing ? String(existing.monto) : String(emp.sueldo_base))
-    setPagoNota(existing?.notas || "")
-    setPagoDialog(true)
+  // ── Abonos ──────────────────────────────────────────────────────
+  const abrirAbono = (emp: Empleado) => {
+    setAbonoEmpleado(emp)
+    const pendiente = Number(emp.sueldo_base) - totalAbonado(emp.id)
+    setAbonoMonto(String(pendiente > 0 ? pendiente : ""))
+    setAbonoFecha(new Date().toISOString().split("T")[0])
+    setAbonoNota("")
+    setAbonoDialog(true)
   }
 
-  const marcarPagado = async () => {
-    if (!pagoEmpleado) return
+  const guardarAbono = async () => {
+    if (!abonoEmpleado || !abonoMonto) return
     setGuardando(true)
     try {
-      await api.pagosEmpleados.upsert({
-        empleado_id: pagoEmpleado.id,
+      await api.abonos.create({
+        empleado_id: abonoEmpleado.id,
         mes: month,
         año: year,
-        monto: Number(pagoMonto) || pagoEmpleado.sueldo_base,
-        pagado: true,
-        fecha_pago: new Date().toISOString().split("T")[0],
-        notas: pagoNota || undefined,
-        crear_gasto: true,
-        empleado_nombre: pagoEmpleado.nombre,
+        monto: Number(abonoMonto),
+        fecha: abonoFecha,
+        notas: abonoNota || undefined,
+        empleado_nombre: abonoEmpleado.nombre,
       })
-      setPagoDialog(false)
+      setAbonoDialog(false)
       await cargar()
-      toast({ title: "Pago registrado", description: "Se registró también en Gastos > Sueldos" })
-    } catch { toast({ title: "Error al registrar pago", variant: "destructive" }) }
+      toast({ title: "Abono registrado", description: "Se registró en Gastos > Sueldos" })
+    } catch { toast({ title: "Error al registrar abono", variant: "destructive" }) }
     finally { setGuardando(false) }
   }
 
-  const desmarcarPagado = async (pago: PagoEmpleado) => {
-    if (!confirm("¿Desmarcar como pagado?")) return
+  const eliminarAbono = async (id: string) => {
+    if (!confirm("¿Eliminar este abono?")) return
     try {
-      await api.pagosEmpleados.upsert({ ...pago, pagado: false, fecha_pago: null })
+      await api.abonos.delete(id)
       await cargar()
-      toast({ title: "Pago desmarcado" })
+      toast({ title: "Abono eliminado" })
     } catch { toast({ title: "Error", variant: "destructive" }) }
   }
 
-  // ── Totales ─────────────────────────────────────────────────────
+  // ── Totales globales ─────────────────────────────────────────────
+  const activosCount = empleados.filter(e => e.activo).length
   const totalSueldos = empleados.filter(e => e.activo).reduce((s, e) => s + Number(e.sueldo_base), 0)
-  const totalPagado = pagos.filter(p => p.pagado).reduce((s, p) => s + Number(p.monto), 0)
-  const pendientes = empleados.filter(e => e.activo && !pagos.find(p => p.empleado_id === e.id && p.pagado)).length
+  const totalPagadoMes = abonos.reduce((s, a) => s + Number(a.monto), 0)
+  const totalPendiente = totalSueldos - totalPagadoMes
 
   return (
     <div className="p-4 md:p-6 space-y-6 pt-20 md:pt-6">
@@ -149,7 +153,7 @@ export default function EmpleadosPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold">Empleados</h1>
-            <p className="text-sm text-muted-foreground">{MESES[month - 1]} {year}</p>
+            <p className="text-sm text-muted-foreground">{MESES[month - 1]} {year} · {activosCount} activos</p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -168,16 +172,18 @@ export default function EmpleadosPage() {
       {/* KPIs */}
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-card rounded-xl border p-4">
-          <p className="text-xs text-muted-foreground mb-1">Total sueldos</p>
+          <p className="text-xs text-muted-foreground mb-1">Total sueldos mes</p>
           <p className="text-xl font-bold">${totalSueldos.toLocaleString("es-CL")}</p>
         </div>
         <div className="bg-card rounded-xl border p-4">
-          <p className="text-xs text-muted-foreground mb-1">Pagado este mes</p>
-          <p className="text-xl font-bold text-success">${totalPagado.toLocaleString("es-CL")}</p>
+          <p className="text-xs text-muted-foreground mb-1">Total abonado</p>
+          <p className="text-xl font-bold text-success">${totalPagadoMes.toLocaleString("es-CL")}</p>
         </div>
         <div className="bg-card rounded-xl border p-4">
-          <p className="text-xs text-muted-foreground mb-1">Pendientes de pago</p>
-          <p className="text-xl font-bold text-warning">{pendientes}</p>
+          <p className="text-xs text-muted-foreground mb-1">Por pagar</p>
+          <p className={`text-xl font-bold ${totalPendiente > 0 ? "text-warning" : "text-success"}`}>
+            ${Math.max(0, totalPendiente).toLocaleString("es-CL")}
+          </p>
         </div>
       </div>
 
@@ -188,92 +194,129 @@ export default function EmpleadosPage() {
         </TabsList>
 
         {/* ── Tab Sueldos ── */}
-        <TabsContent value="sueldos" className="mt-4">
+        <TabsContent value="sueldos" className="mt-4 space-y-3">
           {loading ? (
             <div className="text-center py-12 text-muted-foreground">Cargando...</div>
           ) : empleados.filter(e => e.activo).length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">No hay empleados activos. Agrégalos en la pestaña Equipo.</div>
-          ) : (
-            <div className="space-y-2">
-              {empleados.filter(e => e.activo).map(emp => {
-                const pago = pagos.find(p => p.empleado_id === emp.id)
-                const pagado = pago?.pagado ?? false
-                return (
-                  <div key={emp.id} className="bg-card rounded-xl border p-4 flex items-center gap-4">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold">{emp.nombre}</p>
-                      <p className="text-sm text-muted-foreground">{emp.cargo || "Sin cargo"}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold">${Number(pago?.monto ?? emp.sueldo_base).toLocaleString("es-CL")}</p>
-                      {pago?.fecha_pago && <p className="text-xs text-muted-foreground">{new Date(pago.fecha_pago + "T12:00").toLocaleDateString("es-CL")}</p>}
-                    </div>
-                    {pagado ? (
-                      <div className="flex items-center gap-2">
-                        <Badge className="bg-success/20 text-success border-success/30">
-                          <CheckCircle className="w-3 h-3 mr-1" />
-                          Pagado
-                        </Badge>
-                        {canEdit && (
-                          <Button variant="ghost" size="sm" className="text-muted-foreground h-7 text-xs" onClick={() => desmarcarPagado(pago!)}>
-                            Desmarcar
-                          </Button>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-warning border-warning/30">
-                          <Clock className="w-3 h-3 mr-1" />
-                          Pendiente
-                        </Badge>
-                        {canEdit && (
-                          <Button size="sm" className="h-8" onClick={() => abrirPago(emp)}>
-                            <DollarSign className="w-3.5 h-3.5 mr-1" />
-                            Pagar
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </TabsContent>
+            <div className="text-center py-12 text-muted-foreground">No hay empleados activos.</div>
+          ) : empleados.filter(e => e.activo).map(emp => {
+            const abEmp = abonosPorEmpleado(emp.id)
+            const total = totalAbonado(emp.id)
+            const sueldo = Number(emp.sueldo_base)
+            const pendiente = sueldo - total
+            const pct = sueldo > 0 ? Math.min(100, Math.round((total / sueldo) * 100)) : 0
+            const pagadoCompleto = total >= sueldo
+            const isOpen = expanded === emp.id
 
-        {/* ── Tab Equipo ── */}
-        <TabsContent value="equipo" className="mt-4">
-          <div className="space-y-2">
-            {empleados.length === 0 && !loading && (
-              <div className="text-center py-12 text-muted-foreground">No hay empleados registrados.</div>
-            )}
-            {empleados.map(emp => (
-              <div key={emp.id} className={`bg-card rounded-xl border p-4 flex items-center gap-4 ${!emp.activo ? "opacity-50" : ""}`}>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold">{emp.nombre}</p>
-                    {!emp.activo && <Badge variant="outline" className="text-xs">Inactivo</Badge>}
+            return (
+              <div key={emp.id} className="bg-card rounded-xl border overflow-hidden">
+                {/* Fila principal */}
+                <div className="flex items-center gap-4 p-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold">{emp.nombre}</p>
+                      {pagadoCompleto && (
+                        <span className="flex items-center gap-1 text-xs text-success">
+                          <CheckCircle className="w-3.5 h-3.5" /> Completo
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground">{emp.cargo || "Sin cargo"}</p>
+                    {/* Barra de progreso */}
+                    <div className="mt-2 flex items-center gap-2">
+                      <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${pagadoCompleto ? "bg-success" : "bg-primary"}`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        ${total.toLocaleString("es-CL")} / ${sueldo.toLocaleString("es-CL")}
+                      </span>
+                    </div>
                   </div>
-                  <p className="text-sm text-muted-foreground">{emp.cargo || "Sin cargo"}{emp.rut ? ` · ${emp.rut}` : ""}</p>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {canEdit && !pagadoCompleto && (
+                      <Button size="sm" className="h-8" onClick={() => abrirAbono(emp)}>
+                        <Plus className="w-3.5 h-3.5 mr-1" />
+                        Abonar
+                      </Button>
+                    )}
+                    {canEdit && pagadoCompleto && (
+                      <Button size="sm" variant="outline" className="h-8" onClick={() => abrirAbono(emp)}>
+                        <Plus className="w-3.5 h-3.5 mr-1" />
+                        Abonar
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setExpanded(isOpen ? null : emp.id)}>
+                      {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </Button>
+                  </div>
                 </div>
-                <p className="font-semibold">${Number(emp.sueldo_base).toLocaleString("es-CL")}</p>
-                {canEdit && (
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => abrirEditarEmp(emp)}>
-                      <Pencil className="w-3.5 h-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toggleActivo(emp)}
-                      title={emp.activo ? "Desactivar" : "Activar"}>
-                      <CheckCircle className={`w-3.5 h-3.5 ${emp.activo ? "text-success" : "text-muted-foreground"}`} />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => eliminarEmp(emp.id)}>
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
+
+                {/* Detalle abonos */}
+                {isOpen && (
+                  <div className="border-t border-border bg-secondary/20 px-4 pb-3 pt-2 space-y-1.5">
+                    {abEmp.length === 0 ? (
+                      <p className="text-sm text-muted-foreground py-2">Sin abonos este mes.</p>
+                    ) : abEmp.map(a => (
+                      <div key={a.id} className="flex items-center gap-3 text-sm py-1 border-b border-border/40 last:border-0">
+                        <span className="text-muted-foreground w-20 shrink-0">
+                          {new Date(a.fecha + "T12:00").toLocaleDateString("es-CL", { day:"2-digit", month:"2-digit" })}
+                        </span>
+                        <span className="flex-1">{a.notas || "—"}</span>
+                        <span className="font-semibold text-success">${Number(a.monto).toLocaleString("es-CL")}</span>
+                        {canEdit && (
+                          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive shrink-0" onClick={() => eliminarAbono(a.id)}>
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                    <div className="flex justify-between text-sm font-semibold pt-1">
+                      <span>Pendiente</span>
+                      <span className={pendiente > 0 ? "text-warning" : "text-success"}>
+                        ${Math.max(0, pendiente).toLocaleString("es-CL")}
+                      </span>
+                    </div>
                   </div>
                 )}
               </div>
-            ))}
-          </div>
+            )
+          })}
+        </TabsContent>
+
+        {/* ── Tab Equipo ── */}
+        <TabsContent value="equipo" className="mt-4 space-y-2">
+          {empleados.length === 0 && !loading && (
+            <div className="text-center py-12 text-muted-foreground">No hay empleados registrados.</div>
+          )}
+          {empleados.map(emp => (
+            <div key={emp.id} className={`bg-card rounded-xl border p-4 flex items-center gap-4 ${!emp.activo ? "opacity-50" : ""}`}>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="font-semibold">{emp.nombre}</p>
+                  {!emp.activo && <span className="text-xs text-muted-foreground border rounded px-1.5 py-0.5">Inactivo</span>}
+                </div>
+                <p className="text-sm text-muted-foreground">{emp.cargo || "Sin cargo"}{emp.rut ? ` · ${emp.rut}` : ""}</p>
+              </div>
+              <p className="font-semibold">${Number(emp.sueldo_base).toLocaleString("es-CL")}</p>
+              {canEdit && (
+                <div className="flex gap-1">
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => abrirEditarEmp(emp)}>
+                    <Pencil className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toggleActivo(emp)}
+                    title={emp.activo ? "Desactivar" : "Activar"}>
+                    <CheckCircle className={`w-3.5 h-3.5 ${emp.activo ? "text-success" : "text-muted-foreground"}`} />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => eliminarEmp(emp.id)}>
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              )}
+            </div>
+          ))}
         </TabsContent>
       </Tabs>
 
@@ -310,26 +353,36 @@ export default function EmpleadosPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog pago */}
-      <Dialog open={pagoDialog} onOpenChange={setPagoDialog}>
+      {/* Dialog abono */}
+      <Dialog open={abonoDialog} onOpenChange={setAbonoDialog}>
         <DialogContent className="bg-card border-border max-w-sm">
           <DialogHeader>
-            <DialogTitle>Registrar pago — {pagoEmpleado?.nombre}</DialogTitle>
+            <DialogTitle>Registrar abono — {abonoEmpleado?.nombre}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-2">
+          {abonoEmpleado && (
+            <div className="text-sm text-muted-foreground pb-1">
+              Sueldo base: <strong className="text-foreground">${Number(abonoEmpleado.sueldo_base).toLocaleString("es-CL")}</strong>
+              {" · "}Abonado: <strong className="text-success">${totalAbonado(abonoEmpleado.id).toLocaleString("es-CL")}</strong>
+            </div>
+          )}
+          <div className="space-y-4 py-1">
             <div className="space-y-1.5">
-              <Label>Monto a pagar</Label>
-              <Input type="number" value={pagoMonto} onChange={e => setPagoMonto(e.target.value)} placeholder="0" />
+              <Label>Monto *</Label>
+              <Input type="number" value={abonoMonto} onChange={e => setAbonoMonto(e.target.value)} placeholder="0" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Fecha</Label>
+              <Input type="date" value={abonoFecha} onChange={e => setAbonoFecha(e.target.value)} />
             </div>
             <div className="space-y-1.5">
               <Label>Notas (opcional)</Label>
-              <Input value={pagoNota} onChange={e => setPagoNota(e.target.value)} placeholder="Ej: incluye bono" />
+              <Input value={abonoNota} onChange={e => setAbonoNota(e.target.value)} placeholder="Ej: quincena" />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPagoDialog(false)}>Cancelar</Button>
-            <Button onClick={marcarPagado} disabled={guardando} className="bg-success hover:bg-success/90">
-              {guardando ? "Registrando..." : "Confirmar pago"}
+            <Button variant="outline" onClick={() => setAbonoDialog(false)}>Cancelar</Button>
+            <Button onClick={guardarAbono} disabled={guardando || !abonoMonto}>
+              {guardando ? "Registrando..." : "Registrar abono"}
             </Button>
           </DialogFooter>
         </DialogContent>
