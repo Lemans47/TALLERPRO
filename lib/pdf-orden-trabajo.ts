@@ -30,7 +30,7 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
 
   const bold   = () => doc.setFont("helvetica", "bold")
   const normal = () => doc.setFont("helvetica", "normal")
-  const black  = () => doc.setTextColor(70, 70, 70)
+  const black  = () => doc.setTextColor(0, 0, 0)
   const up     = (s: string) => (s || "").toUpperCase()
 
   // ── Page counter and Y tracker ──────────────────────────────────
@@ -87,7 +87,7 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
       const fechaStr = yr && m && d ? `${d}-${m}-${yr}` : raw
 
       const dX = MR - 55; const dY = 53
-      doc.setLineWidth(0.3); doc.setDrawColor(160, 160, 160)
+      doc.setLineWidth(0.3); doc.setDrawColor(0, 0, 0)
       doc.rect(dX, dY, 22, 6); doc.rect(dX + 22, dY, 33, 6)
       bold(); doc.setFontSize(8); doc.text("N\xB0 OT", dX + 2, dY + 4)
       normal(); doc.text(`#${otNum}`, dX + 24, dY + 4)
@@ -105,7 +105,7 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
   // ── Client info ─────────────────────────────────────────────────
   const RH = 6
   const MID = ML + CW * 0.57
-  doc.setLineWidth(0.3); doc.setDrawColor(160, 160, 160)
+  doc.setLineWidth(0.3); doc.setDrawColor(0, 0, 0)
   doc.rect(ML, y, CW, RH * 3)
   doc.line(ML, y + RH, MR, y + RH)
   doc.line(ML, y + RH * 2, MR, y + RH * 2)
@@ -171,7 +171,7 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
 
   // ── Table header ─────────────────────────────────────────────────
   need(CAT_H + 8)
-  doc.setFillColor(220, 230, 255); doc.setDrawColor(160, 160, 160)
+  doc.setFillColor(220, 230, 255); doc.setDrawColor(0, 0, 0)
   doc.rect(ML, y, CW, 8, "FD")
   black(); bold(); doc.setFontSize(8)
   doc.text("DESCRIPCION DEL TRABAJO A REALIZAR", ML + 2, y + 5.5)
@@ -183,14 +183,14 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
 
   function closeAndOpenSeg() {
     // close current segment border
-    doc.setDrawColor(160, 160, 160); doc.setLineWidth(0.5)
+    doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.5)
     doc.rect(ML, lastSeg.top, CW, y - lastSeg.top)
     doc.setLineWidth(0.3)
     // new page
     newPage()
     // new table header
     need(8)
-    doc.setFillColor(220, 230, 255); doc.setDrawColor(160, 160, 160)
+    doc.setFillColor(220, 230, 255); doc.setDrawColor(0, 0, 0)
     doc.rect(ML, y, CW, 8, "FD")
     black(); bold(); doc.setFontSize(8)
     doc.text("DESCRIPCION DEL TRABAJO A REALIZAR (cont.)", ML + 2, y + 5.5)
@@ -240,7 +240,7 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
   }
 
   // Close last segment border
-  doc.setDrawColor(160, 160, 160); doc.setLineWidth(0.5)
+  doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.5)
   doc.rect(ML, lastSeg.top, CW, y - lastSeg.top)
   doc.setLineWidth(0.3)
   y += 5
@@ -248,7 +248,7 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
   // ── Signatures ───────────────────────────────────────────────────
   need(36)
   const sigW = CW / 2 - 4
-  doc.setDrawColor(160, 160, 160)
+  doc.setDrawColor(0, 0, 0)
   doc.rect(ML, y, sigW, 18)
   black(); bold(); doc.setFontSize(8); doc.text("TECNICO RECIBE:", ML + 2, y + 6)
   normal(); doc.line(ML + 2, y + 15, ML + sigW - 2, y + 15)
