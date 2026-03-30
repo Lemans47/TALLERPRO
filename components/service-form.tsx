@@ -37,6 +37,8 @@ import {
   Camera,
   Upload,
   ImageIcon,
+  AlignJustify,
+  List,
 } from "lucide-react"
 import { api, type Servicio, type Presupuesto, type PrecioPintura, type FotoServicio } from "@/lib/api-client"
 import { useToast } from "@/components/ui/use-toast" // Import useToast hook
@@ -169,6 +171,8 @@ const ItemsList = ({
 export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFormProps) {
   const { toast } = useToast() // Declare useToast hook
   const [loading, setLoading] = useState(false)
+  const [pdfFormatDialog, setPdfFormatDialog] = useState(false)
+  const [savedPresupuesto, setSavedPresupuesto] = useState<any>(null)
   const [preciosPintura, setPreciosPintura] = useState<PrecioPintura[]>([])
   const [piezasSeleccionadas, setPiezasSeleccionadas] = useState<PiezaPintura[]>([])
 
@@ -872,8 +876,8 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       console.log("[v0] Presupuesto created:", newPresupuesto)
       toast({ title: "Presupuesto creado" })
       if (newPresupuesto) {
-        console.log("[v0] Generating PDF")
-        generarPDFPresupuesto(newPresupuesto as any)
+        setSavedPresupuesto(newPresupuesto)
+        setPdfFormatDialog(true)
       }
       console.log("[v0] Calling onSaved")
       onSaved()
@@ -888,6 +892,34 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
 
   return (
     <TooltipProvider>
+      {/* PDF format picker dialog */}
+      <Dialog open={pdfFormatDialog} onOpenChange={setPdfFormatDialog}>
+        <DialogContent className="bg-card border-border max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Generar Presupuesto PDF</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">Elige el formato del presupuesto:</p>
+          <div className="grid grid-cols-2 gap-3 pt-1">
+            <button
+              className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-colors"
+              onClick={() => { generarPDFPresupuesto(savedPresupuesto, false); setPdfFormatDialog(false) }}
+            >
+              <AlignJustify className="w-6 h-6 text-primary" />
+              <span className="font-semibold text-sm">Con detalle</span>
+              <span className="text-xs text-muted-foreground text-center">Cada item con subtotal por categoría</span>
+            </button>
+            <button
+              className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-colors"
+              onClick={() => { generarPDFPresupuesto(savedPresupuesto, true); setPdfFormatDialog(false) }}
+            >
+              <List className="w-6 h-6 text-primary" />
+              <span className="font-semibold text-sm">Solo totales</span>
+              <span className="text-xs text-muted-foreground text-center">Lista sin precios, total al final</span>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border-b border-border bg-gradient-to-r from-primary/10 to-transparent">
