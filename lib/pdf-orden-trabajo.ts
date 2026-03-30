@@ -18,7 +18,7 @@ async function loadImageAsBase64(url: string): Promise<string | null> {
 }
 
 export async function generarOrdenTrabajo(servicio: Servicio) {
-  const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" })
+  const doc = new jsPDF({ unit: "mm", format: [210, 297], orientation: "portrait" })
 
   const ML = 10
   const MR = 200

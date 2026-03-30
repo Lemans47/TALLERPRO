@@ -9,7 +9,7 @@ const DESC_W = CW - MONTO_W
 const PAGE_H = 297
 
 export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = false) {
-  const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" })
+  const doc = new jsPDF({ unit: "mm", format: [210, 297], orientation: "portrait" })
 
   const bold = () => doc.setFont("helvetica", "bold")
   const normal = () => doc.setFont("helvetica", "normal")
