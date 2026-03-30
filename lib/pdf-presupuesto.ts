@@ -278,7 +278,13 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
       placeRow("item", ITEM_H, undefined, row.desc, row.monto)
     }
   })
-  for (let i = 0; i < MIN_BLANK; i++) placeRow("blank", ITEM_H)
+  // Fill with blank rows until we reach the bottom anchor
+  const trh = 6
+  const FIRMA_H = trh * 3 + 2 + 10
+  const bottomAnchor = PAGE_H - 15 - FIRMA_H
+  const spaceLeft = bottomAnchor - cy
+  const blanksNeeded = Math.max(MIN_BLANK, Math.floor(spaceLeft / ITEM_H))
+  for (let i = 0; i < blanksNeeded; i++) placeRow("blank", ITEM_H)
 
   y = cy; pageNum = cp
 
@@ -346,14 +352,10 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   y += 2
 
   // ─── TOTALS + SIGNATURES — anchored to page bottom ───────────────
-  const trh = 6
-  const FIRMA_H = trh * 3 + 2 + 10  // 3 rows + gap + notes box = 30mm
-  const bottomAnchor = PAGE_H - 15 - FIRMA_H  // target y so totals end 15mm from bottom
   if (y > bottomAnchor) {
-    // Items overflow past anchor — open a new page and anchor there
     doc.addPage(); pageNum++; drawPageHeader(pageNum)
+    y = bottomAnchor
   }
-  y = bottomAnchor
   const subtotalVal = Number(servicio.monto_total_sin_iva) || 0
   const totalVal = Number(servicio.monto_total) || 0
   const ivaVal = totalVal - subtotalVal
