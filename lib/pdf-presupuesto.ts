@@ -65,31 +65,33 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     doc.setFontSize(11)
     doc.text("RS", cx, cy + 3.8, { align: "center" })
 
-    // ── Right text ──
-    const tx = cx + ro + 3.5
+    // ── Right text (centered in remaining space) ──
+    const textAreaStart = lx + cx + ro + 3
+    const textAreaEnd = lx + lw - 1.5
+    const tcx = (textAreaStart + textAreaEnd) / 2  // center x of text area
 
     // AUTOMOTORA (orange, spaced)
     doc.setTextColor(255, 140, 0)
     doc.setFont("helvetica", "normal")
-    doc.setFontSize(4.2)
-    doc.text("A U T O M O T O R A", tx, ly + 8)
+    doc.setFontSize(6)
+    doc.text("A U T O M O T O R A", tcx, ly + 8, { align: "center" })
 
-    // RS large white
-    doc.setTextColor(255, 255, 255)
+    // RS large orange bold
+    doc.setTextColor(255, 140, 0)
     doc.setFont("helvetica", "bold")
-    doc.setFontSize(15)
-    doc.text("RS", tx, ly + 21)
+    doc.setFontSize(20)
+    doc.text("RS", tcx, ly + 21, { align: "center" })
 
     // DESABOLLADURA & PINTURA
-    doc.setTextColor(120, 120, 120)
+    doc.setTextColor(130, 130, 130)
     doc.setFont("helvetica", "normal")
-    doc.setFontSize(3.2)
-    doc.text("DESABOLLADURA & PINTURA", tx, ly + 25.5)
+    doc.setFontSize(5)
+    doc.text("DESABOLLADURA & PINTURA", tcx, ly + 26, { align: "center" })
 
     // CALIDAD · PRECISION · CONFIANZA
-    doc.setTextColor(75, 75, 75)
-    doc.setFontSize(2.8)
-    doc.text("CALIDAD  \u00B7  PRECISION  \u00B7  CONFIANZA", tx, ly + 29)
+    doc.setTextColor(85, 85, 85)
+    doc.setFontSize(4.2)
+    doc.text("CALIDAD  \u00B7  PRECISION  \u00B7  CONFIANZA", tcx, ly + 30, { align: "center" })
 
     // Reset colors
     doc.setDrawColor(0, 0, 0)
