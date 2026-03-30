@@ -1,0 +1,154 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 220" width="560" height="220">
+  <defs>
+    <!-- Gradiente fondo -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#111111"/>
+      <stop offset="100%" style="stop-color:#1c1c1c"/>
+    </linearGradient>
+    <!-- Gradiente naranja para el emblema -->
+    <linearGradient id="orangeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff8c00"/>
+      <stop offset="100%" style="stop-color:#e65c00"/>
+    </linearGradient>
+    <!-- Gradiente anillo -->
+    <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff9a00"/>
+      <stop offset="100%" style="stop-color:#cc4e00"/>
+    </linearGradient>
+    <!-- Gradiente texto RS -->
+    <linearGradient id="rsGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff"/>
+      <stop offset="100%" style="stop-color:#dddddd"/>
+    </linearGradient>
+    <!-- Línea decorativa -->
+    <linearGradient id="lineGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#111111;stop-opacity:0"/>
+      <stop offset="30%" style="stop-color:#ff8c00"/>
+      <stop offset="70%" style="stop-color:#ff8c00"/>
+      <stop offset="100%" style="stop-color:#111111;stop-opacity:0"/>
+    </linearGradient>
+    <!-- Brillo del emblema -->
+    <radialGradient id="emblemShine" cx="40%" cy="35%" r="60%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.15"/>
+      <stop offset="100%" style="stop-color:#000000;stop-opacity:0"/>
+    </radialGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#ff8c00" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Fondo -->
+  <rect width="560" height="220" rx="14" fill="url(#bgGrad)"/>
+
+  <!-- Textura sutil de fondo (líneas diagonales) -->
+  <g opacity="0.04" stroke="#ff8c00" stroke-width="1">
+    <line x1="0" y1="40" x2="40" y2="0"/><line x1="0" y1="80" x2="80" y2="0"/>
+    <line x1="0" y1="120" x2="120" y2="0"/><line x1="0" y1="160" x2="160" y2="0"/>
+    <line x1="0" y1="200" x2="200" y2="0"/><line x1="0" y1="220" x2="220" y2="0"/>
+    <line x1="40" y1="220" x2="260" y2="0"/><line x1="80" y1="220" x2="300" y2="0"/>
+    <line x1="120" y1="220" x2="340" y2="0"/><line x1="160" y1="220" x2="380" y2="0"/>
+    <line x1="200" y1="220" x2="420" y2="0"/><line x1="240" y1="220" x2="460" y2="0"/>
+    <line x1="280" y1="220" x2="500" y2="0"/><line x1="320" y1="220" x2="540" y2="0"/>
+    <line x1="360" y1="220" x2="560" y2="20"/><line x1="400" y1="220" x2="560" y2="60"/>
+    <line x1="440" y1="220" x2="560" y2="100"/><line x1="480" y1="220" x2="560" y2="140"/>
+    <line x1="520" y1="220" x2="560" y2="180"/>
+  </g>
+
+  <!-- ===================== EMBLEMA CIRCULAR ===================== -->
+  <g transform="translate(110, 110)" filter="url(#shadow)">
+
+    <!-- Anillo exterior con brillo -->
+    <circle cx="0" cy="0" r="92" fill="url(#ringGrad)" opacity="0.15"/>
+    <circle cx="0" cy="0" r="92" fill="none" stroke="url(#ringGrad)" stroke-width="3"/>
+
+    <!-- Segmentos decorativos del anillo exterior -->
+    <!-- Arco naranja superior -->
+    <path d="M -65 -65 A 92 92 0 0 1 65 -65" fill="none" stroke="#ff8c00" stroke-width="6" stroke-linecap="round"/>
+    <!-- Arco naranja inferior -->
+    <path d="M 65 65 A 92 92 0 0 1 -65 65" fill="none" stroke="#ff8c00" stroke-width="6" stroke-linecap="round"/>
+
+    <!-- Círculo interior fondo -->
+    <circle cx="0" cy="0" r="80" fill="#1a1a1a"/>
+    <circle cx="0" cy="0" r="80" fill="none" stroke="#2a2a2a" stroke-width="1"/>
+
+    <!-- Hexágono decorativo interior -->
+    <polygon points="0,-70 60,-35 60,35 0,70 -60,35 -60,-35"
+             fill="none" stroke="#ff8c00" stroke-width="1" opacity="0.2"/>
+
+    <!-- Líneas cruzadas decorativas -->
+    <line x1="-78" y1="0" x2="78" y2="0" stroke="#ff8c00" stroke-width="0.8" opacity="0.15"/>
+    <line x1="0" y1="-78" x2="0" y2="78" stroke="#ff8c00" stroke-width="0.8" opacity="0.15"/>
+
+    <!-- Fondo del emblema central -->
+    <circle cx="0" cy="0" r="68" fill="url(#orangeGrad)" filter="url(#glow)"/>
+    <circle cx="0" cy="0" r="68" fill="url(#emblemShine)"/>
+    <circle cx="0" cy="0" r="68" fill="none" stroke="#ff9a00" stroke-width="1.5"/>
+
+    <!-- Letras RS -->
+    <text x="0" y="22"
+          font-family="'Arial Black', 'Impact', sans-serif"
+          font-size="72" font-weight="900"
+          fill="url(#rsGrad)" text-anchor="middle"
+          letter-spacing="-2"
+          filter="url(#softGlow)">RS</text>
+
+    <!-- Brillo superior en el emblema -->
+    <ellipse cx="0" cy="-28" rx="38" ry="18" fill="white" opacity="0.07"/>
+  </g>
+
+  <!-- ===================== TEXTO DERECHO ===================== -->
+
+  <!-- AUTOMOTORA -->
+  <text x="388" y="88"
+        font-family="'Arial Narrow', Arial, sans-serif"
+        font-size="14" font-weight="400"
+        fill="#ff8c00" text-anchor="middle"
+        letter-spacing="8">AUTOMOTORA</text>
+
+  <!-- Línea decorativa bajo AUTOMOTORA -->
+  <rect x="301" y="95" width="174" height="1.5" rx="1" fill="url(#lineGrad)" opacity="0.6"/>
+
+  <!-- Nombre RS grande centrado -->
+  <text x="388" y="160"
+        font-family="'Arial Black', Impact, sans-serif"
+        font-size="82" font-weight="900"
+        fill="white" text-anchor="middle"
+        letter-spacing="-3"
+        filter="url(#softGlow)">RS</text>
+
+  <!-- Línea decorativa -->
+  <rect x="301" y="167" width="174" height="1.5" rx="1" fill="url(#lineGrad)" opacity="0.6"/>
+
+  <!-- Subtítulo -->
+  <text x="388" y="185"
+        font-family="Arial, sans-serif"
+        font-size="9.5" font-weight="300"
+        fill="#888888" text-anchor="middle"
+        letter-spacing="3.5">DESABOLLADURA &amp; PINTURA</text>
+
+  <!-- Slogan -->
+  <text x="388" y="200"
+        font-family="Arial, sans-serif"
+        font-size="8.5" font-weight="300"
+        fill="#555555" text-anchor="middle"
+        letter-spacing="2">CALIDAD · PRECISIÓN · CONFIANZA</text>
+
+  <!-- Borde decorativo izquierdo -->
+  <rect x="0" y="0" width="4" height="220" rx="2" fill="url(#ringGrad)"/>
+  <!-- Borde decorativo derecho -->
+  <rect x="556" y="0" width="4" height="220" rx="2" fill="url(#ringGrad)"/>
+</svg>

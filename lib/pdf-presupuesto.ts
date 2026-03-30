@@ -5,6 +5,28 @@ async function loadImageAsBase64(url: string): Promise<string | null> {
   try {
     const res = await fetch(url)
     if (!res.ok) return null
+
+    // SVG → render on canvas → PNG base64
+    if (url.endsWith(".svg")) {
+      const svgText = await res.text()
+      const blob = new Blob([svgText], { type: "image/svg+xml" })
+      const blobUrl = URL.createObjectURL(blob)
+      return new Promise((resolve) => {
+        const img = new Image()
+        img.onload = () => {
+          const canvas = document.createElement("canvas")
+          canvas.width = img.width || 400
+          canvas.height = img.height || 250
+          const ctx = canvas.getContext("2d")!
+          ctx.drawImage(img, 0, 0)
+          URL.revokeObjectURL(blobUrl)
+          resolve(canvas.toDataURL("image/png"))
+        }
+        img.onerror = () => { URL.revokeObjectURL(blobUrl); resolve(null) }
+        img.src = blobUrl
+      })
+    }
+
     const blob = await res.blob()
     return new Promise((resolve) => {
       const reader = new FileReader()
@@ -27,7 +49,7 @@ const PAGE_H = 297
 export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = false) {
   const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" })
 
-  const logoBase64 = await loadImageAsBase64("/car-logo.png")
+  const logoBase64 = await loadImageAsBase64("/logo-taller.svg")
 
   const bold = () => doc.setFont("helvetica", "bold")
   const normal = () => doc.setFont("helvetica", "normal")
