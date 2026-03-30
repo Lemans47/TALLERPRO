@@ -286,8 +286,9 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     }
   })
   // Fill with blank rows up to bottomAnchor (totals section start)
-  const trh = 6
-  const FIRMA_H = trh * 3 + 2 + 10
+  const trh1 = 16  // tall signature row
+  const trh = 6    // totals rows
+  const FIRMA_H = trh1 + trh * 2 + 2 + 10
   const bottomAnchor = PAGE_H - 15 - FIRMA_H
   const spaceLeft = bottomAnchor - 2 - cy  // -2 for the y += 2 after the loop
   if (spaceLeft > 0) {
@@ -370,17 +371,24 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   const labelW = 28
   const valW = MONTO_W - labelW
 
-  // Row 1 — FIRMA CLIENTE / SUB-TOTAL
+  // Row 1 — FIRMA CLIENTE | RECIBI CONFORME / SUB-TOTAL (tall, split)
+  const halfDesc = DESC_W / 2
   doc.setDrawColor(0, 0, 0)
-  doc.rect(ML, y, DESC_W, trh)
-  doc.rect(labelX, y, labelW, trh)
-  doc.rect(labelX + labelW, y, valW, trh)
+  doc.rect(ML, y, halfDesc, trh1)
+  doc.rect(ML + halfDesc, y, halfDesc, trh1)
+  doc.rect(labelX, y, labelW, trh1)
+  doc.rect(labelX + labelW, y, valW, trh1)
   bold(); doc.setFontSize(8)
-  doc.text("FIRMA CLIENTE", ML + 20, y + 4)
-  doc.text("RECIBI CONFORME", ML + DESC_W - 50, y + 4)
+  doc.text("FIRMA CLIENTE", ML + 2, y + 4)
+  doc.text("RECIBI CONFORME", ML + halfDesc + 2, y + 4)
   doc.text("SUB-TOTAL", labelX + 1, y + 4)
-  normal(); doc.text(fmt(subtotalVal), labelX + labelW + 1, y + 4)
-  y += trh
+  normal(); doc.text(fmt(subtotalVal), MR - 1, y + 4, { align: "right" })
+  // Signature lines
+  doc.setDrawColor(160, 160, 160); doc.setLineWidth(0.3)
+  doc.line(ML + 4, y + trh1 - 3, ML + halfDesc - 4, y + trh1 - 3)
+  doc.line(ML + halfDesc + 4, y + trh1 - 3, ML + DESC_W - 4, y + trh1 - 3)
+  doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.3)
+  y += trh1
 
   // Row 2 — AUTORIZO / IVA
   doc.rect(ML, y, DESC_W, trh)
@@ -389,7 +397,7 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   bold(); doc.setFontSize(7)
   doc.text("AUTORIZO LOS TRABAJOS DESCRITOS Y ACEPTO NOTAS", ML + 2, y + 4)
   doc.text("19% IVA", labelX + 1, y + 4)
-  normal(); doc.text(fmt(ivaVal), labelX + labelW + 1, y + 4)
+  normal(); doc.text(fmt(ivaVal), MR - 1, y + 4, { align: "right" })
   y += trh
 
   // Row 3 — TOTAL
@@ -399,7 +407,7 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   doc.setDrawColor(20, 20, 20); doc.rect(labelX, y, labelW + valW, trh)
   doc.setTextColor(255, 255, 255); bold(); doc.setFontSize(9)
   doc.text("TOTAL", labelX + 1, y + 4)
-  doc.text(fmt(totalVal), labelX + labelW + 1, y + 4)
+  doc.text(fmt(totalVal), MR - 1, y + 4, { align: "right" })
   black()
   y += trh + 2
 
