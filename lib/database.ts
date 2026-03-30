@@ -146,13 +146,13 @@ export async function createServicio(servicio: Omit<Servicio, "id" | "created_at
   const db = getSQL()
   const data = await db`
     INSERT INTO servicios (
-      fecha_ingreso, patente, marca, modelo, kilometraje, año, cliente, telefono, observaciones,
+      fecha_ingreso, patente, marca, modelo, color, kilometraje, año, cliente, telefono, observaciones,
       mano_obra_pintura, cobros, costos, piezas_pintura, estado, iva,
       anticipo, saldo_pendiente, monto_total, monto_total_sin_iva, observaciones_checkboxes,
       fotos_ingreso, fotos_entrega
     ) VALUES (
       ${servicio.fecha_ingreso}, ${servicio.patente}, ${servicio.marca}, ${servicio.modelo},
-      ${servicio.kilometraje || null}, ${servicio.año || null},
+      ${servicio.color || null}, ${servicio.kilometraje || null}, ${servicio.año || null},
       ${servicio.cliente}, ${servicio.telefono}, ${servicio.observaciones},
       ${servicio.mano_obra_pintura}, ${JSON.stringify(servicio.cobros)}, ${JSON.stringify(servicio.costos)},
       ${JSON.stringify(servicio.piezas_pintura)}, ${servicio.estado}, ${servicio.iva},
@@ -172,6 +172,7 @@ export async function updateServicio(id: string, servicio: Partial<Servicio>) {
       patente = COALESCE(${servicio.patente}, patente),
       marca = COALESCE(${servicio.marca}, marca),
       modelo = COALESCE(${servicio.modelo}, modelo),
+      color = COALESCE(${servicio.color || null}, color),
       kilometraje = COALESCE(${servicio.kilometraje}, kilometraje),
       año = COALESCE(${servicio.año}, año),
       cliente = COALESCE(${servicio.cliente}, cliente),
