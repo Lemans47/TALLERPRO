@@ -25,7 +25,7 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
 
   // ─── DRAW LOGO (jsPDF primitives, no image needed) ────────────────
   function drawLogo() {
-    const lx = ML, ly = 6, lw = 115, lh = 34
+    const lx = ML, ly = 6, lw = CW, lh = 34
     const cx = lx + 15, cy = ly + lh / 2
 
     // Light gray background
@@ -65,33 +65,43 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     doc.setFontSize(11)
     doc.text("RS", cx, cy + 3.8, { align: "center" })
 
-    // ── Right text (centered in remaining space) ──
-    const textAreaStart = lx + cx + ro + 3
-    const textAreaEnd = lx + lw - 1.5
-    const tcx = (textAreaStart + textAreaEnd) / 2  // center x of text area
+    // ── Center: AUTOMOTORA RS branding ──
+    const emblemRight = cx + ro + 3
+    const companyLeft = lx + lw - 75
+    const tcx = (emblemRight + companyLeft) / 2
 
-    // AUTOMOTORA (orange, spaced) — orange stays visible on gray bg
     doc.setTextColor(255, 140, 0)
     doc.setFont("helvetica", "normal")
     doc.setFontSize(6)
     doc.text("A U T O M O T O R A", tcx, ly + 8, { align: "center" })
 
-    // RS large orange bold
     doc.setTextColor(255, 140, 0)
     doc.setFont("helvetica", "bold")
     doc.setFontSize(20)
     doc.text("RS", tcx, ly + 20, { align: "center" })
 
-    // DESABOLLADURA & PINTURA
     doc.setTextColor(100, 100, 100)
     doc.setFont("helvetica", "normal")
     doc.setFontSize(5)
     doc.text("DESABOLLADURA & PINTURA", tcx, ly + 26, { align: "center" })
 
-    // CALIDAD · PRECISION · CONFIANZA
     doc.setTextColor(140, 140, 140)
     doc.setFontSize(4.2)
     doc.text("CALIDAD  \u00B7  PRECISION  \u00B7  CONFIANZA", tcx, ly + 31, { align: "center" })
+
+    // ── Right: contact info inside banner ──
+    const rx = lx + lw - 2
+    doc.setTextColor(80, 80, 80)
+    doc.setFont("helvetica", "bold")
+    doc.setFontSize(7)
+    doc.text("automotora.rs@gmail.com", rx, ly + 10, { align: "right" })
+    doc.setFont("helvetica", "normal")
+    doc.setFontSize(6.5)
+    doc.text("FRANKLIN 605", rx, ly + 17, { align: "right" })
+    doc.text("FONO +569 91390267", rx, ly + 23, { align: "right" })
+    doc.setTextColor(200, 120, 0)
+    doc.setFontSize(6)
+    doc.text("RUT 76.858.081-2", rx, ly + 30, { align: "right" })
 
     // Reset colors
     doc.setDrawColor(0, 0, 0)
@@ -102,13 +112,6 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   // ─── DRAW PAGE HEADER ─────────────────────────────────────────────
   function drawPageHeader(pageNum: number): number {
     drawLogo()
-
-    black(); bold(); doc.setFontSize(10)
-    doc.text("AUTOMOTORA RS SPA", MR, 16, { align: "right" })
-    normal(); doc.setFontSize(8)
-    doc.text("RUT 76.858.081-2", MR, 23, { align: "right" })
-    doc.text("mail: automotora.rs@gmail.com", MR, 30, { align: "right" })
-    doc.text("FRANKLIN 605 - FONO +569 91390267", MR, 37, { align: "right" })
 
     black(); bold(); doc.setFontSize(16)
     doc.text("PRESUPUESTO", 105, 50, { align: "center" })
