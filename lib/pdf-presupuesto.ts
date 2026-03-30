@@ -65,29 +65,30 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     doc.setFontSize(11)
     doc.text("RS", cx, cy + 3.8, { align: "center" })
 
-    // ── Center: AUTOMOTORA RS branding ──
-    const emblemRight = cx + ro + 3
-    const companyLeft = lx + lw - 75
-    const tcx = (emblemRight + companyLeft) / 2
+    // ── Center: AUTOMOTORA RS branding — centered between emblem and contact ──
+    const contactW = 60  // width reserved for contact block on right
+    const emblemRight = cx + ro + 4
+    const contactLeft = lx + lw - contactW
+    const tcx = (emblemRight + contactLeft) / 2
 
     doc.setTextColor(255, 140, 0)
     doc.setFont("helvetica", "normal")
-    doc.setFontSize(6)
+    doc.setFontSize(7)
     doc.text("A U T O M O T O R A", tcx, ly + 8, { align: "center" })
 
     doc.setTextColor(255, 140, 0)
     doc.setFont("helvetica", "bold")
-    doc.setFontSize(20)
-    doc.text("RS", tcx, ly + 20, { align: "center" })
+    doc.setFontSize(22)
+    doc.text("RS", tcx, ly + 21, { align: "center" })
 
-    doc.setTextColor(100, 100, 100)
+    doc.setTextColor(90, 90, 90)
     doc.setFont("helvetica", "normal")
-    doc.setFontSize(5)
-    doc.text("DESABOLLADURA & PINTURA", tcx, ly + 26, { align: "center" })
+    doc.setFontSize(6)
+    doc.text("DESABOLLADURA & PINTURA", tcx, ly + 27, { align: "center" })
 
     doc.setTextColor(140, 140, 140)
-    doc.setFontSize(4.2)
-    doc.text("CALIDAD  \u00B7  PRECISION  \u00B7  CONFIANZA", tcx, ly + 31, { align: "center" })
+    doc.setFontSize(5)
+    doc.text("CALIDAD  \u00B7  PRECISION  \u00B7  CONFIANZA", tcx, ly + 32, { align: "center" })
 
     // ── Right: contact info inside banner ──
     const rx = lx + lw - 2
