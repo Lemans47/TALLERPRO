@@ -81,8 +81,8 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     doc.setFontSize(22)
     doc.text("RS", tcx, ly + 21, { align: "center" })
 
-    doc.setTextColor(90, 90, 90)
-    doc.setFont("helvetica", "normal")
+    doc.setTextColor(200, 0, 0)
+    doc.setFont("helvetica", "bold")
     doc.setFontSize(6)
     doc.text("DESABOLLADURA & PINTURA", tcx, ly + 27, { align: "center" })
 
@@ -114,8 +114,13 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   function drawPageHeader(pageNum: number): number {
     drawLogo()
 
+    // Red separator line below logo
+    doc.setDrawColor(200, 0, 0); doc.setLineWidth(0.8)
+    doc.line(ML, 42, MR, 42)
+    doc.setLineWidth(0.3); doc.setDrawColor(0, 0, 0)
+
     black(); bold(); doc.setFontSize(16)
-    doc.text("PRESUPUESTO", 105, 50, { align: "center" })
+    doc.text("PRESUPUESTO", 105, 52, { align: "center" })
     if (pageNum > 1) {
       normal(); doc.setFontSize(9)
       doc.text(`(continuacion pagina ${pageNum})`, 105, 56, { align: "center" })
@@ -234,14 +239,13 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
 
   // ─── TABLE HEADER ─────────────────────────────────────────────────
   checkPageBreak(8)
-  doc.setFillColor(220, 220, 220)
-  doc.rect(ML, y, DESC_W, 7, "FD")
-  doc.rect(ML + DESC_W, y, MONTO_W, 7, "FD")
-  doc.setDrawColor(0, 0, 0)
-  black(); bold(); doc.setFontSize(8)
+  doc.setFillColor(20, 20, 20)
+  doc.rect(ML, y, DESC_W, 7, "F")
+  doc.rect(ML + DESC_W, y, MONTO_W, 7, "F")
+  doc.setTextColor(255, 255, 255); bold(); doc.setFontSize(8)
   doc.text("DESCRIPCION", ML + 2, y + 5)
   doc.text("VALOR", ML + DESC_W + MONTO_W / 2, y + 5, { align: "center" })
-  y += 7
+  black(); y += 7
 
   // ─── PRE-CALCULATE all row positions ──────────────────────────────
   const SUBTOTAL_H = 6
@@ -260,13 +264,13 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   function placeRow(type: PlacedRow["type"], rh: number, label?: string, desc?: string, monto?: number) {
     if (cy + rh > PAGE_H - 15) {
       doc.addPage(); cp++; cy = drawPageHeader(cp)
-      doc.setFillColor(220, 220, 220)
-      doc.rect(ML, cy, DESC_W, 7, "FD")
-      doc.rect(ML + DESC_W, cy, MONTO_W, 7, "FD")
-      doc.setDrawColor(0, 0, 0)
-      black(); bold(); doc.setFontSize(8)
+      doc.setFillColor(20, 20, 20)
+      doc.rect(ML, cy, DESC_W, 7, "F")
+      doc.rect(ML + DESC_W, cy, MONTO_W, 7, "F")
+      doc.setTextColor(255, 255, 255); bold(); doc.setFontSize(8)
       doc.text("DESCRIPCION (cont.)", ML + 2, cy + 5)
       doc.text("VALOR", ML + DESC_W + MONTO_W / 2, cy + 5, { align: "center" })
+      black()
       cy += 7
     }
     placed.push({ type, label, desc, monto, ry: cy, rh, pg: cp })
@@ -296,10 +300,7 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   const savedPg = doc.getCurrentPageInfo().pageNumber
   placed.forEach((r) => {
     doc.setPage(r.pg)
-    if (r.type === "category") {
-      doc.setFillColor(240, 240, 240)
-      doc.rect(ML, r.ry, CW, r.rh, "F")
-    } else if (r.type === "subtotal") {
+    if (r.type === "subtotal") {
       doc.setFillColor(232, 232, 232)
       doc.rect(ML, r.ry, CW, r.rh, "F")
     }
@@ -324,8 +325,9 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     doc.setPage(r.pg)
     black()
     if (r.type === "category") {
-      bold(); doc.setFontSize(8)
+      doc.setTextColor(200, 0, 0); bold(); doc.setFontSize(8)
       doc.text(up(r.label!) + ":", ML + 1.5, r.ry + r.rh - 2)
+      black()
     } else if (r.type === "subtotal") {
       bold(); doc.setFontSize(8)
       doc.text(fmt(r.monto!), MR - 1, r.ry + r.rh - 1.5, { align: "right" })
@@ -390,13 +392,14 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   y += trh
 
   // Row 3 — TOTAL
-  doc.setFillColor(220, 220, 220)
-  doc.rect(labelX, y, labelW, trh, "FD")
-  doc.rect(labelX + labelW, y, valW, trh, "FD")
-  doc.setFillColor(255, 255, 255)
-  bold(); doc.setFontSize(9)
+  doc.setFillColor(20, 20, 20)
+  doc.rect(labelX, y, labelW, trh, "F")
+  doc.rect(labelX + labelW, y, valW, trh, "F")
+  doc.setDrawColor(20, 20, 20); doc.rect(labelX, y, labelW + valW, trh)
+  doc.setTextColor(255, 255, 255); bold(); doc.setFontSize(9)
   doc.text("TOTAL", labelX + 1, y + 4)
   doc.text(fmt(totalVal), labelX + labelW + 1, y + 4)
+  black()
   y += trh + 2
 
   // ─── NOTES ────────────────────────────────────────────────────────
