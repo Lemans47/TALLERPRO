@@ -777,10 +777,6 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         )
         console.log("[v0] Servicio created:", newServicio)
         toast({ title: "Servicio guardado" })
-        if (newServicio) {
-          console.log("[v0] Generating PDF")
-          generateServicioPDF(newServicio)
-        }
       }
       console.log("[v0] Calling onSaved")
       onSaved()
