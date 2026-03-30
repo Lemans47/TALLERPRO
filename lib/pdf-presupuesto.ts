@@ -234,7 +234,7 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
 
   // ─── TABLE HEADER ─────────────────────────────────────────────────
   checkPageBreak(8)
-  doc.setFillColor(220, 230, 255)
+  doc.setFillColor(220, 220, 220)
   doc.rect(ML, y, DESC_W, 7, "FD")
   doc.rect(ML + DESC_W, y, MONTO_W, 7, "FD")
   doc.setDrawColor(0, 0, 0)
@@ -260,7 +260,7 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   function placeRow(type: PlacedRow["type"], rh: number, label?: string, desc?: string, monto?: number) {
     if (cy + rh > PAGE_H - 15) {
       doc.addPage(); cp++; cy = drawPageHeader(cp)
-      doc.setFillColor(220, 230, 255)
+      doc.setFillColor(220, 220, 220)
       doc.rect(ML, cy, DESC_W, 7, "FD")
       doc.rect(ML + DESC_W, cy, MONTO_W, 7, "FD")
       doc.setDrawColor(0, 0, 0)
@@ -300,7 +300,7 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
       doc.setFillColor(240, 240, 240)
       doc.rect(ML, r.ry, CW, r.rh, "F")
     } else if (r.type === "subtotal") {
-      doc.setFillColor(230, 236, 255)
+      doc.setFillColor(232, 232, 232)
       doc.rect(ML, r.ry, CW, r.rh, "F")
     }
   })
@@ -390,7 +390,7 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   y += trh
 
   // Row 3 — TOTAL
-  doc.setFillColor(220, 230, 255)
+  doc.setFillColor(220, 220, 220)
   doc.rect(labelX, y, labelW, trh, "FD")
   doc.rect(labelX + labelW, y, valW, trh, "FD")
   doc.setFillColor(255, 255, 255)
