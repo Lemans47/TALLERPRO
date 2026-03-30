@@ -1,22 +1,6 @@
 import jsPDF from "jspdf"
 import type { Servicio } from "@/lib/database"
 
-async function loadImageAsBase64(url: string): Promise<string | null> {
-  try {
-    const res = await fetch(url)
-    if (!res.ok) return null
-    const blob = await res.blob()
-    return new Promise((resolve) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(reader.result as string)
-      reader.onerror = () => resolve(null)
-      reader.readAsDataURL(blob)
-    })
-  } catch {
-    return null
-  }
-}
-
 export async function generarOrdenTrabajo(servicio: Servicio) {
   const doc = new jsPDF({ unit: "mm", format: [210, 297], orientation: "portrait" })
 
@@ -26,12 +10,66 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
   const PAGE_H = 297
   const MARGIN_BOTTOM = 25
 
-  const logoBase64 = await loadImageAsBase64("/car-logo.png")
-
   const bold   = () => doc.setFont("helvetica", "bold")
   const normal = () => doc.setFont("helvetica", "normal")
   const black  = () => doc.setTextColor(0, 0, 0)
   const up     = (s: string) => (s || "").toUpperCase()
+
+  function drawLogo() {
+    const lx = ML, ly = 6, lw = CW, lh = 34
+    const cx = lx + 15, cy = ly + lh / 2
+    const ro = 11.5, rm = 9.5, ri = 8.0
+
+    doc.setFillColor(235, 235, 235)
+    doc.roundedRect(lx, ly, lw, lh, 2, 2, "F")
+    doc.setFillColor(255, 140, 0)
+    doc.roundedRect(lx, ly, 1.2, lh, 1, 1, "F")
+    doc.roundedRect(lx + lw - 1.2, ly, 1.2, lh, 1, 1, "F")
+
+    doc.setFillColor(60, 60, 60)
+    doc.circle(cx, cy, ro, "F")
+    doc.setDrawColor(255, 140, 0); doc.setLineWidth(1.8)
+    doc.circle(cx, cy, ro, "S")
+    doc.setFillColor(50, 50, 50)
+    doc.circle(cx, cy, rm, "F")
+    doc.setFillColor(230, 92, 0)
+    doc.circle(cx, cy, ri, "F")
+    doc.setFillColor(255, 150, 20)
+    doc.circle(cx, cy - 1.5, ri * 0.65, "F")
+    doc.setFillColor(255, 130, 0)
+    doc.circle(cx, cy, ri * 0.5, "F")
+    doc.setTextColor(255, 255, 255)
+    doc.setFont("helvetica", "bold"); doc.setFontSize(11)
+    doc.text("RS", cx, cy + 3.8, { align: "center" })
+
+    const contactW = 60
+    const emblemRight = cx + ro + 4
+    const contactLeft = lx + lw - contactW
+    const tcx = (emblemRight + contactLeft) / 2
+
+    doc.setTextColor(255, 140, 0)
+    doc.setFont("helvetica", "normal"); doc.setFontSize(7)
+    doc.text("A U T O M O T O R A", tcx, ly + 8, { align: "center" })
+    doc.setFont("helvetica", "bold"); doc.setFontSize(22)
+    doc.text("RS", tcx, ly + 21, { align: "center" })
+    doc.setTextColor(90, 90, 90)
+    doc.setFont("helvetica", "normal"); doc.setFontSize(6)
+    doc.text("DESABOLLADURA & PINTURA", tcx, ly + 27, { align: "center" })
+    doc.setTextColor(140, 140, 140); doc.setFontSize(5)
+    doc.text("CALIDAD  \u00B7  PRECISION  \u00B7  CONFIANZA", tcx, ly + 32, { align: "center" })
+
+    const rx = lx + lw - 2
+    doc.setTextColor(80, 80, 80)
+    doc.setFont("helvetica", "bold"); doc.setFontSize(7)
+    doc.text("automotora.rs@gmail.com", rx, ly + 10, { align: "right" })
+    doc.setFont("helvetica", "normal"); doc.setFontSize(6.5)
+    doc.text("FRANKLIN 605", rx, ly + 17, { align: "right" })
+    doc.text("FONO +569 91390267", rx, ly + 23, { align: "right" })
+    doc.setTextColor(200, 120, 0); doc.setFontSize(6)
+    doc.text("RUT 76.858.081-2", rx, ly + 30, { align: "right" })
+
+    doc.setDrawColor(0, 0, 0); doc.setTextColor(0, 0, 0); doc.setLineWidth(0.3)
+  }
 
   // ── Page counter and Y tracker ──────────────────────────────────
   let y = 0
@@ -49,24 +87,7 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
 
   // ── Header ──────────────────────────────────────────────────────
   function drawHeader(pg: number): number {
-    if (logoBase64) {
-      doc.addImage(logoBase64, "PNG", ML, 10, 45, 28)
-    } else {
-      doc.setDrawColor(180, 180, 180); doc.setFillColor(240, 240, 240)
-      doc.roundedRect(ML, 10, 45, 28, 2, 2, "FD")
-      doc.setFontSize(7); doc.setTextColor(150, 150, 150)
-      doc.text("Automotora RS", ML + 8, 26)
-    }
-    black(); bold(); doc.setFontSize(7)
-    doc.text("AUTOMOTORA - SERVICIO INTEGRAL", ML, 43)
-
-    doc.setTextColor(30, 80, 180); doc.setFontSize(22); bold()
-    doc.text("Automotora RS", MR, 19, { align: "right" })
-    black(); normal(); doc.setFontSize(8)
-    doc.text("AUTOMOTORA RS SPA", MR, 25, { align: "right" })
-    doc.text("RUT 76.858.081-2", MR, 30, { align: "right" })
-    doc.text("mail: automotora.rs@gmail.com", MR, 36, { align: "right" })
-    doc.text("FRANKLIN 605 - FONO +569 91390267", MR, 41, { align: "right" })
+    drawLogo()
 
     black(); bold(); doc.setFontSize(16)
     if (pg === 1) {
