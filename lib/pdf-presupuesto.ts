@@ -25,7 +25,7 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
 
   // ─── DRAW LOGO (jsPDF primitives, no image needed) ────────────────
   function drawLogo() {
-    const lx = ML, ly = 8, lw = 115, lh = 30
+    const lx = ML, ly = 6, lw = 115, lh = 34
     const cx = lx + 15, cy = ly + lh / 2
 
     // Dark background
@@ -80,7 +80,7 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     doc.setTextColor(255, 140, 0)
     doc.setFont("helvetica", "bold")
     doc.setFontSize(20)
-    doc.text("RS", tcx, ly + 21, { align: "center" })
+    doc.text("RS", tcx, ly + 20, { align: "center" })
 
     // DESABOLLADURA & PINTURA
     doc.setTextColor(130, 130, 130)
@@ -91,7 +91,7 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     // CALIDAD · PRECISION · CONFIANZA
     doc.setTextColor(85, 85, 85)
     doc.setFontSize(4.2)
-    doc.text("CALIDAD  \u00B7  PRECISION  \u00B7  CONFIANZA", tcx, ly + 30, { align: "center" })
+    doc.text("CALIDAD  \u00B7  PRECISION  \u00B7  CONFIANZA", tcx, ly + 31, { align: "center" })
 
     // Reset colors
     doc.setDrawColor(0, 0, 0)
