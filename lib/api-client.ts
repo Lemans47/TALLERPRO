@@ -209,9 +209,61 @@ export async function deleteClienteApi(id: string): Promise<void> {
   if (!res.ok) throw new Error("Error deleting cliente")
 }
 
-export type { Servicio, Presupuesto, Gasto, PrecioPintura, PiezaPintura, FotoServicio, Cliente, Vehiculo }
+// Empleados
+export async function fetchEmpleados() {
+  const res = await fetch("/api/empleados")
+  if (!res.ok) throw new Error("Error fetching empleados")
+  return res.json()
+}
+
+export async function createEmpleadoApi(data: { nombre: string; rut?: string; cargo?: string; sueldo_base: number }) {
+  const res = await fetch("/api/empleados", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) })
+  if (!res.ok) throw new Error("Error creating empleado")
+  return res.json()
+}
+
+export async function updateEmpleadoApi(id: string, data: object) {
+  const res = await fetch("/api/empleados", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, ...data }) })
+  if (!res.ok) throw new Error("Error updating empleado")
+  return res.json()
+}
+
+export async function deleteEmpleadoApi(id: string) {
+  const res = await fetch(`/api/empleados?id=${id}`, { method: "DELETE" })
+  if (!res.ok) throw new Error("Error deleting empleado")
+}
+
+export async function fetchPagosEmpleados(year: number, month: number) {
+  const res = await fetch(`/api/pagos-empleados?year=${year}&month=${month}`)
+  if (!res.ok) throw new Error("Error fetching pagos")
+  return res.json()
+}
+
+export async function upsertPagoEmpleadoApi(data: object) {
+  const res = await fetch("/api/pagos-empleados", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) })
+  if (!res.ok) throw new Error("Error saving pago")
+  return res.json()
+}
+
+export async function deletePagoEmpleadoApi(id: string) {
+  const res = await fetch(`/api/pagos-empleados?id=${id}`, { method: "DELETE" })
+  if (!res.ok) throw new Error("Error deleting pago")
+}
+
+export type { Servicio, Presupuesto, Gasto, PrecioPintura, PiezaPintura, FotoServicio, Cliente, Vehiculo, Empleado, PagoEmpleado } from "./database"
 
 export const api = {
+  empleados: {
+    getAll: fetchEmpleados,
+    create: createEmpleadoApi,
+    update: updateEmpleadoApi,
+    delete: deleteEmpleadoApi,
+  },
+  pagosEmpleados: {
+    getByMonth: fetchPagosEmpleados,
+    upsert: upsertPagoEmpleadoApi,
+    delete: deletePagoEmpleadoApi,
+  },
   clientes: {
     getAll: fetchClientes,
     getVehiculosConCliente: fetchVehiculosConCliente,

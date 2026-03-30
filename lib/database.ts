@@ -427,6 +427,103 @@ export async function deleteTrabajador(id: string) {
   await db`DELETE FROM trabajadores WHERE id = ${id}`
 }
 
+// Empleados
+export interface Empleado {
+  id: string
+  nombre: string
+  rut?: string
+  cargo?: string
+  sueldo_base: number
+  activo: boolean
+  created_at: string
+}
+
+export interface PagoEmpleado {
+  id: string
+  empleado_id: string
+  mes: number
+  año: number
+  monto: number
+  pagado: boolean
+  fecha_pago?: string
+  notas?: string
+  created_at: string
+  // joined
+  empleado_nombre?: string
+  empleado_cargo?: string
+}
+
+export async function getEmpleados() {
+  const db = getSQL()
+  const data = await db`SELECT * FROM empleados ORDER BY nombre ASC`
+  return data as Empleado[]
+}
+
+export async function createEmpleado(e: { nombre: string; rut?: string; cargo?: string; sueldo_base: number }) {
+  const db = getSQL()
+  const data = await db`
+    INSERT INTO empleados (nombre, rut, cargo, sueldo_base)
+    VALUES (${e.nombre}, ${e.rut || null}, ${e.cargo || null}, ${e.sueldo_base})
+    RETURNING *
+  `
+  return data[0] as Empleado
+}
+
+export async function updateEmpleado(id: string, e: Partial<Empleado>) {
+  const db = getSQL()
+  const data = await db`
+    UPDATE empleados SET
+      nombre     = COALESCE(${e.nombre ?? null}, nombre),
+      rut        = COALESCE(${e.rut ?? null}, rut),
+      cargo      = COALESCE(${e.cargo ?? null}, cargo),
+      sueldo_base = COALESCE(${e.sueldo_base ?? null}, sueldo_base),
+      activo     = COALESCE(${e.activo ?? null}, activo)
+    WHERE id = ${id}
+    RETURNING *
+  `
+  return data[0] as Empleado
+}
+
+export async function deleteEmpleado(id: string) {
+  const db = getSQL()
+  await db`DELETE FROM empleados WHERE id = ${id}`
+}
+
+export async function getPagosEmpleadosByMonth(year: number, month: number) {
+  const db = getSQL()
+  const data = await db`
+    SELECT p.*, e.nombre AS empleado_nombre, e.cargo AS empleado_cargo
+    FROM pagos_empleados p
+    JOIN empleados e ON e.id = p.empleado_id
+    WHERE p.año = ${year} AND p.mes = ${month}
+    ORDER BY e.nombre ASC
+  `
+  return data as PagoEmpleado[]
+}
+
+export async function upsertPagoEmpleado(p: {
+  empleado_id: string; mes: number; año: number; monto: number; pagado?: boolean; fecha_pago?: string | null; notas?: string
+}) {
+  const db = getSQL()
+  const data = await db`
+    INSERT INTO pagos_empleados (empleado_id, mes, año, monto, pagado, fecha_pago, notas)
+    VALUES (${p.empleado_id}, ${p.mes}, ${p.año}, ${p.monto}, ${p.pagado ?? false}, ${p.fecha_pago ?? null}, ${p.notas ?? null})
+    ON CONFLICT (empleado_id, mes, año)
+    DO UPDATE SET
+      monto      = EXCLUDED.monto,
+      pagado     = EXCLUDED.pagado,
+      fecha_pago = EXCLUDED.fecha_pago,
+      notas      = EXCLUDED.notas
+    RETURNING *
+  `
+  return data[0] as PagoEmpleado
+}
+
+export async function deletePagoEmpleado(id: string) {
+  const db = getSQL()
+  await db`DELETE FROM pagos_empleados WHERE id = ${id}`
+}
+
 // Dashboard KPIs
 export async function getDashboardKPIs(year: number, month: number) {
   const servicios = await getServiciosByMonth(year, month)

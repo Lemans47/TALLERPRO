@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Wrench, Receipt, BarChart3, Settings, Menu, X, Car, LogOut, Users } from "lucide-react"
+import { LayoutDashboard, Wrench, Receipt, BarChart3, Settings, Menu, X, Car, LogOut, Users, UserCheck } from "lucide-react"
 import { useState } from "react"
 import { MonthSelector } from "@/components/month-selector"
 import { useAuth } from "@/lib/auth-context"
@@ -12,6 +12,7 @@ const allNavItems = [
   { href: "/servicios", label: "Servicios", icon: Wrench, roles: ["admin", "supervisor", "operador"] },
   { href: "/gastos", label: "Gastos", icon: Receipt, roles: ["admin", "supervisor", "operador"] },
   { href: "/clientes", label: "Clientes", icon: Users, roles: ["admin", "supervisor", "operador"] },
+  { href: "/empleados", label: "Empleados", icon: UserCheck, roles: ["admin", "supervisor"] },
   { href: "/reportes", label: "Reportes", icon: BarChart3, roles: ["admin", "supervisor"] },
   { href: "/configuracion", label: "Configuración", icon: Settings, roles: ["admin"] },
 ]
