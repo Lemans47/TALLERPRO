@@ -356,5 +356,9 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     ML + 12, y + 7.5,
   )
 
-  doc.save(`presupuesto-${servicio.patente}-${fechaStr}.pdf`)
+  const nombreArchivo = [servicio.marca, servicio.modelo, servicio.patente, servicio.cliente]
+    .map(s => (s || "").toUpperCase().replace(/\s+/g, "_"))
+    .filter(Boolean)
+    .join("-")
+  doc.save(`${nombreArchivo}.pdf`)
 }
