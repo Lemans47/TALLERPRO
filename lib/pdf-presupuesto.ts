@@ -291,8 +291,13 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   const FIRMA_H = trh * 3 + 2 + 10
   const bottomAnchor = PAGE_H - 15 - FIRMA_H
   const spaceLeft = bottomAnchor - cy
-  const blanksNeeded = Math.max(MIN_BLANK, Math.floor(spaceLeft / ITEM_H))
-  for (let i = 0; i < blanksNeeded; i++) placeRow("blank", ITEM_H)
+  if (spaceLeft > 0) {
+    const blanksNeeded = Math.max(MIN_BLANK, Math.floor(spaceLeft / ITEM_H))
+    for (let i = 0; i < blanksNeeded; i++) {
+      if (cy + ITEM_H > PAGE_H - 15) break
+      placeRow("blank", ITEM_H)
+    }
+  }
 
   y = cy; pageNum = cp
 
