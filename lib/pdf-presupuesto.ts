@@ -235,7 +235,6 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
 
   const CAT_H = 7
   const ITEM_H = 5.5
-  const MIN_BLANK = 4
 
   // ─── TABLE HEADER ─────────────────────────────────────────────────
   checkPageBreak(8)
@@ -286,17 +285,14 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
       placeRow("item", ITEM_H, undefined, row.desc, row.monto)
     }
   })
-  // Fill with blank rows until we reach the bottom anchor
+  // Fill with blank rows up to bottomAnchor (totals section start)
   const trh = 6
   const FIRMA_H = trh * 3 + 2 + 10
   const bottomAnchor = PAGE_H - 15 - FIRMA_H
-  const spaceLeft = bottomAnchor - cy
+  const spaceLeft = bottomAnchor - 2 - cy  // -2 for the y += 2 after the loop
   if (spaceLeft > 0) {
-    const blanksNeeded = Math.max(MIN_BLANK, Math.floor(spaceLeft / ITEM_H))
-    for (let i = 0; i < blanksNeeded; i++) {
-      if (cy + ITEM_H > PAGE_H - 15) break
-      placeRow("blank", ITEM_H)
-    }
+    const blanksNeeded = Math.floor(spaceLeft / ITEM_H)
+    for (let i = 0; i < blanksNeeded; i++) placeRow("blank", ITEM_H)
   }
 
   y = cy; pageNum = cp
