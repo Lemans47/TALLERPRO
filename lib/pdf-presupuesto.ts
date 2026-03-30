@@ -9,21 +9,27 @@ async function loadImageAsBase64(url: string): Promise<string | null> {
     // SVG → render on canvas → PNG base64
     if (url.endsWith(".svg")) {
       const svgText = await res.text()
-      const blob = new Blob([svgText], { type: "image/svg+xml" })
-      const blobUrl = URL.createObjectURL(blob)
+      // Parse explicit dimensions from SVG attributes
+      const wMatch = svgText.match(/\bwidth="(\d+)"/)
+      const hMatch = svgText.match(/\bheight="(\d+)"/)
+      const svgW = wMatch ? parseInt(wMatch[1]) : 560
+      const svgH = hMatch ? parseInt(hMatch[1]) : 220
+      // Use data URI (avoids blob URL cross-origin issues with SVG filters)
+      const dataUri = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgText)
       return new Promise((resolve) => {
         const img = new Image()
         img.onload = () => {
           const canvas = document.createElement("canvas")
-          canvas.width = img.width || 400
-          canvas.height = img.height || 250
+          const scale = 2 // higher resolution for better PDF quality
+          canvas.width = svgW * scale
+          canvas.height = svgH * scale
           const ctx = canvas.getContext("2d")!
-          ctx.drawImage(img, 0, 0)
-          URL.revokeObjectURL(blobUrl)
+          ctx.scale(scale, scale)
+          ctx.drawImage(img, 0, 0, svgW, svgH)
           resolve(canvas.toDataURL("image/png"))
         }
-        img.onerror = () => { URL.revokeObjectURL(blobUrl); resolve(null) }
-        img.src = blobUrl
+        img.onerror = () => resolve(null)
+        img.src = dataUri
       })
     }
 
