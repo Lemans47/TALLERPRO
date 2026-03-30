@@ -866,11 +866,17 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
 
       console.log("[v0] presupuestoData prepared:", presupuestoData)
 
-      const newPresupuesto = await api.presupuestos.create(
-        presupuestoData as Omit<Presupuesto, "id" | "created_at" | "updated_at">,
-      )
-      console.log("[v0] Presupuesto created:", newPresupuesto)
-      toast({ title: "Presupuesto creado" })
+      let newPresupuesto: Presupuesto
+      if (servicioAEditar?.isPresupuesto && servicioAEditar.id) {
+        newPresupuesto = await api.presupuestos.update(servicioAEditar.id, presupuestoData)
+        toast({ title: "Presupuesto actualizado" })
+      } else {
+        newPresupuesto = await api.presupuestos.create(
+          presupuestoData as Omit<Presupuesto, "id" | "created_at" | "updated_at">,
+        )
+        toast({ title: "Presupuesto creado" })
+      }
+      console.log("[v0] Presupuesto saved:", newPresupuesto)
       if (newPresupuesto) {
         setSavedPresupuesto(newPresupuesto)
         setPdfFormatDialog(true)
