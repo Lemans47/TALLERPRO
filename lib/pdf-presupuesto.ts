@@ -103,13 +103,12 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   function drawPageHeader(pageNum: number): number {
     drawLogo()
 
-    doc.setTextColor(30, 80, 180); doc.setFontSize(22); bold()
-    doc.text("Automotora RS", MR, 19, { align: "right" })
-    black(); normal(); doc.setFontSize(8)
-    doc.text("AUTOMOTORA RS SPA", MR, 25, { align: "right" })
-    doc.text("RUT 76.858.081-2", MR, 30, { align: "right" })
-    doc.text("mail: automotora.rs@gmail.com", MR, 36, { align: "right" })
-    doc.text("FRANKLIN 605 - FONO +569 91390267", MR, 41, { align: "right" })
+    black(); bold(); doc.setFontSize(10)
+    doc.text("AUTOMOTORA RS SPA", MR, 16, { align: "right" })
+    normal(); doc.setFontSize(8)
+    doc.text("RUT 76.858.081-2", MR, 23, { align: "right" })
+    doc.text("mail: automotora.rs@gmail.com", MR, 30, { align: "right" })
+    doc.text("FRANKLIN 605 - FONO +569 91390267", MR, 37, { align: "right" })
 
     black(); bold(); doc.setFontSize(16)
     doc.text("PRESUPUESTO", 105, 50, { align: "center" })
@@ -346,10 +345,15 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   doc.setPage(savedPg)
   y += 2
 
-  // ─── TOTALS + SIGNATURES ──────────────────────────────────────────
+  // ─── TOTALS + SIGNATURES — anchored to page bottom ───────────────
   const trh = 6
-  const TOTALS_H = 6 * 3 + 12 + 2 + 10 + 4
-  checkPageBreak(TOTALS_H)
+  const FIRMA_H = trh * 3 + 2 + 10  // 3 rows + gap + notes box = 30mm
+  const bottomAnchor = PAGE_H - 15 - FIRMA_H  // target y so totals end 15mm from bottom
+  if (y > bottomAnchor) {
+    // Items overflow past anchor — open a new page and anchor there
+    doc.addPage(); pageNum++; drawPageHeader(pageNum)
+  }
+  y = bottomAnchor
   const subtotalVal = Number(servicio.monto_total_sin_iva) || 0
   const totalVal = Number(servicio.monto_total) || 0
   const ivaVal = totalVal - subtotalVal
