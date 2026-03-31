@@ -832,29 +832,31 @@ export async function getClienteConVehiculos(clienteId: string) {
 
 export async function deduplicarClientes(): Promise<number> {
   const db = getSQL()
-  // Find duplicates grouped by normalized name, keep the one with most data (has phone/email, oldest)
-  const dupes = await db`
-    SELECT LOWER(TRIM(nombre)) as nombre_norm,
-           MIN(id) FILTER (WHERE telefono IS NOT NULL) as keep_with_phone,
-           MIN(id) as keep_fallback,
-           array_agg(id) as all_ids,
-           COUNT(*) as cnt
-    FROM clientes
-    GROUP BY LOWER(TRIM(nombre))
-    HAVING COUNT(*) > 1
-  `
-  if (dupes.length === 0) return 0
+  const todos = await db`SELECT * FROM clientes ORDER BY created_at ASC`
+
+  // Group by normalized name
+  const grupos: Record<string, typeof todos> = {}
+  for (const c of todos) {
+    const key = (c.nombre as string).toLowerCase().trim()
+    if (!grupos[key]) grupos[key] = []
+    grupos[key].push(c)
+  }
 
   let deleted = 0
-  for (const group of dupes) {
-    const keepId = group.keep_with_phone || group.keep_fallback
-    const toDelete = (group.all_ids as string[]).filter((id: string) => id !== keepId)
-    if (toDelete.length === 0) continue
-    // Reassign vehicles to the kept client
-    await db`UPDATE vehiculos SET cliente_id = ${keepId}, updated_at = NOW() WHERE cliente_id = ANY(${toDelete})`
-    // Delete duplicate clients
-    await db`DELETE FROM clientes WHERE id = ANY(${toDelete})`
-    deleted += toDelete.length
+  for (const grupo of Object.values(grupos)) {
+    if (grupo.length <= 1) continue
+    // Keep the one with phone first, then oldest
+    const keeper = [...grupo].sort((a, b) => {
+      if (a.telefono && !b.telefono) return -1
+      if (!a.telefono && b.telefono) return 1
+      return new Date(a.created_at as string).getTime() - new Date(b.created_at as string).getTime()
+    })[0]
+    const toDelete = grupo.filter((c) => c.id !== keeper.id)
+    for (const dup of toDelete) {
+      await db`UPDATE vehiculos SET cliente_id = ${keeper.id as string}, updated_at = NOW() WHERE cliente_id = ${dup.id as string}`
+      await db`DELETE FROM clientes WHERE id = ${dup.id as string}`
+      deleted++
+    }
   }
   return deleted
 }
