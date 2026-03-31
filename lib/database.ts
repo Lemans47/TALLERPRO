@@ -9,7 +9,7 @@ function getSQL() {
     throw new Error("Database connection string not found")
   }
 
-  return postgres(connectionString, { ssl: "require", max: 1 }) as any
+  return postgres(connectionString, { ssl: "require", max: 1, prepare: false }) as any
 }
 
 // Types
