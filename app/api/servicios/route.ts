@@ -45,7 +45,7 @@ export async function POST(request: Request) {
     // Sincronizar cliente y vehículo en sus tablas
     if (servicio.cliente && servicio.patente) {
       await upsertClienteYVehiculo(servicio.cliente, servicio.telefono || "", servicio.patente, {
-        marca: servicio.marca, modelo: servicio.modelo, color: servicio.color, año: servicio.año ? Number(servicio.año) : undefined,
+        marca: servicio.marca, modelo: servicio.modelo, color: servicio.color, año: servicio.año ? Number(servicio.año) : null,
       }).catch(() => {}) // no bloquear si falla
     }
     return NextResponse.json(servicio)
@@ -63,7 +63,7 @@ export async function PUT(request: Request) {
     // Sincronizar cliente y vehículo en sus tablas
     if (servicio.cliente && servicio.patente) {
       await upsertClienteYVehiculo(servicio.cliente, servicio.telefono || "", servicio.patente, {
-        marca: servicio.marca, modelo: servicio.modelo, color: servicio.color, año: servicio.año ? Number(servicio.año) : undefined,
+        marca: servicio.marca, modelo: servicio.modelo, color: servicio.color, año: servicio.año ? Number(servicio.año) : null,
       }).catch(() => {})
     }
     return NextResponse.json(servicio)

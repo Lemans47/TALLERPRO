@@ -285,6 +285,7 @@ export async function updatePresupuesto(id: string, presupuesto: Partial<Presupu
       patente = COALESCE(${presupuesto.patente ?? null}, patente),
       marca = COALESCE(${presupuesto.marca ?? null}, marca),
       modelo = COALESCE(${presupuesto.modelo ?? null}, modelo),
+      color = COALESCE(${presupuesto.color ?? null}, color),
       kilometraje = COALESCE(${presupuesto.kilometraje ?? null}, kilometraje),
       año = COALESCE(${presupuesto.año ?? null}, año),
       cliente = COALESCE(${presupuesto.cliente ?? null}, cliente),
@@ -889,20 +890,11 @@ export async function deletePrecioPintura(id: string) {
 
 export async function batchUpdatePreciosPintura(updates: { id: string; precio: number }[]) {
   const db = getSQL()
-
   if (updates.length === 0) return []
-
-  // Construir el query dinámicamente con CASE para actualizar múltiples filas en una sola query
-  const ids = updates.map((u) => u.id)
-  const caseStatement = updates.map((u) => `WHEN id = '${u.id}' THEN ${u.precio}`).join(" ")
-
-  const data = await db`
-    UPDATE precios_pintura SET
-      precio = CASE ${db.unsafe(caseStatement)} END,
-      updated_at = NOW()
-    WHERE id = ANY(${ids})
-    RETURNING *
-  `
-
-  return data as PrecioPintura[]
+  const results = await Promise.all(
+    updates.map((u) =>
+      db`UPDATE precios_pintura SET precio = ${u.precio}, updated_at = NOW() WHERE id = ${u.id} RETURNING *`
+    )
+  )
+  return results.flat() as PrecioPintura[]
 }
