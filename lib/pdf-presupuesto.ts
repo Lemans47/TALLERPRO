@@ -32,10 +32,9 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     doc.setFillColor(235, 235, 235)
     doc.roundedRect(lx, ly, lw, lh, 2, 2, "F")
 
-    // Black left/right border strips
-    doc.setFillColor(20, 20, 20)
-    doc.roundedRect(lx, ly, 1.2, lh, 1, 1, "F")
-    doc.roundedRect(lx + lw - 1.2, ly, 1.2, lh, 1, 1, "F")
+    // Red left border strip only (no right strip)
+    doc.setFillColor(200, 0, 0)
+    doc.roundedRect(lx, ly, 2.5, lh, 1, 1, "F")
 
     // ── Circular emblem ──
     const ro = 11.5, rm = 9.5, ri = 8.0
@@ -114,9 +113,11 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   function drawPageHeader(pageNum: number): number {
     drawLogo()
 
-    // Red separator line below logo
-    doc.setDrawColor(200, 0, 0); doc.setLineWidth(0.8)
+    // Red separator line below logo + thin gray line below with small gap
+    doc.setDrawColor(200, 0, 0); doc.setLineWidth(1.2)
     doc.line(ML, 42, MR, 42)
+    doc.setDrawColor(190, 190, 190); doc.setLineWidth(0.3)
+    doc.line(ML, 44.5, MR, 44.5)
     doc.setLineWidth(0.3); doc.setDrawColor(0, 0, 0)
 
     black(); bold(); doc.setFontSize(16)
@@ -302,7 +303,10 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   const savedPg = doc.getCurrentPageInfo().pageNumber
   placed.forEach((r) => {
     doc.setPage(r.pg)
-    if (r.type === "subtotal") {
+    if (r.type === "category") {
+      doc.setFillColor(200, 0, 0)
+      doc.rect(ML, r.ry, CW, r.rh, "F")
+    } else if (r.type === "subtotal") {
       doc.setFillColor(232, 232, 232)
       doc.rect(ML, r.ry, CW, r.rh, "F")
     }
@@ -327,7 +331,7 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     doc.setPage(r.pg)
     black()
     if (r.type === "category") {
-      doc.setTextColor(200, 0, 0); bold(); doc.setFontSize(8)
+      doc.setTextColor(255, 255, 255); bold(); doc.setFontSize(8)
       doc.text(up(r.label!) + ":", ML + 1.5, r.ry + r.rh - 2)
       black()
     } else if (r.type === "subtotal") {
@@ -401,10 +405,10 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   y += trh
 
   // Row 3 — TOTAL
-  doc.setFillColor(20, 20, 20)
+  doc.setFillColor(200, 0, 0)
   doc.rect(labelX, y, labelW, trh, "F")
   doc.rect(labelX + labelW, y, valW, trh, "F")
-  doc.setDrawColor(20, 20, 20); doc.rect(labelX, y, labelW + valW, trh)
+  doc.setDrawColor(200, 0, 0); doc.rect(labelX, y, labelW + valW, trh)
   doc.setTextColor(255, 255, 255); bold(); doc.setFontSize(9)
   doc.text("TOTAL", labelX + 1, y + 4)
   doc.text(fmt(totalVal), MR - 1, y + 4, { align: "right" })
