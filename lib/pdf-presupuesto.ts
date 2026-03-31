@@ -207,14 +207,18 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   const grouped: Record<string, { descripcion: string; monto: number }[]> = {}
   const categoryOrder: string[] = []
 
+  const PINTURA_KEY = "Pintura"
+  const toPinturaKey = (cat: string) =>
+    cat.toLowerCase().trim() === "pintura" ? PINTURA_KEY : cat
+
   cobros.forEach((c) => {
-    const cat = c.categoria || "Sin categoria"
+    const cat = toPinturaKey(c.categoria || "Sin categoria")
     if (!grouped[cat]) { grouped[cat] = []; categoryOrder.push(cat) }
     grouped[cat].push({ descripcion: c.descripcion || "", monto: Number(c.monto) || 0 })
   })
   if (piezas.length > 0) {
-    if (!grouped["Pintura"]) { grouped["Pintura"] = []; categoryOrder.push("Pintura") }
-    piezas.forEach((p) => grouped["Pintura"].push({ descripcion: p.nombre || "", monto: Number(p.precio) || 0 }))
+    if (!grouped[PINTURA_KEY]) { grouped[PINTURA_KEY] = []; categoryOrder.push(PINTURA_KEY) }
+    piezas.forEach((p) => grouped[PINTURA_KEY].push({ descripcion: p.nombre || "", monto: Number(p.precio) || 0 }))
   }
 
   const displayRows: DisplayRow[] = []

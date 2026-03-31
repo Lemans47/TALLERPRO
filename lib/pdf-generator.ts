@@ -83,12 +83,22 @@ export function generateServicioPDF(data: Servicio | Presupuesto) {
   // Agrupar cobros por categoría
   const cobrosPorCategoria: { [key: string]: { descripcion: string; monto: number }[] } = {}
 
+  const PINTURA_CAT = "pintura"
   data.cobros.forEach((cobro) => {
-    if (!cobrosPorCategoria[cobro.categoria]) {
-      cobrosPorCategoria[cobro.categoria] = []
+    const key = cobro.categoria?.toLowerCase().trim() === PINTURA_CAT ? "Pintura" : cobro.categoria
+    if (!cobrosPorCategoria[key]) {
+      cobrosPorCategoria[key] = []
     }
-    cobrosPorCategoria[cobro.categoria].push(cobro)
+    cobrosPorCategoria[key].push(cobro)
   })
+
+  // Merge piezas_pintura into Pintura category
+  if (data.piezas_pintura && Array.isArray(data.piezas_pintura) && data.piezas_pintura.length > 0) {
+    if (!cobrosPorCategoria["Pintura"]) cobrosPorCategoria["Pintura"] = []
+    data.piezas_pintura.forEach((pieza) => {
+      cobrosPorCategoria["Pintura"].push({ categoria: "Pintura", descripcion: pieza.nombre, monto: pieza.precio || 0 })
+    })
+  }
 
   // Mostrar trabajos por categoría
   Object.entries(cobrosPorCategoria).forEach(([categoria, items]) => {
@@ -106,20 +116,6 @@ export function generateServicioPDF(data: Servicio | Presupuesto) {
     })
     yPos += 2
   })
-
-  // Piezas de pintura si hay
-  if (data.piezas_pintura && Array.isArray(data.piezas_pintura) && data.piezas_pintura.length > 0) {
-    doc.setFont("helvetica", "bold")
-    doc.text("PIEZAS DE PINTURA:", 20, yPos)
-    yPos += 5
-
-    doc.setFont("helvetica", "normal")
-    data.piezas_pintura.forEach((pieza) => {
-      doc.text(`• ${pieza.nombre}`, 25, yPos)
-      yPos += 5
-    })
-    yPos += 2
-  }
 
   // Observaciones adicionales
   if (data.observaciones) {
