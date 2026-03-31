@@ -765,9 +765,9 @@ export async function upsertClienteYVehiculo(
 ) {
   const db = getSQL()
 
-  // Buscar o crear cliente por nombre+telefono
+  // Buscar o crear cliente por nombre (case-insensitive, trim)
   let clienteRows = await db`
-    SELECT * FROM clientes WHERE nombre = ${nombre} AND telefono = ${telefono} LIMIT 1
+    SELECT * FROM clientes WHERE LOWER(TRIM(nombre)) = LOWER(TRIM(${nombre})) LIMIT 1
   `
   let cliente: Cliente
   if (clienteRows.length > 0) {
@@ -828,6 +828,35 @@ export async function getClienteConVehiculos(clienteId: string) {
     cliente: (clienteData[0] as Cliente) || null,
     vehiculos: vehiculosData as Vehiculo[],
   }
+}
+
+export async function deduplicarClientes(): Promise<number> {
+  const db = getSQL()
+  // Find duplicates grouped by normalized name, keep the one with most data (has phone/email, oldest)
+  const dupes = await db`
+    SELECT LOWER(TRIM(nombre)) as nombre_norm,
+           MIN(id) FILTER (WHERE telefono IS NOT NULL) as keep_with_phone,
+           MIN(id) as keep_fallback,
+           array_agg(id) as all_ids,
+           COUNT(*) as cnt
+    FROM clientes
+    GROUP BY LOWER(TRIM(nombre))
+    HAVING COUNT(*) > 1
+  `
+  if (dupes.length === 0) return 0
+
+  let deleted = 0
+  for (const group of dupes) {
+    const keepId = group.keep_with_phone || group.keep_fallback
+    const toDelete = (group.all_ids as string[]).filter((id: string) => id !== keepId)
+    if (toDelete.length === 0) continue
+    // Reassign vehicles to the kept client
+    await db`UPDATE vehiculos SET cliente_id = ${keepId}, updated_at = NOW() WHERE cliente_id = ANY(${toDelete})`
+    // Delete duplicate clients
+    await db`DELETE FROM clientes WHERE id = ANY(${toDelete})`
+    deleted += toDelete.length
+  }
+  return deleted
 }
 
 export async function deletePrecioPintura(id: string) {

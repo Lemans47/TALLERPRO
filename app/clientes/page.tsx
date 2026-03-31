@@ -12,7 +12,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { Users, Search, Pencil, Trash2, Plus, Car, Phone, Mail, RefreshCw, X } from "lucide-react"
+import { Users, Search, Pencil, Trash2, Plus, Car, Phone, Mail, RefreshCw, X, GitMerge } from "lucide-react"
 import { api, type Cliente, type Vehiculo } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth-context"
 
@@ -27,6 +27,7 @@ export default function ClientesPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editando, setEditando] = useState<Cliente | null>(null)
   const [guardando, setGuardando] = useState(false)
+  const [deduplicando, setDeduplicando] = useState(false)
   const [form, setForm] = useState({ nombre: "", telefono: "", email: "", notas: "" })
 
   const cargarDatos = useCallback(async () => {
@@ -91,6 +92,21 @@ export default function ClientesPage() {
     }
   }
 
+  const deduplicar = async () => {
+    if (!confirm("¿Unificar todos los clientes duplicados? Se mantendrá el registro con más datos.")) return
+    setDeduplicando(true)
+    try {
+      const res = await fetch("/api/clientes/deduplicar", { method: "POST" })
+      const { deleted } = await res.json()
+      alert(deleted > 0 ? `Se eliminaron ${deleted} duplicado(s).` : "No se encontraron duplicados.")
+      await cargarDatos()
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setDeduplicando(false)
+    }
+  }
+
   const vehiculosPorCliente = (clienteId: string) =>
     vehiculos.filter((v) => v.cliente_id === clienteId)
 
@@ -121,6 +137,12 @@ export default function ClientesPage() {
           <Button variant="outline" size="icon" onClick={cargarDatos} disabled={loading}>
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
+          {role === "admin" && (
+            <Button variant="outline" onClick={deduplicar} disabled={deduplicando}>
+              <GitMerge className="w-4 h-4 mr-2" />
+              {deduplicando ? "Limpiando..." : "Limpiar duplicados"}
+            </Button>
+          )}
           {(role === "admin" || role === "supervisor") && (
             <Button onClick={abrirNuevo}>
               <Plus className="w-4 h-4 mr-2" />
