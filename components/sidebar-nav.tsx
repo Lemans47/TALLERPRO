@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Wrench, Receipt, BarChart3, Settings, Menu, X, Car, LogOut, Users, UserCheck } from "lucide-react"
+import { LayoutDashboard, Wrench, Receipt, BarChart3, Settings, Menu, X, Car, LogOut, Users, UserCheck, ExternalLink } from "lucide-react"
 import { useState } from "react"
 import { MonthSelector } from "@/components/month-selector"
 import { useAuth } from "@/lib/auth-context"
@@ -122,6 +122,16 @@ export function SidebarNav() {
             <NavItem key={item.href} item={item} />
           ))}
         </nav>
+
+        {/* Link página pública */}
+        <div className="px-3 pb-2">
+          <Link href="/solicitar-presupuesto" target="_blank">
+            <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-primary border border-primary/30 hover:bg-primary/10 transition-all">
+              <ExternalLink className="w-4 h-4" />
+              Formulario para clientes
+            </div>
+          </Link>
+        </div>
 
         {/* User info + logout */}
         <div className="p-4 border-t border-sidebar-border space-y-3">

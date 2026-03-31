@@ -10,13 +10,15 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
   const router = useRouter()
 
+  const isPublicRoute = pathname === "/login" || pathname.startsWith("/solicitar-presupuesto")
+
   useEffect(() => {
-    if (!loading && !user && pathname !== "/login") {
+    if (!loading && !user && !isPublicRoute) {
       router.push("/login")
     }
-  }, [user, loading, pathname])
+  }, [user, loading, pathname, isPublicRoute])
 
-  if (pathname === "/login") {
+  if (isPublicRoute) {
     return <>{children}</>
   }
 
@@ -28,7 +30,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
     )
   }
 
-  if (!user && pathname !== "/login") {
+  if (!user && !isPublicRoute) {
     router.push("/login")
     return null
   }

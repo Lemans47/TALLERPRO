@@ -6,7 +6,8 @@
       "Bash(powershell.exe -Command \"cd ''c:\\\\Users\\\\roros\\\\Desktop\\\\v0-taller-gestion-app-main\\\\v0-taller-gestion-app-main''; npm install --legacy-peer-deps 2>&1\")",
       "Bash(npm install:*)",
       "Bash(find c:UsersrorosDesktopv0-taller-gestion-app-mainv0-taller-gestion-app-main -name *.sql -o -name schema* -o -name migration*)",
-      "Bash(grep -n \"ALTER TABLE\\\\|ADD COLUMN.*cliente\" \"c:\\\\Users\\\\roros\\\\Desktop\\\\v0-taller-gestion-app-main\\\\v0-taller-gestion-app-main/scripts\"/*.sql)"
+      "Bash(grep -n \"ALTER TABLE\\\\|ADD COLUMN.*cliente\" \"c:\\\\Users\\\\roros\\\\Desktop\\\\v0-taller-gestion-app-main\\\\v0-taller-gestion-app-main/scripts\"/*.sql)",
+      "Bash(node scripts/migrate-to-supabase.mjs)"
     ]
   }
 }
