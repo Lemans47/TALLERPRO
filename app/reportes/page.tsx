@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,7 +11,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
-import { Download, FileSpreadsheet, TrendingUp, TrendingDown, DollarSign, Wrench, RefreshCw } from "lucide-react"
+import { Download, FileSpreadsheet, TrendingUp, TrendingDown, DollarSign, Wrench, RefreshCw, Users, ArrowUpRight, ArrowDownRight, Minus } from "lucide-react"
 import { useMonth } from "@/lib/month-context"
 import { api, type Servicio, type Gasto } from "@/lib/api-client"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
@@ -23,6 +24,17 @@ export default function ReportsPage() {
   const [servicios, setServicios] = useState<Servicio[]>([])
   const [gastos, setGastos] = useState<Gasto[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Comparison month
+  const prevMonth = (() => {
+    const [y, m] = selectedMonth.split("-").map(Number)
+    const d = new Date(y, m - 2, 1)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+  })()
+  const [compMonth, setCompMonth] = useState(prevMonth)
+  const [compServicios, setCompServicios] = useState<Servicio[]>([])
+  const [compGastos, setCompGastos] = useState<Gasto[]>([])
+  const [compLoading, setCompLoading] = useState(false)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -88,8 +100,51 @@ export default function ReportsPage() {
     { name: "Otros", value: servicios.filter((s) => s.observaciones_checkboxes?.includes("otros")).length },
   ].filter((d) => d.value > 0)
 
+  // Load comparison month data
+  const loadCompData = useCallback(async () => {
+    setCompLoading(true)
+    try {
+      const [y, m] = compMonth.split("-").map(Number)
+      const [s, g] = await Promise.all([api.servicios.getByMonth(y, m), api.gastos.getByMonth(y, m)])
+      setCompServicios(s)
+      setCompGastos(g)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setCompLoading(false)
+    }
+  }, [compMonth])
+
+  // Top clientes
+  const topClientes = (() => {
+    const map: Record<string, { cliente: string; total: number; count: number }> = {}
+    for (const s of servicios) {
+      const key = s.cliente || "Sin nombre"
+      if (!map[key]) map[key] = { cliente: key, total: 0, count: 0 }
+      map[key].total += Number(s.monto_total_sin_iva) || 0
+      map[key].count++
+    }
+    return Object.values(map).sort((a, b) => b.total - a.total).slice(0, 10)
+  })()
+
+  // Ingresos por tipo de servicio
+  const ingresosPorTipo = [
+    { name: "Pintura", value: servicios.filter(s => s.observaciones_checkboxes?.includes("pintura")).reduce((acc, s) => acc + Number(s.monto_total_sin_iva), 0) },
+    { name: "Desabolladura", value: servicios.filter(s => s.observaciones_checkboxes?.includes("desabolladura")).reduce((acc, s) => acc + Number(s.monto_total_sin_iva), 0) },
+    { name: "Mecánica", value: servicios.filter(s => s.observaciones_checkboxes?.includes("mecanica")).reduce((acc, s) => acc + Number(s.monto_total_sin_iva), 0) },
+    { name: "Otros", value: servicios.filter(s => s.observaciones_checkboxes?.includes("otros")).reduce((acc, s) => acc + Number(s.monto_total_sin_iva), 0) },
+  ].filter(d => d.value > 0)
+
+  // Comparison KPIs
+  const compIngresos = compServicios.filter(s => s.estado === "Cerrado/Pagado").reduce((sum, s) => sum + Number(s.monto_total_sin_iva), 0)
+  const compGastosTot = compGastos.reduce((sum, g) => sum + Number(g.monto), 0)
+  const compCostos = compServicios.reduce((sum, s) => sum + (s.costos || []).reduce((c, x) => c + Number(x.monto), 0), 0)
+  const compUtilidad = compIngresos - compGastosTot - compCostos
+
   const [selYear, selMonth] = selectedMonth.split("-").map(Number)
   const monthName = new Date(selYear, selMonth - 1, 1).toLocaleDateString("es-CL", { month: "long", year: "numeric" })
+  const [compYear, compMonthNum] = compMonth.split("-").map(Number)
+  const compMonthName = new Date(compYear, compMonthNum - 1, 1).toLocaleDateString("es-CL", { month: "long", year: "numeric" })
 
   const exportarPDF = () => {
     const doc = new jsPDF()
@@ -225,6 +280,15 @@ export default function ReportsPage() {
         </div>
       </div>
 
+      <Tabs defaultValue="resumen">
+
+        <TabsList className="mb-4">
+          <TabsTrigger value="resumen">Resumen</TabsTrigger>
+          <TabsTrigger value="clientes">Top Clientes</TabsTrigger>
+          <TabsTrigger value="comparar">Comparar meses</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="resumen" className="space-y-6">
       {/* Main KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
@@ -411,6 +475,118 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
       </div>
+        </TabsContent>
+
+        {/* ── TOP CLIENTES ── */}
+        <TabsContent value="clientes" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Ranking por ingresos */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Users className="w-4 h-4" /> Top clientes por ingresos
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {topClientes.length === 0 ? (
+                  <p className="text-muted-foreground text-sm">Sin datos este mes</p>
+                ) : (
+                  <div className="space-y-2">
+                    {topClientes.map((c, i) => (
+                      <div key={c.cliente} className="flex items-center gap-3">
+                        <span className="text-xs font-bold text-muted-foreground w-5 text-right">{i + 1}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{c.cliente}</p>
+                          <p className="text-xs text-muted-foreground">{c.count} servicio(s)</p>
+                        </div>
+                        <span className="text-sm font-semibold shrink-0">${c.total.toLocaleString("es-CL")}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Ingresos por tipo de servicio */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Ingresos por tipo de servicio</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {ingresosPorTipo.length === 0 ? (
+                  <p className="text-muted-foreground text-sm">Sin datos este mes</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={ingresosPorTipo} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                      <Tooltip formatter={(v: number) => [`$${v.toLocaleString("es-CL")}`, "Ingresos"]} contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px" }} />
+                      <Bar dataKey="value" fill="var(--chart-1)" radius={[4, 4, 0, 0]} name="Ingresos" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* ── COMPARAR MESES ── */}
+        <TabsContent value="comparar" className="space-y-6">
+          <div className="flex items-center gap-3">
+            <p className="text-sm font-medium">Comparar con:</p>
+            <input
+              type="month"
+              value={compMonth}
+              onChange={(e) => setCompMonth(e.target.value)}
+              className="border border-border rounded-md px-3 py-1.5 text-sm bg-background"
+            />
+            <Button size="sm" onClick={loadCompData} disabled={compLoading}>
+              {compLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : "Cargar"}
+            </Button>
+          </div>
+
+          {compServicios.length > 0 || compGastos.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {[
+                { label: "Ingresos Netos", cur: ingresosTotales, comp: compIngresos },
+                { label: "Gastos Totales", cur: totalGastos + costosServicios, comp: compGastosTot + compCostos },
+                { label: "Utilidad Neta", cur: utilidadNeta, comp: compUtilidad },
+                { label: "N° Servicios", cur: servicios.length, comp: compServicios.length, isCurrency: false },
+              ].map(({ label, cur, comp, isCurrency = true }) => {
+                const diff = cur - comp
+                const pct = comp !== 0 ? ((diff / Math.abs(comp)) * 100).toFixed(1) : null
+                const up = diff >= 0
+                return (
+                  <Card key={label}>
+                    <CardContent className="p-4 space-y-3">
+                      <p className="text-xs text-muted-foreground">{label}</p>
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground capitalize">{monthName.split(" ")[0]}</span>
+                          <span className="font-semibold">{isCurrency ? `$${cur.toLocaleString("es-CL")}` : cur}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground capitalize">{compMonthName.split(" ")[0]}</span>
+                          <span className="font-semibold">{isCurrency ? `$${comp.toLocaleString("es-CL")}` : comp}</span>
+                        </div>
+                      </div>
+                      <div className={`flex items-center gap-1 text-xs font-medium ${up ? "text-green-500" : "text-red-500"}`}>
+                        {diff === 0 ? <Minus className="w-3 h-3" /> : up ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                        {pct ? `${up ? "+" : ""}${pct}%` : "—"}
+                        <span className="text-muted-foreground font-normal">vs mes anterior</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-sm">Selecciona un mes y presiona "Cargar" para comparar.</p>
+          )}
+        </TabsContent>
+
+      </Tabs>
     </div>
   )
 }
