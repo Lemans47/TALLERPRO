@@ -91,7 +91,8 @@ export function generateServicioPDF(data: Servicio | Presupuesto) {
     reparar: "Reparar",
     otros: "Otros",
   }
-  data.cobros.forEach((cobro) => {
+  const cobrosArr = Array.isArray(data.cobros) ? data.cobros : (typeof data.cobros === "string" ? JSON.parse(data.cobros) : [])
+  cobrosArr.forEach((cobro: any) => {
     const key = CAT_LABELS[cobro.categoria?.toLowerCase().trim()] || cobro.categoria
     if (!cobrosPorCategoria[key]) {
       cobrosPorCategoria[key] = []
