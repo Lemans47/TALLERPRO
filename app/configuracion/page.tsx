@@ -40,6 +40,7 @@ export default function ConfiguracionPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [stats, setStats] = useState({ servicios: 0, gastos: 0, presupuestos: 0 })
   const [loading, setLoading] = useState(true)
+  const [dbProvider, setDbProvider] = useState("...")
   const [precioPintura, setPrecioPintura] = useState<PrecioPintura | null>(null)
   const [piezasPintura, setPiezasPintura] = useState<PiezaPintura[]>([])
   const [precioTemp, setPrecioTemp] = useState("")
@@ -63,12 +64,13 @@ export default function ConfiguracionPage() {
 
   const loadData = async () => {
     try {
-      const [servicios, gastos, presupuestos, precio, piezas] = await Promise.all([
+      const [servicios, gastos, presupuestos, precio, piezas, configRes] = await Promise.all([
         api.servicios.getAll(),
         api.gastos.getAll(),
         api.presupuestos.getAll(),
         api.precioPintura.get(),
         api.piezasPintura.getAll(),
+        fetch("/api/config").then((r) => r.json()),
       ])
       setStats({
         servicios: servicios.length,
@@ -78,6 +80,7 @@ export default function ConfiguracionPage() {
       setPrecioPintura(precio)
       setPrecioTemp(precio?.precio_por_pieza?.toString() || "")
       setPiezasPintura(piezas)
+      if (configRes?.provider) setDbProvider(configRes.provider)
     } catch (error) {
       console.error("Error loading data:", error)
     } finally {
@@ -267,7 +270,7 @@ export default function ConfiguracionPage() {
               <div className="flex items-center gap-3 p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg">
                 <CheckCircle className="w-5 h-5 text-green-600" />
                 <div>
-                  <p className="font-medium text-green-800 dark:text-green-200">Conectado a Supabase</p>
+                  <p className="font-medium text-green-800 dark:text-green-200">Base de datos conectada</p>
                   <p className="text-sm text-green-600 dark:text-green-400">
                     Tus datos se sincronizan automáticamente en la nube
                   </p>
@@ -302,7 +305,7 @@ export default function ConfiguracionPage() {
             <CardContent className="space-y-2">
               <div className="flex justify-between py-2 border-b">
                 <span className="text-sm text-muted-foreground">Método de almacenamiento</span>
-                <span className="text-sm font-medium">Supabase (PostgreSQL)</span>
+                <span className="text-sm font-medium">{dbProvider}</span>
               </div>
               <div className="flex justify-between py-2 border-b">
                 <span className="text-sm text-muted-foreground">Versión de la aplicación</span>
