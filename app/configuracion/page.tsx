@@ -28,8 +28,13 @@ import {
   Plus,
   Save,
   Settings,
+  Users,
 } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { api, type PrecioPintura, type PiezaPintura } from "@/lib/api-client"
+import { useAuth } from "@/lib/auth-context"
+
+type UsuarioRow = { id: string; email: string; role: string | null; created_at: string; last_sign_in_at: string | null }
 
 export default function ConfiguracionPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
@@ -43,6 +48,11 @@ export default function ConfiguracionPage() {
   const [savingPiezas, setSavingPiezas] = useState(false)
   const { toast } = useToast()
   const router = useRouter()
+  const { role: myRole } = useAuth()
+  const [usuarios, setUsuarios] = useState<UsuarioRow[]>([])
+  const [usuariosLoading, setUsuariosLoading] = useState(false)
+  const [usuariosError, setUsuariosError] = useState<string | null>(null)
+  const [savingRole, setSavingRole] = useState<string | null>(null)
 
   useEffect(() => {
     loadData()
@@ -69,6 +79,40 @@ export default function ConfiguracionPage() {
       console.error("Error loading data:", error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadUsuarios = async () => {
+    setUsuariosLoading(true)
+    setUsuariosError(null)
+    try {
+      const res = await fetch("/api/usuarios")
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setUsuarios(data)
+    } catch (e: any) {
+      setUsuariosError(e.message)
+    } finally {
+      setUsuariosLoading(false)
+    }
+  }
+
+  const cambiarRol = async (userId: string, role: string) => {
+    setSavingRole(userId)
+    try {
+      const res = await fetch("/api/usuarios", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, role }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setUsuarios((prev) => prev.map((u) => (u.id === userId ? { ...u, role } : u)))
+      toast({ title: "Rol actualizado" })
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" })
+    } finally {
+      setSavingRole(null)
     }
   }
 
@@ -172,6 +216,16 @@ export default function ConfiguracionPage() {
             <Paintbrush className="w-4 h-4 mr-2" />
             Precios Pintura
           </TabsTrigger>
+          {myRole === "admin" && (
+            <TabsTrigger
+              value="usuarios"
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              onClick={loadUsuarios}
+            >
+              <Users className="w-4 h-4 mr-2" />
+              Usuarios
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {/* General Tab */}
@@ -405,6 +459,64 @@ export default function ConfiguracionPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Usuarios Tab */}
+        {myRole === "admin" && (
+          <TabsContent value="usuarios" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="w-5 h-5" /> Gestión de Usuarios
+                </CardTitle>
+                <CardDescription>Administra los roles de acceso de cada usuario.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {usuariosError ? (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="w-4 h-4" />
+                    <AlertDescription>
+                      {usuariosError.includes("SUPABASE_SERVICE_ROLE_KEY")
+                        ? "Falta configurar la variable SUPABASE_SERVICE_ROLE_KEY en Vercel. Agrégala en Project Settings → Environment Variables."
+                        : usuariosError}
+                    </AlertDescription>
+                  </Alert>
+                ) : usuariosLoading ? (
+                  <p className="text-muted-foreground text-sm">Cargando usuarios...</p>
+                ) : usuarios.length === 0 ? (
+                  <p className="text-muted-foreground text-sm">Sin usuarios registrados.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {usuarios.map((u) => (
+                      <div key={u.id} className="flex items-center justify-between gap-4 p-3 border border-border rounded-lg">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{u.email}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Último acceso: {u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleDateString("es-CL") : "nunca"}
+                          </p>
+                        </div>
+                        <Select
+                          value={u.role || ""}
+                          onValueChange={(val) => cambiarRol(u.id, val)}
+                          disabled={savingRole === u.id}
+                        >
+                          <SelectTrigger className="w-36">
+                            <SelectValue placeholder="Sin rol" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="admin">Admin</SelectItem>
+                            <SelectItem value="supervisor">Supervisor</SelectItem>
+                            <SelectItem value="operador">Operador</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+
       </Tabs>
 
       {/* Delete Dialog */}
