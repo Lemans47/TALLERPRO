@@ -394,10 +394,10 @@ export async function updateGasto(id: string, gasto: Partial<Gasto>) {
   const db = getSQL()
   const data = await db`
     UPDATE gastos SET
-      fecha = COALESCE(${gasto.fecha}, fecha),
-      categoria = COALESCE(${gasto.categoria}, categoria),
-      descripcion = COALESCE(${gasto.descripcion}, descripcion),
-      monto = COALESCE(${gasto.monto}, monto),
+      fecha = COALESCE(${gasto.fecha ?? null}, fecha),
+      categoria = COALESCE(${gasto.categoria ?? null}, categoria),
+      descripcion = COALESCE(${gasto.descripcion ?? null}, descripcion),
+      monto = COALESCE(${gasto.monto ?? null}, monto),
       updated_at = NOW()
     WHERE id = ${id}
     RETURNING *
@@ -434,9 +434,9 @@ export async function updateTrabajador(id: string, trabajador: Partial<Trabajado
   const db = getSQL()
   const data = await db`
     UPDATE trabajadores SET
-      nombre = COALESCE(${trabajador.nombre}, nombre),
-      sueldo_base = COALESCE(${trabajador.sueldo_base}, sueldo_base),
-      activo = COALESCE(${trabajador.activo}, activo),
+      nombre = COALESCE(${trabajador.nombre ?? null}, nombre),
+      sueldo_base = COALESCE(${trabajador.sueldo_base ?? null}, sueldo_base),
+      activo = COALESCE(${trabajador.activo ?? null}, activo),
       updated_at = NOW()
     WHERE id = ${id}
     RETURNING *
@@ -762,10 +762,10 @@ export async function updateCliente(id: string, cliente: Partial<Cliente>) {
   const db = getSQL()
   const data = await db`
     UPDATE clientes SET
-      nombre = COALESCE(${cliente.nombre}, nombre),
-      telefono = COALESCE(${cliente.telefono}, telefono),
-      email = COALESCE(${cliente.email}, email),
-      notas = COALESCE(${cliente.notas}, notas),
+      nombre = COALESCE(${cliente.nombre ?? null}, nombre),
+      telefono = COALESCE(${cliente.telefono ?? null}, telefono),
+      email = COALESCE(${cliente.email ?? null}, email),
+      notas = COALESCE(${cliente.notas ?? null}, notas),
       updated_at = NOW()
     WHERE id = ${id}
     RETURNING *
