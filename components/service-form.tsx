@@ -355,7 +355,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       })
 
       // Cargar cobros por categoría
-      const cobrosData = servicioAEditar.cobros || []
+      const cobrosData = Array.isArray(servicioAEditar.cobros) ? servicioAEditar.cobros : (typeof servicioAEditar.cobros === "string" ? JSON.parse(servicioAEditar.cobros) : [])
       console.log("[v0] cobrosData from servicio:", cobrosData)
       const newCobros: ItemsPorCategoria = {
         pintura: [],
@@ -375,7 +375,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       setCobros(newCobros)
 
       // Cargar costos por categoría
-      const costosData = servicioAEditar.costos || []
+      const costosData = Array.isArray(servicioAEditar.costos) ? servicioAEditar.costos : (typeof servicioAEditar.costos === "string" ? JSON.parse(servicioAEditar.costos) : [])
       console.log("[v0] costosData from servicio:", costosData)
       const newCostos: ItemsPorCategoria = {
         pintura: [],
@@ -399,7 +399,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         try {
           const [precio, piezas] = await Promise.all([api.precioPintura.get(), api.piezasPintura.getAll()])
           const precioGlobal = precio?.precio_por_pieza || 0
-          const piezasData = servicioAEditar.piezas_pintura || []
+          const piezasData = Array.isArray(servicioAEditar.piezas_pintura) ? servicioAEditar.piezas_pintura : (typeof servicioAEditar.piezas_pintura === "string" ? JSON.parse(servicioAEditar.piezas_pintura) : [])
           
           if (Array.isArray(piezas) && piezas.length > 0) {
             const piezasConPrecio = piezas.map((p) => {
