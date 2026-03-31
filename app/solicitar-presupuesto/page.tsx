@@ -58,11 +58,13 @@ export default function SolicitarPresupuestoPage() {
       for (const file of Array.from(files)) {
         const fd = new FormData()
         fd.append("file", file)
+        fd.append("upload_preset", "tallerpro")
         fd.append("folder", "tallerpro/solicitudes")
-        const res = await fetch("/api/upload", { method: "POST", body: fd })
+        const res = await fetch("https://api.cloudinary.com/v1_1/dzjtujwor/image/upload", { method: "POST", body: fd })
         if (!res.ok) throw new Error()
-        const { url } = await res.json()
-        setPhotos(p => [...p, { url, name: file.name }])
+        const data = await res.json()
+        if (data.error) throw new Error(data.error.message)
+        setPhotos(p => [...p, { url: data.secure_url, name: file.name }])
       }
     } catch {
       setUploadError("No se pudo subir la foto. Intenta de nuevo.")
