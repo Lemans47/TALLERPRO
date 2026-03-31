@@ -53,6 +53,9 @@ export default function ConfiguracionPage() {
   const [usuariosLoading, setUsuariosLoading] = useState(false)
   const [usuariosError, setUsuariosError] = useState<string | null>(null)
   const [savingRole, setSavingRole] = useState<string | null>(null)
+  const [inviteEmail, setInviteEmail] = useState("")
+  const [inviteRole, setInviteRole] = useState("operador")
+  const [inviting, setInviting] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -94,6 +97,27 @@ export default function ConfiguracionPage() {
       setUsuariosError(e.message)
     } finally {
       setUsuariosLoading(false)
+    }
+  }
+
+  const invitarUsuario = async () => {
+    if (!inviteEmail.trim()) return
+    setInviting(true)
+    try {
+      const res = await fetch("/api/usuarios", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: inviteEmail.trim(), role: inviteRole }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      toast({ title: "Invitación enviada", description: `Se envió un email a ${inviteEmail}` })
+      setInviteEmail("")
+      await loadUsuarios()
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" })
+    } finally {
+      setInviting(false)
     }
   }
 
@@ -471,6 +495,31 @@ export default function ConfiguracionPage() {
                 <CardDescription>Administra los roles de acceso de cada usuario.</CardDescription>
               </CardHeader>
               <CardContent>
+                {/* Invite form */}
+                <div className="flex gap-2 mb-4">
+                  <Input
+                    placeholder="correo@ejemplo.com"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    type="email"
+                    className="flex-1"
+                  />
+                  <Select value={inviteRole} onValueChange={setInviteRole}>
+                    <SelectTrigger className="w-36">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="supervisor">Supervisor</SelectItem>
+                      <SelectItem value="operador">Operador</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button onClick={invitarUsuario} disabled={inviting || !inviteEmail.trim()}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    {inviting ? "Enviando..." : "Invitar"}
+                  </Button>
+                </div>
+
                 {usuariosError ? (
                   <Alert variant="destructive">
                     <AlertTriangle className="w-4 h-4" />

@@ -34,6 +34,23 @@ export async function GET() {
   }
 }
 
+export async function POST(req: NextRequest) {
+  try {
+    const { email, role } = await req.json()
+    if (!email || !role) return NextResponse.json({ error: "Faltan datos" }, { status: 400 })
+    const admin = getAdminClient()
+    // Invite user via email
+    const { data, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email)
+    if (inviteError) throw inviteError
+    // Assign role
+    const { error: roleError } = await admin.from("user_roles").upsert({ user_id: data.user.id, role }, { onConflict: "user_id" })
+    if (roleError) throw roleError
+    return NextResponse.json({ ok: true, userId: data.user.id })
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 })
+  }
+}
+
 export async function PUT(req: NextRequest) {
   try {
     const { userId, role } = await req.json()
