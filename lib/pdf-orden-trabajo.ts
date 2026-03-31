@@ -173,14 +173,18 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
   const grouped: Record<string, string[]> = {}
   const order: string[] = []
 
-  ;(servicio.cobros || []).forEach((c) => {
+  const parseArr = (v: any) => Array.isArray(v) ? v : (typeof v === "string" && v ? JSON.parse(v) : [])
+  const cobrosOT = parseArr(servicio.cobros)
+  const piezasOT = parseArr(servicio.piezas_pintura)
+
+  cobrosOT.forEach((c: any) => {
     const cat = c.categoria || "Sin categoria"
     if (!grouped[cat]) { grouped[cat] = []; order.push(cat) }
     grouped[cat].push(c.descripcion || "")
   })
-  if ((servicio.piezas_pintura || []).length > 0) {
+  if (piezasOT.length > 0) {
     if (!grouped["Pintura"]) { grouped["Pintura"] = []; order.push("Pintura") }
-    servicio.piezas_pintura!.forEach((p) => grouped["Pintura"].push(p.nombre || ""))
+    piezasOT.forEach((p: any) => grouped["Pintura"].push(p.nombre || ""))
   }
   order.forEach((cat) => {
     rows.push({ type: "category", label: cat })
