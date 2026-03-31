@@ -421,8 +421,9 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       cargarPiezasSeleccionadas()
 
       // Cargar fotos existentes
-      setFotosIngreso(servicioAEditar.fotos_ingreso || [])
-      setFotosEntrega(servicioAEditar.fotos_entrega || [])
+      const parseArr = (v: any) => Array.isArray(v) ? v : (typeof v === "string" && v ? JSON.parse(v) : [])
+      setFotosIngreso(parseArr(servicioAEditar.fotos_ingreso))
+      setFotosEntrega(parseArr(servicioAEditar.fotos_entrega))
     } else {
       setFotosIngreso([])
       setFotosEntrega([])
