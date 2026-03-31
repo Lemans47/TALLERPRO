@@ -36,6 +36,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
   const { toast } = useToast()
   const [filtroEstado, setFiltroEstado] = useState("todos")
   const [montoPago, setMontoPago] = useState("")
+  const [modoCorregir, setModoCorregir] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [servicioSeleccionado, setServicioSeleccionado] = useState<Servicio | null>(null)
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false)
@@ -57,20 +58,34 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
 
     try {
       const monto = Number(montoPago)
-      const nuevoSaldo = Number(servicioSeleccionado.saldo_pendiente) - monto
+      const total = Number(servicioSeleccionado.monto_total)
+      let nuevoAnticipo: number
+      let nuevoSaldo: number
+
+      if (modoCorregir) {
+        // Set exact anticipo value
+        nuevoAnticipo = monto
+        nuevoSaldo = Math.max(0, total - monto)
+      } else {
+        // Add to existing anticipo
+        nuevoAnticipo = Number(servicioSeleccionado.anticipo) + monto
+        nuevoSaldo = Math.max(0, total - nuevoAnticipo)
+      }
+
       const nuevoEstado = nuevoSaldo <= 0 ? "Cerrado/Pagado" : servicioSeleccionado.estado
 
       await api.servicios.update(servicioSeleccionado.id, {
-        anticipo: Number(servicioSeleccionado.anticipo) + monto,
-        saldo_pendiente: Math.max(0, nuevoSaldo),
+        anticipo: nuevoAnticipo,
+        saldo_pendiente: nuevoSaldo,
         estado: nuevoEstado,
       })
 
       setMontoPago("")
+      setModoCorregir(false)
       setDialogOpen(false)
       setServicioSeleccionado(null)
       onDeleted()
-      toast({ title: "Pago registrado" })
+      toast({ title: modoCorregir ? "Anticipo corregido" : "Pago registrado" })
     } catch (error) {
       console.error("Error:", error)
       toast({ title: "Error", description: "No se pudo registrar el pago", variant: "destructive" })
@@ -150,20 +165,45 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
         </DialogContent>
       </Dialog>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) { setModoCorregir(false); setMontoPago("") } }}>
         <DialogContent className="bg-card border-border">
           <DialogHeader>
             <DialogTitle>Registrar Pago - {servicioSeleccionado?.patente}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="p-4 rounded-xl bg-warning/5 border border-warning/20">
-              <Label className="text-muted-foreground text-sm">Saldo Pendiente</Label>
-              <p className="text-3xl font-bold text-warning">
-                ${Number(servicioSeleccionado?.saldo_pendiente).toLocaleString("es-CL")}
-              </p>
+            {/* Toggle agregar / corregir */}
+            <div className="flex rounded-lg border border-border overflow-hidden text-sm">
+              <button
+                className={`flex-1 py-2 font-medium transition-colors ${!modoCorregir ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}
+                onClick={() => { setModoCorregir(false); setMontoPago("") }}
+              >
+                Agregar abono
+              </button>
+              <button
+                className={`flex-1 py-2 font-medium transition-colors ${modoCorregir ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}
+                onClick={() => { setModoCorregir(true); setMontoPago(String(Number(servicioSeleccionado?.anticipo) || 0)) }}
+              >
+                Corregir anticipo
+              </button>
             </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 rounded-xl bg-success/5 border border-success/20">
+                <Label className="text-muted-foreground text-xs">Anticipo actual</Label>
+                <p className="text-xl font-bold text-success">
+                  ${Number(servicioSeleccionado?.anticipo).toLocaleString("es-CL")}
+                </p>
+              </div>
+              <div className="p-3 rounded-xl bg-warning/5 border border-warning/20">
+                <Label className="text-muted-foreground text-xs">Saldo pendiente</Label>
+                <p className="text-xl font-bold text-warning">
+                  ${Number(servicioSeleccionado?.saldo_pendiente).toLocaleString("es-CL")}
+                </p>
+              </div>
+            </div>
+
             <div className="space-y-2">
-              <Label>Monto a Abonar</Label>
+              <Label>{modoCorregir ? "Nuevo valor del anticipo" : "Monto a abonar"}</Label>
               <Input
                 type="number"
                 value={montoPago}
@@ -176,7 +216,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
               onClick={handleRegistrarPago}
               className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
             >
-              Confirmar Abono
+              {modoCorregir ? "Guardar corrección" : "Confirmar Abono"}
             </Button>
           </div>
         </DialogContent>
