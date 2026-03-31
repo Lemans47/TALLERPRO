@@ -2,7 +2,18 @@ import * as React from 'react'
 
 import { cn } from '@/lib/utils'
 
-function Input({ className, type, ...props }: React.ComponentProps<'input'>) {
+const TEXT_TYPES = new Set([undefined, 'text', 'search', 'tel'])
+
+function Input({ className, type, onChange, ...props }: React.ComponentProps<'input'>) {
+  const shouldUppercase = TEXT_TYPES.has(type as string | undefined)
+
+  const handleChange = shouldUppercase
+    ? (e: React.ChangeEvent<HTMLInputElement>) => {
+        e.target.value = e.target.value.toUpperCase()
+        onChange?.(e)
+      }
+    : onChange
+
   return (
     <input
       type={type}
@@ -13,6 +24,7 @@ function Input({ className, type, ...props }: React.ComponentProps<'input'>) {
         'aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive',
         className,
       )}
+      onChange={handleChange}
       {...props}
     />
   )
