@@ -83,13 +83,20 @@ export function generateServicioPDF(data: Servicio | Presupuesto) {
   // Agrupar cobros por categoría
   const cobrosPorCategoria: { [key: string]: { descripcion: string; monto: number }[] } = {}
 
-  const PINTURA_CAT = "pintura"
+  const CAT_LABELS: Record<string, string> = {
+    pintura: "Pintura",
+    desabolladura: "Desabolladura",
+    mecanica: "Mecánica",
+    repuestos: "Repuestos",
+    reparar: "Reparar",
+    otros: "Otros",
+  }
   data.cobros.forEach((cobro) => {
-    const key = cobro.categoria?.toLowerCase().trim() === PINTURA_CAT ? "Pintura" : cobro.categoria
+    const key = CAT_LABELS[cobro.categoria?.toLowerCase().trim()] || cobro.categoria
     if (!cobrosPorCategoria[key]) {
       cobrosPorCategoria[key] = []
     }
-    cobrosPorCategoria[key].push(cobro)
+    cobrosPorCategoria[key].push({ ...cobro, categoria: key })
   })
 
   // Merge piezas_pintura into Pintura category
