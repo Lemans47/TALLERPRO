@@ -1,20 +1,15 @@
-import { neon, type NeonQueryFunction } from "@neondatabase/serverless"
-
-let sql: NeonQueryFunction<false, false> | null = null
+import postgres from "postgres"
 
 function getSQL() {
-  // No cachear la conexión - crear una nueva en cada llamada para evitar problemas de state
   const connectionString =
     process.env.DATABASE_URL ||
-    process.env.POSTGRES_URL ||
-    process.env.NEON_DATABASE_URL ||
-    process.env.POSTGRES_URL_NON_POOLING
+    process.env.POSTGRES_URL
 
   if (!connectionString) {
     throw new Error("Database connection string not found")
   }
 
-  return neon(connectionString)
+  return postgres(connectionString, { ssl: "require", max: 1 }) as any
 }
 
 // Types
@@ -877,7 +872,7 @@ export async function deduplicarClientes(): Promise<number> {
       if (!a.telefono && b.telefono) return 1
       return new Date(a.created_at as string).getTime() - new Date(b.created_at as string).getTime()
     })[0]
-    const toDelete = grupo.filter((c) => c.id !== keeper.id)
+    const toDelete = grupo.filter((c: any) => c.id !== keeper.id)
     for (const dup of toDelete) {
       await db`UPDATE vehiculos SET cliente_id = ${keeper.id as string}, updated_at = NOW() WHERE cliente_id = ${dup.id as string}`
       await db`DELETE FROM clientes WHERE id = ${dup.id as string}`
