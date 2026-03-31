@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server"
-import { neon } from "@neondatabase/serverless"
+import postgres from "postgres"
 
 function getSQL() {
   const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL
   if (!connectionString) throw new Error("Database connection string not found")
-  return neon(connectionString)
+  return postgres(connectionString, { ssl: "require", max: 1, prepare: false })
 }
 
 export async function GET(request: Request) {
@@ -29,6 +29,7 @@ export async function GET(request: Request) {
       LIMIT 8
     `
 
+    await db.end()
     return NextResponse.json(rows)
   } catch (error) {
     console.error("buscar-patente error:", error)
