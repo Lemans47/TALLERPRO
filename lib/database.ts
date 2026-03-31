@@ -118,6 +118,32 @@ export async function getServicioById(id: string) {
   return (data[0] as Servicio) || null
 }
 
+export async function getHistorialByPatente(patente: string) {
+  const db = getSQL()
+  const data = await db`
+    SELECT id, fecha_ingreso, patente, marca, modelo, color, cliente, telefono,
+           observaciones, estado, monto_total, monto_total_sin_iva, cobros,
+           piezas_pintura, anticipo, saldo_pendiente, numero_ot
+    FROM servicios
+    WHERE UPPER(TRIM(patente)) = UPPER(TRIM(${patente}))
+    ORDER BY fecha_ingreso DESC
+  `
+  return data as Servicio[]
+}
+
+export async function getHistorialByCliente(nombre: string) {
+  const db = getSQL()
+  const data = await db`
+    SELECT id, fecha_ingreso, patente, marca, modelo, color, cliente, telefono,
+           observaciones, estado, monto_total, monto_total_sin_iva, cobros,
+           piezas_pintura, anticipo, saldo_pendiente, numero_ot
+    FROM servicios
+    WHERE LOWER(TRIM(cliente)) = LOWER(TRIM(${nombre}))
+    ORDER BY fecha_ingreso DESC
+  `
+  return data as Servicio[]
+}
+
 export async function getServicios() {
   const db = getSQL()
   const data = await db`
