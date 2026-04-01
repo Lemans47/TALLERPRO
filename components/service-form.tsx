@@ -456,19 +456,21 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       anticipo: 0,
     })
     setCobros({
-      pintura: [],
+      desmontar: [],
       desabolladura: [],
+      reparar: [],
+      pintura: [],
       mecanica: [],
       repuestos: [],
-      reparar: [],
       otros: [],
     })
     setCostos({
-      pintura: [],
+      desmontar: [],
       desabolladura: [],
+      reparar: [],
+      pintura: [],
       mecanica: [],
       repuestos: [],
-      reparar: [],
       otros: [],
     })
     setPiezasSeleccionadas((prev) => {
