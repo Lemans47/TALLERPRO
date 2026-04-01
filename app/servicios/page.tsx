@@ -31,17 +31,21 @@ export default function ServicesPage() {
     setLoading(true)
     try {
       const [year, month] = selectedMonth.split("-").map(Number)
-      const [delMes, todos, presupuestosData] = await Promise.all([
+      const [delMes, todos, presupuestosDelMes, todosPresupuestos] = await Promise.all([
         api.servicios.getByMonth(year, month),
         api.servicios.getAll(),
         api.presupuestos.getByMonth(year, month),
+        api.presupuestos.getAll(),
       ])
       // Servicios del mes + activos de cualquier mes, sin duplicados
       const activos = todos.filter((s) => ESTADOS_ACTIVOS.includes(s.estado))
       const idsDelMes = new Set(delMes.map((s) => s.id))
       const extra = activos.filter((s) => !idsDelMes.has(s.id))
       setServicios([...delMes, ...extra])
-      setPresupuestos(presupuestosData)
+      // Presupuestos del mes + todos los demás (todos son activos hasta convertirse)
+      const idsPresDelMes = new Set(presupuestosDelMes.map((p) => p.id))
+      const extraPres = todosPresupuestos.filter((p) => !idsPresDelMes.has(p.id))
+      setPresupuestos([...presupuestosDelMes, ...extraPres])
     } catch (error) {
       console.error("Error loading data:", error)
     } finally {
