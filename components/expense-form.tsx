@@ -28,12 +28,18 @@ export function ExpenseForm({ defaultCategory, gastoAEditar, onSaved, onCancel }
     fecha: new Date().toISOString().split("T")[0],
   })
 
+  const toDateStr = (v: any) => {
+    if (!v) return new Date().toISOString().split("T")[0]
+    if (v instanceof Date) return v.toISOString().split("T")[0]
+    return String(v).split("T")[0]
+  }
+
   useEffect(() => {
     if (gastoAEditar) {
       setFormData({
         descripcion: gastoAEditar.descripcion,
         monto: String(gastoAEditar.monto),
-        fecha: gastoAEditar.fecha,
+        fecha: toDateStr(gastoAEditar.fecha),
       })
     } else {
       setFormData({

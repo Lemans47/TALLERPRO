@@ -339,7 +339,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   useEffect(() => {
     if (servicioAEditar) {
       setFormData({
-        fecha_ingreso: servicioAEditar.fecha_ingreso,
+        fecha_ingreso: servicioAEditar.fecha_ingreso instanceof Date ? servicioAEditar.fecha_ingreso.toISOString().split("T")[0] : String(servicioAEditar.fecha_ingreso).split("T")[0],
         patente: servicioAEditar.patente,
         marca: servicioAEditar.marca || "",
         modelo: servicioAEditar.modelo || "",
