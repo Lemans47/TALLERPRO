@@ -1669,15 +1669,15 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                           </tr>
                         </thead>
                         <tbody>
-                          {cobros.pintura.length === 0 ? (
+                          {safeArr(cobros.pintura).length === 0 ? (
                             <tr>
                               <td colSpan={5} className="text-center p-4 text-muted-foreground text-xs">
                                 Sin items adicionales. Usa el botón + para agregar.
                               </td>
                             </tr>
                           ) : (
-                            cobros.pintura.map((itemCobro, index) => {
-                              const itemCosto = costos.pintura[index]
+                            safeArr(cobros.pintura).map((itemCobro, index) => {
+                              const itemCosto = safeArr(costos.pintura)[index]
                               const cobro = Number(itemCobro.monto) || 0
                               const costo = itemCosto ? Number(itemCosto.monto) || 0 : 0
                               const utilidad = cobro - costo
@@ -1750,7 +1750,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
 
                     {/* Totales */}
                     {(() => {
-                      const cobrosPintura = cobros.pintura.reduce((sum, item) => sum + (Number(item.monto) || 0), 0)
+                      const cobrosPintura = safeArr(cobros.pintura).reduce((sum, item) => sum + (Number(item.monto) || 0), 0)
                       // Costos manuales (excluir auto-gestionados para evitar doble conteo)
                       const costosManual = costos.pintura
                         .filter((item) => !isAutoItem(item.descripcion))
@@ -1908,13 +1908,13 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                         <div>
                           <p className="text-xs text-muted-foreground">Total Costo</p>
                           <p className="text-lg font-bold text-warning">
-                            ${Object.values(costos[categoria as keyof ItemsPorCategoria]).reduce((sum, item) => sum + (Number(item.monto) || 0), 0).toLocaleString("es-CL")}
+                            ${safeArr(costos[categoria as keyof ItemsPorCategoria]).reduce((sum, item) => sum + (Number(item.monto) || 0), 0).toLocaleString("es-CL")}
                           </p>
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground">Utilidad</p>
-                          <p className={`text-lg font-bold ${(Object.values(cobros[categoria as keyof ItemsPorCategoria]).reduce((sum, item) => sum + (Number(item.monto) || 0), 0) - Object.values(costos[categoria as keyof ItemsPorCategoria]).reduce((sum, item) => sum + (Number(item.monto) || 0), 0)) >= 0 ? "text-info" : "text-destructive"}`}>
-                            ${(Object.values(cobros[categoria as keyof ItemsPorCategoria]).reduce((sum, item) => sum + (Number(item.monto) || 0), 0) - Object.values(costos[categoria as keyof ItemsPorCategoria]).reduce((sum, item) => sum + (Number(item.monto) || 0), 0)).toLocaleString("es-CL")}
+                          <p className={`text-lg font-bold ${(safeArr(cobros[categoria as keyof ItemsPorCategoria]).reduce((sum, item) => sum + (Number(item.monto) || 0), 0) - safeArr(costos[categoria as keyof ItemsPorCategoria]).reduce((sum, item) => sum + (Number(item.monto) || 0), 0)) >= 0 ? "text-info" : "text-destructive"}`}>
+                            ${(safeArr(cobros[categoria as keyof ItemsPorCategoria]).reduce((sum, item) => sum + (Number(item.monto) || 0), 0) - safeArr(costos[categoria as keyof ItemsPorCategoria]).reduce((sum, item) => sum + (Number(item.monto) || 0), 0)).toLocaleString("es-CL")}
                           </p>
                         </div>
                       </div>
