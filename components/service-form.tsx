@@ -643,7 +643,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   const costosManualPintura = costos.pintura
     .filter((item) => !isAutoItem(item.descripcion))
     .reduce((sum, item) => sum + (Number(item.monto) || 0), 0)
-  const costosOtros = [...costos.desabolladura, ...costos.mecanica, ...costos.repuestos, ...costos.reparar, ...costos.otros]
+  const costosOtros = [...costos.desmontar, ...costos.desabolladura, ...costos.reparar, ...costos.mecanica, ...costos.repuestos, ...costos.otros]
     .reduce((sum, item) => sum + (Number(item.monto) || 0), 0)
 
   const totalCostos = costosManualPintura + costosOtros + autoCostoManoObra + autoCostoMateriales

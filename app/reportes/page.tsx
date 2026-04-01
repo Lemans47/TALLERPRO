@@ -73,9 +73,9 @@ export default function ReportsPage() {
   const totalGastos = gastos.reduce((sum, g) => sum + Number(g.monto), 0)
 
   // Costos de servicios
+  const parseArr = (v: any) => Array.isArray(v) ? v : (typeof v === "string" && v ? JSON.parse(v) : [])
   const costosServicios = servicios.reduce((sum, s) => {
-    const costos = s.costos || []
-    return sum + costos.reduce((c, costo) => c + Number(costo.monto), 0)
+    return sum + parseArr(s.costos).reduce((c: number, costo: any) => c + Number(costo.monto), 0)
   }, 0)
 
   const utilidadNeta = ingresosTotales - totalGastos - costosServicios
@@ -138,7 +138,7 @@ export default function ReportsPage() {
   // Comparison KPIs
   const compIngresos = compServicios.filter(s => s.estado === "Cerrado/Pagado").reduce((sum, s) => sum + Number(s.monto_total_sin_iva), 0)
   const compGastosTot = compGastos.reduce((sum, g) => sum + Number(g.monto), 0)
-  const compCostos = compServicios.reduce((sum, s) => sum + (s.costos || []).reduce((c, x) => c + Number(x.monto), 0), 0)
+  const compCostos = compServicios.reduce((sum, s) => sum + parseArr(s.costos).reduce((c: number, x: any) => c + Number(x.monto), 0), 0)
   const compUtilidad = compIngresos - compGastosTot - compCostos
 
   const [selYear, selMonth] = selectedMonth.split("-").map(Number)

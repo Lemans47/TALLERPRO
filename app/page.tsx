@@ -68,8 +68,8 @@ export default function DashboardPage() {
     const totalGastos = gastos.reduce((sum, g) => sum + Number(g.monto || 0), 0)
 
     const costosServicios = servicios.reduce((sum, s) => {
-      const costos = s.costos || []
-      return sum + costos.reduce((c, costo) => c + Number(costo.monto || 0), 0)
+      const costos = Array.isArray(s.costos) ? s.costos : (typeof s.costos === "string" && s.costos ? JSON.parse(s.costos) : [])
+      return sum + costos.reduce((c: number, costo: any) => c + Number(costo.monto || 0), 0)
     }, 0)
 
     const gastosTotal = totalGastos + costosServicios

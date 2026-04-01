@@ -36,7 +36,8 @@ export function RevenueChart() {
           }
           // Solo sumar costos de servicios cerrados/pagados
           if (s.estado === "Cerrado/Pagado") {
-            const costoServicio = (s.costos || []).reduce((sum, c) => sum + (Number(c.monto) || 0), 0)
+            const costosArr = Array.isArray(s.costos) ? s.costos : (typeof s.costos === "string" && s.costos ? JSON.parse(s.costos) : [])
+            const costoServicio = costosArr.reduce((sum: number, c: any) => sum + (Number(c.monto) || 0), 0)
             monthlyData[key].gastos += costoServicio
           }
         }
