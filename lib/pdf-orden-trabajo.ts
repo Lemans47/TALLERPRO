@@ -177,16 +177,27 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
   const cobrosOT = parseArr(servicio.cobros)
   const piezasOT = parseArr(servicio.piezas_pintura)
 
+  const CAT_LABELS_OT: Record<string, string> = {
+    desmontar: "Desmontar y Montar",
+    desabolladura: "Desabolladura",
+    reparar: "Reparar",
+    pintura: "Pintura",
+    mecanica: "Mecánica",
+    repuestos: "Repuestos",
+    otros: "Otros",
+  }
+  const CAT_ORDER_OT = ["Desmontar y Montar", "Desabolladura", "Reparar", "Pintura", "Mecánica", "Repuestos", "Otros"]
   cobrosOT.forEach((c: any) => {
-    const cat = c.categoria || "Sin categoria"
-    if (!grouped[cat]) { grouped[cat] = []; order.push(cat) }
+    const cat = CAT_LABELS_OT[c.categoria?.toLowerCase().trim()] || c.categoria || "Sin categoria"
+    if (!grouped[cat]) { grouped[cat] = [] }
     grouped[cat].push(c.descripcion || "")
   })
   if (piezasOT.length > 0) {
-    if (!grouped["Pintura"]) { grouped["Pintura"] = []; order.push("Pintura") }
+    if (!grouped["Pintura"]) { grouped["Pintura"] = [] }
     piezasOT.forEach((p: any) => grouped["Pintura"].push(p.nombre || ""))
   }
-  order.forEach((cat) => {
+  const orderedCatsOT = [...CAT_ORDER_OT.filter((c) => grouped[c]), ...Object.keys(grouped).filter((c) => !CAT_ORDER_OT.includes(c))]
+  orderedCatsOT.forEach((cat) => {
     rows.push({ type: "category", label: cat })
     grouped[cat].forEach((desc) => rows.push({ type: "item", desc }))
   })

@@ -67,16 +67,20 @@ const ESTADOS = [
 ]
 
 const CATEGORIAS_COBROS = [
-  { id: "pintura", label: "Piezas Pintura", icon: Paintbrush },
+  { id: "desmontar", label: "Desmontar y Montar", icon: Wrench },
   { id: "desabolladura", label: "Desabolladura", icon: Hammer },
+  { id: "reparar", label: "Reparar", icon: Wrench },
+  { id: "pintura", label: "Piezas Pintura", icon: Paintbrush },
   { id: "mecanica", label: "Mecánica", icon: Settings2 },
   { id: "repuestos", label: "Repuestos", icon: Package },
   { id: "otros", label: "Otros", icon: DollarSign },
 ]
 
 const CATEGORIAS_COSTOS = [
-  { id: "pintura", label: "Mano Obra Pintura", icon: Paintbrush },
+  { id: "desmontar", label: "Desmontar y Montar", icon: Wrench },
   { id: "desabolladura", label: "Desabolladura", icon: Hammer },
+  { id: "reparar", label: "Reparar", icon: Wrench },
+  { id: "pintura", label: "Mano Obra Pintura", icon: Paintbrush },
   { id: "mecanica", label: "Mecánica", icon: Settings2 },
   { id: "repuestos", label: "Repuestos", icon: Package },
   { id: "otros", label: "Otros", icon: DollarSign },
@@ -89,11 +93,12 @@ interface ItemDetalle {
 }
 
 interface ItemsPorCategoria {
-  pintura: ItemDetalle[]
+  desmontar: ItemDetalle[]
   desabolladura: ItemDetalle[]
+  reparar: ItemDetalle[]
+  pintura: ItemDetalle[]
   mecanica: ItemDetalle[]
   repuestos: ItemDetalle[]
-  reparar: ItemDetalle[]
   otros: ItemDetalle[]
 }
 
@@ -188,7 +193,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   const [searchValue, setSearchValue] = useState("")
   const [showEditPiezasModal, setShowEditPiezasModal] = useState(false)
   const [activeTab, setActiveTab] = useState("cobros")
-  const [activeCobroTab, setActiveCobroTab] = useState("pintura")
+  const [activeCobroTab, setActiveCobroTab] = useState("desmontar")
   const [activeCostoTab, setActiveCostoTab] = useState("pintura") // Added state for cost tab
   const [fotosIngreso, setFotosIngreso] = useState<FotoServicio[]>([])
   const [fotosEntrega, setFotosEntrega] = useState<FotoServicio[]>([])
@@ -216,20 +221,22 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   })
 
   const [cobros, setCobros] = useState<ItemsPorCategoria>({
-    pintura: [],
+    desmontar: [],
     desabolladura: [],
+    reparar: [],
+    pintura: [],
     mecanica: [],
     repuestos: [],
-    reparar: [],
     otros: [],
   })
 
   const [costos, setCostos] = useState<ItemsPorCategoria>({
-    pintura: [],
+    desmontar: [],
     desabolladura: [],
+    reparar: [],
+    pintura: [],
     mecanica: [],
     repuestos: [],
-    reparar: [],
     otros: [],
   })
 
@@ -1512,12 +1519,13 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
               {/* Tab: Detalles de Trabajo (Cobros + Costos unificados) */}
               <TabsContent value="cobros" className="space-y-4">
                 <Tabs value={activeCobroTab} onValueChange={setActiveCobroTab}>
-                  <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 bg-secondary/20 h-auto">
-                    <TabsTrigger value="pintura" className="text-xs py-2">Pintura</TabsTrigger>
+                  <TabsList className="grid w-full grid-cols-4 sm:grid-cols-7 bg-secondary/20 h-auto">
+                    <TabsTrigger value="desmontar" className="text-xs py-2">Desmontar</TabsTrigger>
                     <TabsTrigger value="desabolladura" className="text-xs py-2">Desabolladura</TabsTrigger>
+                    <TabsTrigger value="reparar" className="text-xs py-2">Reparar</TabsTrigger>
+                    <TabsTrigger value="pintura" className="text-xs py-2">Pintura</TabsTrigger>
                     <TabsTrigger value="mecanica" className="text-xs py-2">Mecánica</TabsTrigger>
                     <TabsTrigger value="repuestos" className="text-xs py-2">Repuestos</TabsTrigger>
-                    <TabsTrigger value="reparar" className="text-xs py-2">Reparar</TabsTrigger>
                     <TabsTrigger value="otros" className="text-xs py-2">Otros</TabsTrigger>
                   </TabsList>
 
@@ -1789,7 +1797,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                   </TabsContent>
 
                   {/* Tabs para otras categorías - Con Textarea para descripción */}
-                  {["desabolladura", "mecanica", "repuestos", "reparar", "otros"].map((categoria) => (
+                  {["desmontar", "desabolladura", "reparar", "mecanica", "repuestos", "otros"].map((categoria) => (
                     <TabsContent key={categoria} value={categoria} className="space-y-3">
                       {/* Tabla unificada de Cobros y Costos */}
                       <div className="overflow-x-auto border border-border rounded-lg">

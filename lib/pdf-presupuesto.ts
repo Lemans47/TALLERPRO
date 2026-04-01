@@ -209,28 +209,31 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   const categoryOrder: string[] = []
 
   const CAT_LABELS: Record<string, string> = {
-    pintura: "Pintura",
+    desmontar: "Desmontar y Montar",
     desabolladura: "Desabolladura",
+    reparar: "Reparar",
+    pintura: "Pintura",
     mecanica: "Mecánica",
     repuestos: "Repuestos",
-    reparar: "Reparar",
     otros: "Otros",
   }
+  const CAT_ORDER = ["Desmontar y Montar", "Desabolladura", "Reparar", "Pintura", "Mecánica", "Repuestos", "Otros"]
   const normalizecat = (cat: string) => CAT_LABELS[cat.toLowerCase().trim()] || cat
 
   cobros.forEach((c) => {
     const cat = normalizecat(c.categoria || "Sin categoria")
-    if (!grouped[cat]) { grouped[cat] = []; categoryOrder.push(cat) }
+    if (!grouped[cat]) { grouped[cat] = [] }
     grouped[cat].push({ descripcion: c.descripcion || "", monto: Number(c.monto) || 0 })
   })
   if (piezas.length > 0) {
     const pinturaKey = CAT_LABELS["pintura"]
-    if (!grouped[pinturaKey]) { grouped[pinturaKey] = []; categoryOrder.push(pinturaKey) }
+    if (!grouped[pinturaKey]) { grouped[pinturaKey] = [] }
     piezas.forEach((p) => grouped[pinturaKey].push({ descripcion: p.nombre || "", monto: Number(p.precio) || 0 }))
   }
 
   const displayRows: DisplayRow[] = []
-  categoryOrder.forEach((cat) => {
+  const orderedCats = [...CAT_ORDER.filter((c) => grouped[c]), ...Object.keys(grouped).filter((c) => !CAT_ORDER.includes(c))]
+  orderedCats.forEach((cat) => {
     const total = grouped[cat].reduce((acc, item) => acc + item.monto, 0)
     if (soloTotales) {
       // Category + items, no prices

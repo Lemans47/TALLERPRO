@@ -84,13 +84,15 @@ export function generateServicioPDF(data: Servicio | Presupuesto) {
   const cobrosPorCategoria: { [key: string]: { descripcion: string; monto: number }[] } = {}
 
   const CAT_LABELS: Record<string, string> = {
-    pintura: "Pintura",
+    desmontar: "Desmontar y Montar",
     desabolladura: "Desabolladura",
+    reparar: "Reparar",
+    pintura: "Pintura",
     mecanica: "Mecánica",
     repuestos: "Repuestos",
-    reparar: "Reparar",
     otros: "Otros",
   }
+  const CAT_ORDER = ["Desmontar y Montar", "Desabolladura", "Reparar", "Pintura", "Mecánica", "Repuestos", "Otros"]
   const cobrosArr = Array.isArray(data.cobros) ? data.cobros : (typeof data.cobros === "string" ? JSON.parse(data.cobros) : [])
   cobrosArr.forEach((cobro: any) => {
     const key = CAT_LABELS[cobro.categoria?.toLowerCase().trim()] || cobro.categoria
@@ -108,8 +110,10 @@ export function generateServicioPDF(data: Servicio | Presupuesto) {
     })
   }
 
-  // Mostrar trabajos por categoría
-  Object.entries(cobrosPorCategoria).forEach(([categoria, items]) => {
+  // Mostrar trabajos por categoría en orden fijo
+  const orderedCats = [...CAT_ORDER.filter((c) => cobrosPorCategoria[c]), ...Object.keys(cobrosPorCategoria).filter((c) => !CAT_ORDER.includes(c))]
+  orderedCats.forEach((categoria) => {
+    const items = cobrosPorCategoria[categoria]
     doc.setFont("helvetica", "bold")
     doc.text(`${categoria.toUpperCase()}:`, 20, yPos)
     yPos += 5
