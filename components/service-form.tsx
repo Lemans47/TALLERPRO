@@ -629,8 +629,9 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   const autoCostoManoObra = cantidadPiezasAuto * (Number(manoObraConfig) || 0)
   const autoCostoMateriales = cantidadPiezasAuto * (Number(materialesConfig) || 0)
 
+  const safeArr = (v: any): ItemDetalle[] => Array.isArray(v) ? v : []
   const totalCobros = Object.values(cobros)
-    .flat()
+    .flatMap((v) => safeArr(v))
     .reduce((sum, item) => sum + (Number(item.monto) || 0), 0)
 
   // Para costos: excluir items auto-gestionados de pintura (mano de obra y materiales)
@@ -640,10 +641,10 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
     const d = desc.toLowerCase()
     return d.includes("mano de obra") || d.includes("materiales pintura")
   }
-  const costosManualPintura = costos.pintura
+  const costosManualPintura = safeArr(costos.pintura)
     .filter((item) => !isAutoItem(item.descripcion))
     .reduce((sum, item) => sum + (Number(item.monto) || 0), 0)
-  const costosOtros = [...costos.desmontar, ...costos.desabolladura, ...costos.reparar, ...costos.mecanica, ...costos.repuestos, ...costos.otros]
+  const costosOtros = [...safeArr(costos.desmontar), ...safeArr(costos.desabolladura), ...safeArr(costos.reparar), ...safeArr(costos.mecanica), ...safeArr(costos.repuestos), ...safeArr(costos.otros)]
     .reduce((sum, item) => sum + (Number(item.monto) || 0), 0)
 
   const totalCostos = costosManualPintura + costosOtros + autoCostoManoObra + autoCostoMateriales
@@ -704,7 +705,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       // Convertir cobros por categoría a array con descripción
       const cobrosArray: { categoria: string; descripcion: string; monto: number }[] = []
       Object.entries(cobros).forEach(([categoria, items]) => {
-        items.forEach((item) => {
+        safeArr(items).forEach((item) => {
           if (item.monto > 0 || item.descripcion) {
             cobrosArray.push({ categoria, descripcion: item.descripcion || categoria, monto: item.monto })
           }
@@ -715,7 +716,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       // Para pintura: excluir items auto-gestionados (se recalculan abajo)
       const costosArray: { categoria: string; descripcion: string; monto: number }[] = []
       Object.entries(costos).forEach(([categoria, items]) => {
-        items.forEach((item) => {
+        safeArr(items).forEach((item) => {
           if (item.monto > 0 || item.descripcion) {
             if (categoria === "pintura" && isAutoItem(item.descripcion)) return
             costosArray.push({ categoria, descripcion: item.descripcion || categoria, monto: item.monto })
@@ -815,7 +816,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       // Convertir cobros por categoría a array con descripción
       const cobrosArray: { categoria: string; descripcion: string; monto: number }[] = []
       Object.entries(cobros).forEach(([categoria, items]) => {
-        items.forEach((item) => {
+        safeArr(items).forEach((item) => {
           if (item.monto > 0 || item.descripcion) {
             cobrosArray.push({ categoria, descripcion: item.descripcion || categoria, monto: item.monto })
           }
@@ -826,7 +827,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       // Para pintura: excluir items auto-gestionados (se recalculan abajo)
       const costosArray: { categoria: string; descripcion: string; monto: number }[] = []
       Object.entries(costos).forEach(([categoria, items]) => {
-        items.forEach((item) => {
+        safeArr(items).forEach((item) => {
           if (item.monto > 0 || item.descripcion) {
             if (categoria === "pintura" && isAutoItem(item.descripcion)) return
             costosArray.push({ categoria, descripcion: item.descripcion || categoria, monto: item.monto })
@@ -1817,15 +1818,15 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                             </tr>
                           </thead>
                           <tbody>
-                            {cobros[categoria as keyof ItemsPorCategoria].length === 0 ? (
+                            {safeArr(cobros[categoria as keyof ItemsPorCategoria]).length === 0 ? (
                               <tr>
                                 <td colSpan={5} className="text-center p-4 text-muted-foreground text-xs">
                                   Sin items. Usa el botón + para agregar.
                                 </td>
                               </tr>
                             ) : (
-                              cobros[categoria as keyof ItemsPorCategoria].map((itemCobro, index) => {
-                                const itemCosto = costos[categoria as keyof ItemsPorCategoria][index]
+                              safeArr(cobros[categoria as keyof ItemsPorCategoria]).map((itemCobro, index) => {
+                                const itemCosto = safeArr(costos[categoria as keyof ItemsPorCategoria])[index]
                                 const cobro = Number(itemCobro.monto) || 0
                                 const costo = itemCosto ? Number(itemCosto.monto) || 0 : 0
                                 const utilidad = cobro - costo
