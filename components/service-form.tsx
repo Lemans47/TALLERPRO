@@ -362,7 +362,18 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       })
 
       // Cargar cobros por categoría
-      const cobrosData = Array.isArray(servicioAEditar.cobros) ? servicioAEditar.cobros : (typeof servicioAEditar.cobros === "string" ? JSON.parse(servicioAEditar.cobros) : [])
+      const parseToFlatArray = (v: any): any[] => {
+        const parsed = Array.isArray(v) ? v : (typeof v === "string" && v ? JSON.parse(v) : v)
+        if (Array.isArray(parsed)) return parsed
+        if (parsed && typeof parsed === "object") {
+          // Old format: {pintura: [...], mecanica: [...]} → flatten to [{categoria, descripcion, monto}]
+          return Object.entries(parsed).flatMap(([cat, items]: [string, any]) =>
+            Array.isArray(items) ? items.map((i: any) => ({ ...i, categoria: cat })) : []
+          )
+        }
+        return []
+      }
+      const cobrosData = parseToFlatArray(servicioAEditar.cobros)
       console.log("[v0] cobrosData from servicio:", cobrosData)
       const newCobros: ItemsPorCategoria = {
         desmontar: [],
@@ -383,7 +394,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       setCobros(newCobros)
 
       // Cargar costos por categoría
-      const costosData = Array.isArray(servicioAEditar.costos) ? servicioAEditar.costos : (typeof servicioAEditar.costos === "string" ? JSON.parse(servicioAEditar.costos) : [])
+      const costosData = parseToFlatArray(servicioAEditar.costos)
       console.log("[v0] costosData from servicio:", costosData)
       const newCostos: ItemsPorCategoria = {
         desmontar: [],
