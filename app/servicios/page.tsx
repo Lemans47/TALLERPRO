@@ -25,15 +25,22 @@ export default function ServicesPage() {
   const [serviciosOpen, setServiciosOpen] = useState(true)
   const [presupuestosOpen, setPresupuestosOpen] = useState(true)
 
+  const ESTADOS_ACTIVOS = ["En Cola", "En Proceso", "Esperando Repuestos", "Por Cobrar"]
+
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
       const [year, month] = selectedMonth.split("-").map(Number)
-      const [serviciosData, presupuestosData] = await Promise.all([
+      const [delMes, todos, presupuestosData] = await Promise.all([
         api.servicios.getByMonth(year, month),
+        api.servicios.getAll(),
         api.presupuestos.getByMonth(year, month),
       ])
-      setServicios(serviciosData)
+      // Servicios del mes + activos de cualquier mes, sin duplicados
+      const activos = todos.filter((s) => ESTADOS_ACTIVOS.includes(s.estado))
+      const idsDelMes = new Set(delMes.map((s) => s.id))
+      const extra = activos.filter((s) => !idsDelMes.has(s.id))
+      setServicios([...delMes, ...extra])
       setPresupuestos(presupuestosData)
     } catch (error) {
       console.error("Error loading data:", error)
