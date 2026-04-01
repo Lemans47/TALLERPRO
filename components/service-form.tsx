@@ -365,11 +365,12 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       const cobrosData = Array.isArray(servicioAEditar.cobros) ? servicioAEditar.cobros : (typeof servicioAEditar.cobros === "string" ? JSON.parse(servicioAEditar.cobros) : [])
       console.log("[v0] cobrosData from servicio:", cobrosData)
       const newCobros: ItemsPorCategoria = {
-        pintura: [],
+        desmontar: [],
         desabolladura: [],
+        reparar: [],
+        pintura: [],
         mecanica: [],
         repuestos: [],
-        reparar: [],
         otros: [],
       }
       cobrosData.forEach((c: { categoria: string; descripcion: string; monto: number }) => {
@@ -385,11 +386,12 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       const costosData = Array.isArray(servicioAEditar.costos) ? servicioAEditar.costos : (typeof servicioAEditar.costos === "string" ? JSON.parse(servicioAEditar.costos) : [])
       console.log("[v0] costosData from servicio:", costosData)
       const newCostos: ItemsPorCategoria = {
-        pintura: [],
+        desmontar: [],
         desabolladura: [],
+        reparar: [],
+        pintura: [],
         mecanica: [],
         repuestos: [],
-        reparar: [],
         otros: [],
       }
       costosData.forEach((c: { categoria?: string; descripcion: string; monto: number }) => {
