@@ -205,7 +205,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   const [mostrarSugerencias, setMostrarSugerencias] = useState(false)
 
   const [formData, setFormData] = useState({
-    fecha_ingreso: new Date().toISOString().split("T")[0],
+    fecha_ingreso: (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}-${String(n.getDate()).padStart(2,"0")}` })(),
     patente: "",
     marca: "",
     modelo: "",
@@ -346,7 +346,14 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   useEffect(() => {
     if (servicioAEditar) {
       setFormData({
-        fecha_ingreso: servicioAEditar.fecha_ingreso instanceof Date ? servicioAEditar.fecha_ingreso.toISOString().split("T")[0] : String(servicioAEditar.fecha_ingreso).split("T")[0],
+        fecha_ingreso: (() => {
+          const v = servicioAEditar.fecha_ingreso
+          if (v instanceof Date) {
+            const y = v.getFullYear(), m = String(v.getMonth()+1).padStart(2,"0"), d = String(v.getDate()).padStart(2,"0")
+            return `${y}-${m}-${d}`
+          }
+          return String(v).split("T")[0]
+        })(),
         patente: servicioAEditar.patente,
         marca: servicioAEditar.marca || "",
         modelo: servicioAEditar.modelo || "",
@@ -452,7 +459,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
 
   const resetForm = () => {
     setFormData({
-      fecha_ingreso: new Date().toISOString().split("T")[0],
+      fecha_ingreso: (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}-${String(n.getDate()).padStart(2,"0")}` })(),
       patente: "",
       marca: "",
       modelo: "",
