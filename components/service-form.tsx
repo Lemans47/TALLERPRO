@@ -769,6 +769,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         cobros: cobrosArray,
         costos: costosArray,
         piezas_pintura: piezasPinturaArray,
+        estado: formData.estado,
         iva: formData.iva,
         anticipo: anticipoExistente,
         saldo_pendiente: saldoPendiente,
