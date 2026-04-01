@@ -187,15 +187,15 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
     otros: "Otros",
   }
   const CAT_ORDER_OT = ["Desmontar y Montar", "Desabolladura", "Reparar", "Pintura", "Mecánica", "Repuestos", "Otros"]
+  if (piezasOT.length > 0) {
+    if (!grouped["Pintura"]) { grouped["Pintura"] = [] }
+    piezasOT.forEach((p: any) => grouped["Pintura"].push(p.nombre || ""))
+  }
   cobrosOT.forEach((c: any) => {
     const cat = CAT_LABELS_OT[c.categoria?.toLowerCase().trim()] || c.categoria || "Sin categoria"
     if (!grouped[cat]) { grouped[cat] = [] }
     grouped[cat].push(c.descripcion || "")
   })
-  if (piezasOT.length > 0) {
-    if (!grouped["Pintura"]) { grouped["Pintura"] = [] }
-    piezasOT.forEach((p: any) => grouped["Pintura"].push(p.nombre || ""))
-  }
   const orderedCatsOT = [...CAT_ORDER_OT.filter((c) => grouped[c]), ...Object.keys(grouped).filter((c) => !CAT_ORDER_OT.includes(c))]
   orderedCatsOT.forEach((cat) => {
     rows.push({ type: "category", label: cat })

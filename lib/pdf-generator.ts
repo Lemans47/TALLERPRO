@@ -93,6 +93,13 @@ export function generateServicioPDF(data: Servicio | Presupuesto) {
     otros: "Otros",
   }
   const CAT_ORDER = ["Desmontar y Montar", "Desabolladura", "Reparar", "Pintura", "Mecánica", "Repuestos", "Otros"]
+  // Piezas pintura primero (items base), cobros después (extras al final)
+  if (data.piezas_pintura && Array.isArray(data.piezas_pintura) && data.piezas_pintura.length > 0) {
+    if (!cobrosPorCategoria["Pintura"]) cobrosPorCategoria["Pintura"] = []
+    data.piezas_pintura.forEach((pieza) => {
+      cobrosPorCategoria["Pintura"].push({ categoria: "Pintura", descripcion: pieza.nombre, monto: pieza.precio || 0 })
+    })
+  }
   const cobrosArr = Array.isArray(data.cobros) ? data.cobros : (typeof data.cobros === "string" ? JSON.parse(data.cobros) : [])
   cobrosArr.forEach((cobro: any) => {
     const key = CAT_LABELS[cobro.categoria?.toLowerCase().trim()] || cobro.categoria
@@ -101,14 +108,6 @@ export function generateServicioPDF(data: Servicio | Presupuesto) {
     }
     cobrosPorCategoria[key].push({ ...cobro, categoria: key })
   })
-
-  // Merge piezas_pintura into Pintura category
-  if (data.piezas_pintura && Array.isArray(data.piezas_pintura) && data.piezas_pintura.length > 0) {
-    if (!cobrosPorCategoria["Pintura"]) cobrosPorCategoria["Pintura"] = []
-    data.piezas_pintura.forEach((pieza) => {
-      cobrosPorCategoria["Pintura"].push({ categoria: "Pintura", descripcion: pieza.nombre, monto: pieza.precio || 0 })
-    })
-  }
 
   // Mostrar trabajos por categoría en orden fijo
   const orderedCats = [...CAT_ORDER.filter((c) => cobrosPorCategoria[c]), ...Object.keys(cobrosPorCategoria).filter((c) => !CAT_ORDER.includes(c))]
