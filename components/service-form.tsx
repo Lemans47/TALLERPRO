@@ -173,6 +173,12 @@ const ItemsList = ({
   </div>
 )
 
+const isAutoItem = (desc: string | null | undefined) => {
+  if (!desc) return false
+  const d = desc.toLowerCase()
+  return d.includes("mano de obra") || d.includes("materiales pintura")
+}
+
 export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFormProps) {
   const { toast } = useToast() // Declare useToast hook
   const [loading, setLoading] = useState(false)
@@ -413,6 +419,8 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         otros: [],
       }
       costosData.forEach((c: { categoria?: string; descripcion: string; monto: number }) => {
+        // Skip auto-generated pintura cost items — they'll be recalculated from selected piezas
+        if (isAutoItem(c.descripcion)) return
         const cat = (c.categoria || "otros") as keyof ItemsPorCategoria
         if (cat in newCostos) {
           newCostos[cat].push({ id: crypto.randomUUID(), descripcion: c.descripcion, monto: c.monto })
@@ -652,23 +660,13 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
     .flatMap((v) => safeArr(v))
     .reduce((sum, item) => sum + (Number(item.monto) || 0), 0)
 
-  // Para costos: excluir items auto-gestionados de pintura (mano de obra y materiales)
-  // para evitar doble conteo con los valores auto-calculados
-  const isAutoItem = (desc: string | null | undefined) => {
-    if (!desc) return false
-    const d = desc.toLowerCase()
-    return d.includes("mano de obra") || d.includes("materiales pintura")
-  }
   const costosOtros = [...safeArr(costos.desmontar), ...safeArr(costos.desabolladura), ...safeArr(costos.reparar), ...safeArr(costos.mecanica), ...safeArr(costos.repuestos), ...safeArr(costos.otros)]
     .reduce((sum, item) => sum + (Number(item.monto) || 0), 0)
 
-  // Al editar: usar costos.pintura guardados tal cual (incluye mano obra y materiales ya calculados)
-  // Al crear: excluir auto-items y agregar los recalculados desde config actual
-  const totalCostoPintura = servicioAEditar
-    ? safeArr(costos.pintura).reduce((sum, item) => sum + (Number(item.monto) || 0), 0)
-    : safeArr(costos.pintura).filter((item) => !isAutoItem(item.descripcion)).reduce((sum, item) => sum + (Number(item.monto) || 0), 0) + autoCostoManoObra + autoCostoMateriales
+  // costos.pintura nunca contiene auto-items (se filtran al cargar) — sumar manual + recalculado
+  const costosManualPintura = safeArr(costos.pintura).reduce((sum, item) => sum + (Number(item.monto) || 0), 0)
 
-  const totalCostos = totalCostoPintura + costosOtros
+  const totalCostos = costosManualPintura + costosOtros + autoCostoManoObra + autoCostoMateriales
 
   const cobroTotal = totalPiezasPintura + totalCobros
   const montoConIva = formData.iva === "con" ? Math.round(cobroTotal * 1.19) : cobroTotal
