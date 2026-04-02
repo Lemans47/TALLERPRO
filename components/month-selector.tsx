@@ -7,14 +7,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 export function MonthSelector() {
   const { selectedMonth, setSelectedMonth } = useMonth()
 
-  // Generate last 12 months
+  // Generate months from April 2026 up to current month
+  const START_YEAR = 2026
+  const START_MONTH = 4 // April
   const months = []
   const now = new Date()
-  for (let i = 0; i < 12; i++) {
-    const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
-    const label = date.toLocaleDateString("es-CL", { year: "numeric", month: "long" })
-    months.push({ value, label: label.charAt(0).toUpperCase() + label.slice(1) })
+  const currentYear = now.getFullYear()
+  const currentMonth = now.getMonth() + 1
+  for (let y = currentYear; y >= START_YEAR; y--) {
+    const fromMonth = y === START_YEAR ? START_MONTH : 1
+    const toMonth = y === currentYear ? currentMonth : 12
+    for (let m = toMonth; m >= fromMonth; m--) {
+      const date = new Date(y, m - 1, 1)
+      const value = `${y}-${String(m).padStart(2, "0")}`
+      const label = date.toLocaleDateString("es-CL", { year: "numeric", month: "long" })
+      months.push({ value, label: label.charAt(0).toUpperCase() + label.slice(1) })
+    }
   }
 
   return (
