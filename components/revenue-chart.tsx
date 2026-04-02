@@ -21,10 +21,11 @@ export function RevenueChart() {
       const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
 
       const now = new Date()
+      const START = "2026-04"
       for (let i = 5; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
-        monthlyData[key] = { ingresos: 0, gastos: 0 }
+        if (key >= START) monthlyData[key] = { ingresos: 0, gastos: 0 }
       }
 
       servicios.forEach((s) => {
@@ -78,7 +79,7 @@ export function RevenueChart() {
             <TrendingUp className="w-5 h-5 text-primary" />
             Ingresos vs Gastos
           </h3>
-          <p className="text-sm text-muted-foreground">Últimos 6 meses</p>
+          <p className="text-sm text-muted-foreground">Desde Abril 2026</p>
         </div>
         <div className="flex items-center gap-4 text-sm">
           <div className="flex items-center gap-2">
