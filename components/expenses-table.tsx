@@ -87,11 +87,11 @@ export function ExpensesTable({ gastos, onEditGasto, onDeleted, loading }: Expen
                   <div className="min-w-0 flex-1">
                     <p className="font-medium truncate">{gasto.descripcion}</p>
                     <p className="text-sm text-muted-foreground">
-                      {new Date(gasto.fecha).toLocaleDateString("es-CL", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      })}
+                      {(() => {
+                        const [y, m, d] = (gasto.fecha || "").substring(0, 10).split("-")
+                        const months = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"]
+                        return `${Number(d)} ${months[Number(m)-1]} ${y}`
+                      })()}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">

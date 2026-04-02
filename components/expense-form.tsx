@@ -22,17 +22,24 @@ interface ExpenseFormProps {
 export function ExpenseForm({ defaultCategory, gastoAEditar, onSaved, onCancel }: ExpenseFormProps) {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
+  const localToday = () => {
+    const n = new Date()
+    return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}-${String(n.getDate()).padStart(2,"0")}`
+  }
+
+  const toDateStr = (v: any) => {
+    if (!v) return localToday()
+    if (v instanceof Date) {
+      return `${v.getFullYear()}-${String(v.getMonth()+1).padStart(2,"0")}-${String(v.getDate()).padStart(2,"0")}`
+    }
+    return String(v).substring(0, 10)
+  }
+
   const [formData, setFormData] = useState({
     descripcion: "",
     monto: "",
-    fecha: new Date().toISOString().split("T")[0],
+    fecha: localToday(),
   })
-
-  const toDateStr = (v: any) => {
-    if (!v) return new Date().toISOString().split("T")[0]
-    if (v instanceof Date) return v.toISOString().split("T")[0]
-    return String(v).split("T")[0]
-  }
 
   useEffect(() => {
     if (gastoAEditar) {
@@ -45,7 +52,7 @@ export function ExpenseForm({ defaultCategory, gastoAEditar, onSaved, onCancel }
       setFormData({
         descripcion: "",
         monto: "",
-        fecha: new Date().toISOString().split("T")[0],
+        fecha: localToday(),
       })
     }
   }, [gastoAEditar])
@@ -77,7 +84,7 @@ export function ExpenseForm({ defaultCategory, gastoAEditar, onSaved, onCancel }
       setFormData({
         descripcion: "",
         monto: "",
-        fecha: new Date().toISOString().split("T")[0],
+        fecha: localToday(),
       })
       onSaved()
     } catch (error) {
@@ -92,7 +99,7 @@ export function ExpenseForm({ defaultCategory, gastoAEditar, onSaved, onCancel }
     setFormData({
       descripcion: "",
       monto: "",
-      fecha: new Date().toISOString().split("T")[0],
+      fecha: localToday(),
     })
     onCancel()
   }
