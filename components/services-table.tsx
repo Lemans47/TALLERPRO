@@ -283,7 +283,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                     </span>
                     <span className="flex items-center gap-1.5 text-muted-foreground">
                       <Calendar className="w-3.5 h-3.5" />
-                      {new Date(servicio.fecha_ingreso).toLocaleDateString("es-CL")}
+                      {servicio.fecha_ingreso?.substring(0, 10).split("-").reverse().join("-")}
                     </span>
                   </div>
 

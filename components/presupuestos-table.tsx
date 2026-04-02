@@ -121,7 +121,7 @@ export function PresupuestosTable({ presupuestos, onEditPresupuesto, onConverted
                     </span>
                     <span className="flex items-center gap-1.5">
                       <Calendar className="w-3.5 h-3.5" />
-                      {new Date(presupuesto.fecha_ingreso).toLocaleDateString("es-CL")}
+                      {presupuesto.fecha_ingreso?.substring(0, 10).split("-").reverse().join("-")}
                     </span>
                   </div>
                 </div>
