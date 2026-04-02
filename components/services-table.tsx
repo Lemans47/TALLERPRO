@@ -66,6 +66,7 @@ const ESTADOS = [
 export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }: ServicesTableProps) {
   const { toast } = useToast()
   const [filtroEstado, setFiltroEstado] = useState("todos")
+  const [sortBy, setSortBy] = useState("fecha_desc")
   const [montoPago, setMontoPago] = useState("")
   const [modoCorregir, setModoCorregir] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -151,7 +152,24 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
     return styles[estado] || "bg-gray-500/10 text-gray-400 border-gray-500/30"
   }
 
-  const serviciosFiltrados = servicios.filter((s) => filtroEstado === "todos" || s.estado === filtroEstado)
+  const ESTADO_ORDER = ["En Cola","En Proceso","En Reparación","Esperando Repuestos","Control de Calidad","Listo para Entrega","Por Cobrar","Entregado","Cerrado/Pagado"]
+
+  const serviciosFiltrados = servicios
+    .filter((s) => filtroEstado === "todos" || s.estado === filtroEstado)
+    .sort((a, b) => {
+      switch (sortBy) {
+        case "fecha_asc":  return (a.fecha_ingreso || "").localeCompare(b.fecha_ingreso || "")
+        case "fecha_desc": return (b.fecha_ingreso || "").localeCompare(a.fecha_ingreso || "")
+        case "estado":     return ESTADO_ORDER.indexOf(a.estado) - ESTADO_ORDER.indexOf(b.estado)
+        case "monto_desc": return Number(b.monto_total || 0) - Number(a.monto_total || 0)
+        case "monto_asc":  return Number(a.monto_total || 0) - Number(b.monto_total || 0)
+        case "margen": {
+          const mg = (s: Servicio) => { const g = calcGanancia(s); return g ? g.margen : -Infinity }
+          return mg(b) - mg(a)
+        }
+        default: return 0
+      }
+    })
 
   if (loading) {
     return (
@@ -263,21 +281,32 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
             {serviciosFiltrados.length}
           </Badge>
         </div>
-        <Select value={filtroEstado} onValueChange={setFiltroEstado}>
-          <SelectTrigger className="w-full sm:w-[180px] bg-secondary/50 border-border">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="bg-card border-border">
-            <SelectItem value="todos" className="focus:bg-secondary">
-              Todos los Estados
-            </SelectItem>
-            {ESTADOS.map((e) => (
-              <SelectItem key={e} value={e} className="focus:bg-secondary">
-                {e}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="w-full sm:w-[170px] bg-secondary/50 border-border">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-card border-border">
+              <SelectItem value="fecha_desc" className="focus:bg-secondary">Fecha ↓ (reciente)</SelectItem>
+              <SelectItem value="fecha_asc"  className="focus:bg-secondary">Fecha ↑ (antiguo)</SelectItem>
+              <SelectItem value="estado"     className="focus:bg-secondary">Por estado</SelectItem>
+              <SelectItem value="monto_desc" className="focus:bg-secondary">Monto ↓ (mayor)</SelectItem>
+              <SelectItem value="monto_asc"  className="focus:bg-secondary">Monto ↑ (menor)</SelectItem>
+              <SelectItem value="margen"     className="focus:bg-secondary">Margen ↓ (mayor)</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={filtroEstado} onValueChange={setFiltroEstado}>
+            <SelectTrigger className="w-full sm:w-[180px] bg-secondary/50 border-border">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-card border-border">
+              <SelectItem value="todos" className="focus:bg-secondary">Todos los Estados</SelectItem>
+              {ESTADOS.map((e) => (
+                <SelectItem key={e} value={e} className="focus:bg-secondary">{e}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Content */}
