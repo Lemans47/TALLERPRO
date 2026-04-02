@@ -297,8 +297,12 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   placed.forEach((r) => {
     doc.setPage(r.pg)
     if (r.type === "category") {
+      doc.saveGraphicsState()
+      // @ts-ignore
+      doc.setGState(new doc.GState({ opacity: 0.45 }))
       doc.setFillColor(210, 210, 210)
       doc.rect(ML, r.ry, CW, r.rh, "F")
+      doc.restoreGraphicsState()
     } else if (r.type === "subtotal") {
       doc.setFillColor(232, 232, 232)
       doc.rect(ML, r.ry, CW, r.rh, "F")
@@ -358,7 +362,7 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
 
   // ─── TOTALS + SIGNATURES — anchored to page bottom ───────────────
   if (y > bottomAnchor) {
-    doc.addPage(); pageNum++; drawPageHeader(pageNum)
+    doc.addPage(); pageNum++; drawPageHeader(pageNum, logoBase64)
     y = bottomAnchor
   }
   const subtotalVal = Number(servicio.monto_total_sin_iva) || 0
@@ -398,11 +402,15 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   y += trh
 
   // Row 3 — TOTAL
-  doc.setFillColor(200, 0, 0)
+  doc.saveGraphicsState()
+  // @ts-ignore
+  doc.setGState(new doc.GState({ opacity: 0.45 }))
+  doc.setFillColor(210, 210, 210)
   doc.rect(labelX, y, labelW, trh, "F")
   doc.rect(labelX + labelW, y, valW, trh, "F")
-  doc.setDrawColor(200, 0, 0); doc.rect(labelX, y, labelW + valW, trh)
-  doc.setTextColor(255, 255, 255); bold(); doc.setFontSize(9)
+  doc.restoreGraphicsState()
+  doc.setDrawColor(80, 80, 80); doc.rect(labelX, y, labelW + valW, trh)
+  doc.setTextColor(40, 40, 40); bold(); doc.setFontSize(9)
   doc.text("TOTAL", labelX + 1, y + 4)
   doc.text(fmt(totalVal), MR - 1, y + 4, { align: "right" })
   black()
