@@ -17,11 +17,15 @@ interface KPIs {
   ingresosFacturado: number  // todos los servicios del mes, sin IVA
   ingresosCobrado: number    // solo Cerrado/Pagado, sin IVA
   totalGastos: number
-  utilidadOperacional: number
-  margenPromedio: number
+  utilidadRealizada: number  // ingresosCobrado - costos cerrados - gastos
+  utilidadEstimada: number   // ingresosFacturado - todos costos - gastos
+  margenRealizado: number
+  margenEstimado: number
+  tasaCobro: number          // % del facturado ya cobrado
   porCobrar: number
   serviciosActivos: number
   serviciosTotal: number
+  serviciosCerrados: number
 }
 
 export default function DashboardPage() {
@@ -31,11 +35,15 @@ export default function DashboardPage() {
     ingresosFacturado: 0,
     ingresosCobrado: 0,
     totalGastos: 0,
-    utilidadOperacional: 0,
-    margenPromedio: 0,
+    utilidadRealizada: 0,
+    utilidadEstimada: 0,
+    margenRealizado: 0,
+    margenEstimado: 0,
+    tasaCobro: 0,
     porCobrar: 0,
     serviciosActivos: 0,
     serviciosTotal: 0,
+    serviciosCerrados: 0,
   })
   const [servicios, setServicios] = useState<Servicio[]>([])
   const [loading, setLoading] = useState(true)
@@ -61,22 +69,33 @@ export default function DashboardPage() {
   }
 
   const calculateKPIs = (servicios: Servicio[], gastos: Gasto[]) => {
-    // Todos los servicios del mes, sin IVA (facturado total)
-    const ingresosFacturado = servicios.reduce((sum, s) => sum + Number(s.monto_total_sin_iva || 0), 0)
-    // Solo los pagados, sin IVA
-    const ingresosCobrado = servicios
-      .filter((s) => s.estado === "Cerrado/Pagado")
-      .reduce((sum, s) => sum + Number(s.monto_total_sin_iva || 0), 0)
+    const serviciosCerrados = servicios.filter((s) => s.estado === "Cerrado/Pagado")
 
-    const totalGastos = gastos.reduce((sum, g) => sum + Number(g.monto || 0), 0)
-    const costosServicios = servicios.reduce((sum, s) => {
-      const costos = Array.isArray(s.costos) ? s.costos : (typeof s.costos === "string" && s.costos ? JSON.parse(s.costos) : [])
-      return sum + costos.reduce((c: number, costo: any) => c + Number(costo.monto || 0), 0)
+    // Ingresos
+    const ingresosFacturado = servicios.reduce((sum, s) => sum + Number(s.monto_total_sin_iva || 0), 0)
+    const ingresosCobrado = serviciosCerrados.reduce((sum, s) => sum + Number(s.monto_total_sin_iva || 0), 0)
+
+    // Gastos operacionales del mes
+    const gastosOperacionales = gastos.reduce((sum, g) => sum + Number(g.monto || 0), 0)
+
+    // Costos internos de servicios cerrados (match con ingresosCobrado)
+    const parseArr = (v: any) => Array.isArray(v) ? v : (typeof v === "string" && v ? JSON.parse(v) : [])
+    const costosCerrados = serviciosCerrados.reduce((sum, s) => {
+      return sum + parseArr(s.costos).reduce((c: number, costo: any) => c + Number(costo.monto || 0), 0)
     }, 0)
 
-    const gastosTotal = totalGastos + costosServicios
-    const utilidadOperacional = ingresosCobrado - gastosTotal
-    const margenPromedio = ingresosCobrado > 0 ? (utilidadOperacional / ingresosCobrado) * 100 : 0
+    // Costos internos de todos los servicios (para utilidad estimada)
+    const costosTotal = servicios.reduce((sum, s) => {
+      return sum + parseArr(s.costos).reduce((c: number, costo: any) => c + Number(costo.monto || 0), 0)
+    }, 0)
+
+    // Utilidades
+    const utilidadRealizada = ingresosCobrado - costosCerrados - gastosOperacionales
+    const utilidadEstimada = ingresosFacturado - costosTotal - gastosOperacionales
+    const margenRealizado = ingresosCobrado > 0 ? (utilidadRealizada / ingresosCobrado) * 100 : 0
+    const margenEstimado = ingresosFacturado > 0 ? (utilidadEstimada / ingresosFacturado) * 100 : 0
+
+    const tasaCobro = ingresosFacturado > 0 ? (ingresosCobrado / ingresosFacturado) * 100 : 0
 
     const porCobrar = servicios
       .filter((s) => Number(s.saldo_pendiente || 0) > 0)
@@ -85,12 +104,16 @@ export default function DashboardPage() {
     setKpis({
       ingresosFacturado,
       ingresosCobrado,
-      totalGastos: gastosTotal,
-      utilidadOperacional,
-      margenPromedio,
+      totalGastos: gastosOperacionales + costosCerrados,
+      utilidadRealizada,
+      utilidadEstimada,
+      margenRealizado,
+      margenEstimado,
+      tasaCobro,
       porCobrar,
       serviciosActivos: servicios.filter((s) => s.estado !== "Cerrado/Pagado").length,
       serviciosTotal: servicios.length,
+      serviciosCerrados: serviciosCerrados.length,
     })
   }
 
@@ -139,25 +162,23 @@ export default function DashboardPage() {
           variant="default"
         />
         <KPICard
+          title="Cobrado"
+          value={formatCurrency(kpis.ingresosCobrado)}
+          description={`Tasa de cobro: ${kpis.tasaCobro.toFixed(1)}%`}
+          icon={<DollarSign className="w-5 h-5" />}
+          variant="success"
+        />
+        <KPICard
           title="Gastos Totales"
           value={formatCurrency(kpis.totalGastos)}
           description="Operacionales + Costos"
           icon={<TrendingDown className="w-5 h-5" />}
           variant="destructive"
         />
-        {!isOperador && (
-          <KPICard
-            title="Utilidad"
-            value={formatCurrency(kpis.utilidadOperacional)}
-            description={`Margen: ${kpis.margenPromedio.toFixed(1)}%`}
-            icon={<TrendingUp className="w-5 h-5" />}
-            variant={kpis.utilidadOperacional >= 0 ? "success" : "destructive"}
-          />
-        )}
         <KPICard
           title="Servicios"
           value={kpis.serviciosTotal.toString()}
-          description={`${kpis.serviciosActivos} en proceso`}
+          description={`${kpis.serviciosCerrados} cerrados · ${kpis.serviciosActivos} en proceso`}
           icon={<Wrench className="w-5 h-5" />}
           variant="default"
         />
@@ -177,31 +198,56 @@ export default function DashboardPage() {
       </div>
 
       {/* KPIs secundarios */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {!isOperador && (
+      {!isOperador && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <KPICard
-            title="Margen de Utilidad"
-            value={`${kpis.margenPromedio.toFixed(1)}%`}
-            description="Rentabilidad operacional"
-            icon={<Activity className="w-5 h-5" />}
-            variant={kpis.margenPromedio >= 20 ? "success" : kpis.margenPromedio >= 0 ? "warning" : "destructive"}
+            title="Utilidad Realizada"
+            value={formatCurrency(kpis.utilidadRealizada)}
+            description={`Margen: ${kpis.margenRealizado.toFixed(1)}% · sobre cobrado`}
+            icon={<TrendingUp className="w-5 h-5" />}
+            variant={kpis.utilidadRealizada >= 0 ? "success" : "destructive"}
           />
-        )}
-        <KPICard
-          title="Por Cobrar"
-          value={formatCurrency(kpis.porCobrar)}
-          description="Saldos pendientes"
-          icon={<AlertCircle className="w-5 h-5" />}
-          variant={kpis.porCobrar > 0 ? "warning" : "success"}
-        />
-        <KPICard
-          title="Cobrado"
-          value={formatCurrency(kpis.ingresosCobrado)}
-          description="Solo servicios pagados, sin IVA"
-          icon={<DollarSign className="w-5 h-5" />}
-          variant="success"
-        />
-      </div>
+          <KPICard
+            title="Utilidad Estimada"
+            value={formatCurrency(kpis.utilidadEstimada)}
+            description={`Margen: ${kpis.margenEstimado.toFixed(1)}% · si todo se cobra`}
+            icon={<TrendingUp className="w-5 h-5" />}
+            variant={kpis.utilidadEstimada >= 0 ? "warning" : "destructive"}
+          />
+          <KPICard
+            title="Por Cobrar"
+            value={formatCurrency(kpis.porCobrar)}
+            description="Saldos pendientes"
+            icon={<AlertCircle className="w-5 h-5" />}
+            variant={kpis.porCobrar > 0 ? "warning" : "success"}
+          />
+          <KPICard
+            title="Tasa de Cierre"
+            value={`${kpis.serviciosTotal > 0 ? ((kpis.serviciosCerrados / kpis.serviciosTotal) * 100).toFixed(1) : "0.0"}%`}
+            description={`${kpis.serviciosCerrados} de ${kpis.serviciosTotal} servicios cerrados`}
+            icon={<Activity className="w-5 h-5" />}
+            variant={kpis.serviciosCerrados / (kpis.serviciosTotal || 1) >= 0.5 ? "success" : "warning"}
+          />
+        </div>
+      )}
+      {isOperador && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <KPICard
+            title="Por Cobrar"
+            value={formatCurrency(kpis.porCobrar)}
+            description="Saldos pendientes"
+            icon={<AlertCircle className="w-5 h-5" />}
+            variant={kpis.porCobrar > 0 ? "warning" : "success"}
+          />
+          <KPICard
+            title="Tasa de Cierre"
+            value={`${kpis.serviciosTotal > 0 ? ((kpis.serviciosCerrados / kpis.serviciosTotal) * 100).toFixed(1) : "0.0"}%`}
+            description={`${kpis.serviciosCerrados} de ${kpis.serviciosTotal} servicios cerrados`}
+            icon={<Activity className="w-5 h-5" />}
+            variant={kpis.serviciosCerrados / (kpis.serviciosTotal || 1) >= 0.5 ? "success" : "warning"}
+          />
+        </div>
+      )}
     </div>
   )
 }

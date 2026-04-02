@@ -99,6 +99,29 @@ export function ServicesStatusChart({ servicios }: ServicesStatusChartProps) {
           </div>
         ))}
       </div>
+
+      {/* Tasa de cierre */}
+      {servicios.length > 0 && (() => {
+        const cerrados = servicios.filter((s) => s.estado === "Cerrado/Pagado").length
+        const pct = Math.round((cerrados / servicios.length) * 100)
+        return (
+          <div className="mt-5 pt-4 border-t border-border">
+            <div className="flex justify-between items-center mb-1.5">
+              <span className="text-xs text-muted-foreground">Tasa de cierre</span>
+              <span className="text-xs font-semibold text-foreground">{cerrados}/{servicios.length} · {pct}%</span>
+            </div>
+            <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all"
+                style={{
+                  width: `${pct}%`,
+                  backgroundColor: pct >= 50 ? "#22c55e" : "#f59e0b",
+                }}
+              />
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
