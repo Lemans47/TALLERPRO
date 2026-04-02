@@ -622,6 +622,22 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
     [],
   )
 
+  const upsertItemCostoByIndex = useCallback(
+    (categoria: keyof ItemsPorCategoria, index: number, field: "descripcion" | "monto", value: string | number) => {
+      setCostos((prev) => {
+        const arr = [...prev[categoria]]
+        if (arr[index]) {
+          arr[index] = { ...arr[index], [field]: value }
+        } else {
+          while (arr.length < index) arr.push({ id: crypto.randomUUID(), descripcion: "", monto: 0 })
+          arr[index] = { id: crypto.randomUUID(), descripcion: "", monto: field === "monto" ? (value as number) : 0 }
+        }
+        return { ...prev, [categoria]: arr }
+      })
+    },
+    [],
+  )
+
   const removeItemCosto = useCallback((categoria: keyof ItemsPorCategoria, id: string) => {
     setCostos((prev) => ({
       ...prev,
@@ -1728,7 +1744,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                                       <Input
                                         type="number"
                                         value={itemCosto?.monto || ""}
-                                        onChange={(e) => updateItemCosto("pintura", itemCosto?.id || crypto.randomUUID(), "monto", Number(e.target.value) || 0)}
+                                        onChange={(e) => upsertItemCostoByIndex("pintura", index, "monto", Number(e.target.value) || 0)}
                                         placeholder="0"
                                         className="bg-background/50 text-xs h-8 border-0 text-right w-32"
                                       />
@@ -1877,7 +1893,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                                         <Input
                                           type="number"
                                           value={itemCosto?.monto || ""}
-                                          onChange={(e) => updateItemCosto(categoria as keyof ItemsPorCategoria, itemCosto?.id || crypto.randomUUID(), "monto", Number(e.target.value) || 0)}
+                                          onChange={(e) => upsertItemCostoByIndex(categoria as keyof ItemsPorCategoria, index, "monto", Number(e.target.value) || 0)}
                                           placeholder="0"
                                           className="bg-background/50 text-xs h-8 border-0 text-right w-32"
                                         />
