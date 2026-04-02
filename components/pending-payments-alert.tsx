@@ -8,9 +8,10 @@ import type { Servicio } from "@/lib/database"
 
 interface PendingPaymentsAlertProps {
   servicios: Servicio[]
+  maxItems?: number
 }
 
-export function PendingPaymentsAlert({ servicios }: PendingPaymentsAlertProps) {
+export function PendingPaymentsAlert({ servicios, maxItems = 5 }: PendingPaymentsAlertProps) {
   const ahora = new Date()
 
   const pendingPayments = servicios
@@ -71,7 +72,7 @@ export function PendingPaymentsAlert({ servicios }: PendingPaymentsAlertProps) {
 
       {/* List */}
       <div className="divide-y divide-border max-h-[280px] overflow-y-auto">
-        {pendingPayments.slice(0, 5).map((pago) => (
+        {pendingPayments.slice(0, maxItems).map((pago) => (
           <div
             key={pago.id}
             className={`p-4 transition-colors hover:bg-secondary/50 ${
@@ -123,9 +124,9 @@ export function PendingPaymentsAlert({ servicios }: PendingPaymentsAlertProps) {
       </div>
 
       {/* Footer */}
-      {pendingPayments.length > 5 && (
+      {pendingPayments.length > maxItems && (
         <div className="p-3 bg-secondary/30 text-center text-sm text-muted-foreground">
-          Y {pendingPayments.length - 5} servicios más con saldo pendiente
+          Y {pendingPayments.length - maxItems} servicios más con saldo pendiente
         </div>
       )}
 

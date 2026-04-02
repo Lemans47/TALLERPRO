@@ -1,12 +1,12 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
+import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import { TrendingUp } from "lucide-react"
 import { fetchChartData } from "@/lib/api-client"
 
 export function RevenueChart() {
-  const [chartData, setChartData] = useState<Array<{ mes: string; ingresos: number; gastos: number }>>([])
+  const [chartData, setChartData] = useState<Array<{ mes: string; ingresos: number; gastos: number; margen: number }>>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -35,7 +35,6 @@ export function RevenueChart() {
           if (s.estado === "Cerrado/Pagado") {
             monthlyData[key].ingresos += Number(s.monto_total_sin_iva || 0)
           }
-          // Solo sumar costos de servicios cerrados/pagados
           if (s.estado === "Cerrado/Pagado") {
             const costosArr = Array.isArray(s.costos) ? s.costos : (typeof s.costos === "string" && s.costos ? JSON.parse(s.costos) : [])
             const costoServicio = costosArr.reduce((sum: number, c: any) => sum + (Number(c.monto) || 0), 0)
@@ -56,10 +55,14 @@ export function RevenueChart() {
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([key, values]) => {
           const [, month] = key.split("-")
+          const ingresos = Math.round(values.ingresos)
+          const gastosVal = Math.round(values.gastos)
+          const margen = ingresos > 0 ? Math.round(((ingresos - gastosVal) / ingresos) * 100) : 0
           return {
             mes: monthNames[Number.parseInt(month) - 1],
-            ingresos: Math.round(values.ingresos),
-            gastos: Math.round(values.gastos),
+            ingresos,
+            gastos: gastosVal,
+            margen,
           }
         })
 
@@ -83,12 +86,16 @@ export function RevenueChart() {
         </div>
         <div className="flex items-center gap-4 text-sm">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-primary" />
+            <div className="w-3 h-3 rounded-full bg-[#f59e0b]" />
             <span className="text-muted-foreground">Ingresos</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-destructive" />
+            <div className="w-3 h-3 rounded-full bg-[#dc2626]" />
             <span className="text-muted-foreground">Gastos</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-[#22c55e]" />
+            <span className="text-muted-foreground">Margen %</span>
           </div>
         </div>
       </div>
@@ -102,7 +109,7 @@ export function RevenueChart() {
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={280}>
-          <BarChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+          <ComposedChart data={chartData} margin={{ top: 10, right: 30, left: -10, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#dee2e7" vertical={false} />
             <XAxis
               dataKey="mes"
@@ -111,16 +118,27 @@ export function RevenueChart() {
               tickLine={false}
             />
             <YAxis
+              yAxisId="left"
               tick={{ fontSize: 12, fill: "#6b7280" }}
               tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
               axisLine={false}
               tickLine={false}
             />
+            <YAxis
+              yAxisId="right"
+              orientation="right"
+              tick={{ fontSize: 12, fill: "#6b7280" }}
+              tickFormatter={(v) => `${v}%`}
+              domain={[0, 100]}
+              axisLine={false}
+              tickLine={false}
+            />
             <Tooltip
-              formatter={(value: number, name: string) => [
-                `$${value.toLocaleString("es-CL")}`,
-                name === "ingresos" ? "Ingresos" : "Gastos",
-              ]}
+              formatter={(value: number, name: string) => {
+                if (name === "margen") return [`${value}%`, "Margen"]
+                if (name === "ingresos") return [`$${value.toLocaleString("es-CL")}`, "Ingresos"]
+                return [`$${value.toLocaleString("es-CL")}`, "Gastos"]
+              }}
               contentStyle={{
                 backgroundColor: "#1e2a3c",
                 border: "1px solid #334155",
@@ -130,9 +148,18 @@ export function RevenueChart() {
               labelStyle={{ color: "#e2e8f0", fontWeight: 600 }}
               cursor={{ fill: "#334155", opacity: 0.5 }}
             />
-            <Bar dataKey="ingresos" fill="#f59e0b" radius={[6, 6, 0, 0]} />
-            <Bar dataKey="gastos" fill="#dc2626" radius={[6, 6, 0, 0]} />
-          </BarChart>
+            <Bar yAxisId="left" dataKey="ingresos" fill="#f59e0b" radius={[6, 6, 0, 0]} />
+            <Bar yAxisId="left" dataKey="gastos" fill="#dc2626" radius={[6, 6, 0, 0]} />
+            <Line
+              yAxisId="right"
+              dataKey="margen"
+              stroke="#22c55e"
+              strokeWidth={2}
+              dot={{ r: 3, fill: "#22c55e", strokeWidth: 0 }}
+              activeDot={{ r: 5 }}
+              type="monotone"
+            />
+          </ComposedChart>
         </ResponsiveContainer>
       )}
     </div>
