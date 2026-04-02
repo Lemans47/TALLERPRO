@@ -56,6 +56,11 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
 
   // ─── DRAW PAGE HEADER ─────────────────────────────────────────────
   function drawPageHeader(pageNum: number, logoBase64: string): number {
+    // Watermark — large centered logo behind all content
+    if (watermarkBase64) {
+      const wmSize = 130
+      doc.addImage(watermarkBase64, "PNG", (210 - wmSize) / 2, (297 - wmSize) / 2, wmSize, wmSize)
+    }
     drawLogo(logoBase64)
 
     // Red separator line below logo + thin gray line below with small gap
@@ -85,17 +90,30 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   }
 
   // ─── LOAD LOGO ────────────────────────────────────────────────────
-  const logoBase64 = await new Promise<string>((resolve) => {
+  const { logoBase64, watermarkBase64 } = await new Promise<{ logoBase64: string; watermarkBase64: string }>((resolve) => {
     const img = new window.Image()
     img.crossOrigin = "anonymous"
     img.onload = () => {
+      // Full logo
       const canvas = document.createElement("canvas")
       canvas.width = img.width
       canvas.height = img.height
-      canvas.getContext("2d")!.drawImage(img, 0, 0)
-      resolve(canvas.toDataURL("image/png"))
+      const ctx = canvas.getContext("2d")!
+      ctx.drawImage(img, 0, 0)
+      const logoBase64 = canvas.toDataURL("image/png")
+
+      // Watermark — same image at ~8% opacity
+      const wCanvas = document.createElement("canvas")
+      wCanvas.width = img.width
+      wCanvas.height = img.height
+      const wCtx = wCanvas.getContext("2d")!
+      wCtx.globalAlpha = 0.08
+      wCtx.drawImage(img, 0, 0)
+      const watermarkBase64 = wCanvas.toDataURL("image/png")
+
+      resolve({ logoBase64, watermarkBase64 })
     }
-    img.onerror = () => resolve("")
+    img.onerror = () => resolve({ logoBase64: "", watermarkBase64: "" })
     img.src = "https://res.cloudinary.com/dzjtujwor/image/upload/v1775100136/LOGO_AUTOMOTORA_RS_narpoz.png"
   })
 
