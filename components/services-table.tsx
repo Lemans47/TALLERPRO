@@ -152,7 +152,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
     return styles[estado] || "bg-gray-500/10 text-gray-400 border-gray-500/30"
   }
 
-  const ESTADO_ORDER = ["En Cola","En Proceso","En Reparación","Esperando Repuestos","Control de Calidad","Listo para Entrega","Por Cobrar","Entregado","Cerrado/Pagado"]
+  const ESTADO_ORDER = ["En Cola","En Proceso","Esperando Repuestos","En Reparación","Control de Calidad","Listo para Entrega","Por Cobrar","Entregado","Cerrado/Pagado"]
 
   const serviciosFiltrados = servicios
     .filter((s) => filtroEstado === "todos" || s.estado === filtroEstado)
