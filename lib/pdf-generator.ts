@@ -41,7 +41,7 @@ export async function generateServicioPDF(data: Servicio | Presupuesto) {
   // Fecha
   doc.setFontSize(10)
   doc.setFont("helvetica", "normal")
-  doc.text(`FECHA: ${new Date(data.fecha_ingreso).toLocaleDateString("es-CL")}`, 150, 55)
+  doc.text(`FECHA: ${(data.fecha_ingreso || "").substring(0, 10).split("-").reverse().join("-")}`, 150, 55)
 
   // Información del Cliente
   doc.setFontSize(10)
