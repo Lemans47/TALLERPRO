@@ -28,7 +28,7 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     const lx = ML, ly = 6, lw = CW, lh = 34
 
     // Light gray background
-    doc.setFillColor(235, 235, 235)
+    doc.setFillColor(255, 255, 255)
     doc.roundedRect(lx, ly, lw, lh, 2, 2, "F")
 
     // Company logo image on the left
