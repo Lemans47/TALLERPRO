@@ -297,7 +297,7 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   placed.forEach((r) => {
     doc.setPage(r.pg)
     if (r.type === "category") {
-      doc.setFillColor(210, 60, 60)
+      doc.setFillColor(210, 210, 210)
       doc.rect(ML, r.ry, CW, r.rh, "F")
     } else if (r.type === "subtotal") {
       doc.setFillColor(232, 232, 232)
@@ -324,7 +324,7 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     doc.setPage(r.pg)
     black()
     if (r.type === "category") {
-      doc.setTextColor(255, 255, 255); bold(); doc.setFontSize(8)
+      doc.setTextColor(40, 40, 40); bold(); doc.setFontSize(8)
       doc.text(up(r.label!) + ":", ML + 1.5, r.ry + r.rh - 2)
       black()
     } else if (r.type === "subtotal") {
