@@ -9,6 +9,7 @@ import { RefreshCw, Receipt, Paintbrush, Wrench, Home, Users } from "lucide-reac
 import { useMonth } from "@/lib/month-context"
 import { api, type Gasto } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth-context"
+import { GastosFijosPlantillas } from "@/components/gastos-fijos-plantillas"
 
 const ALL_CATEGORIAS = [
   { id: "Gastos de Pintura", label: "Pintura", icon: Paintbrush, color: "text-purple-400", roles: ["admin", "supervisor", "operador"] },
@@ -145,6 +146,9 @@ export default function ExpensesPage() {
 
         {CATEGORIAS.map((cat) => (
           <TabsContent key={cat.id} value={cat.id} className="mt-6">
+            {cat.id === "Gastos Fijos" && (
+              <GastosFijosPlantillas selectedMonth={selectedMonth} onGenerated={loadGastos} />
+            )}
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
               <div className="xl:col-span-1">
                 <ExpenseForm

@@ -898,3 +898,73 @@ export async function batchUpdatePreciosPintura(updates: { id: string; precio: n
   )
   return results.flat() as PrecioPintura[]
 }
+
+// ── Gastos Fijos Plantillas ──────────────────────────────────────────────────
+export interface GastoFijoPlantilla {
+  id: string
+  descripcion: string
+  monto_estimado: number
+  orden: number
+  activo: boolean
+  created_at: string
+}
+
+async function ensurePlantillasTable(db: any) {
+  await db`
+    CREATE TABLE IF NOT EXISTS gastos_fijos_plantillas (
+      id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+      descripcion TEXT NOT NULL,
+      monto_estimado INTEGER NOT NULL DEFAULT 0,
+      orden INTEGER DEFAULT 0,
+      activo BOOLEAN DEFAULT TRUE,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `
+  // Seed defaults if empty
+  const count = await db`SELECT COUNT(*) AS n FROM gastos_fijos_plantillas`
+  if (Number(count[0].n) === 0) {
+    await db`
+      INSERT INTO gastos_fijos_plantillas (descripcion, monto_estimado, orden) VALUES
+      ('Luz', 0, 1),
+      ('Agua', 0, 2),
+      ('Convenio Contribuciones', 0, 3),
+      ('Boleta Electrónica', 0, 4)
+    `
+  }
+}
+
+export async function getPlantillas() {
+  const db = getSQL()
+  await ensurePlantillasTable(db)
+  const data = await db`SELECT * FROM gastos_fijos_plantillas WHERE activo = TRUE ORDER BY orden ASC, created_at ASC`
+  return data as GastoFijoPlantilla[]
+}
+
+export async function createPlantilla(p: { descripcion: string; monto_estimado: number }) {
+  const db = getSQL()
+  await ensurePlantillasTable(db)
+  const maxOrden = await db`SELECT COALESCE(MAX(orden), 0) AS m FROM gastos_fijos_plantillas`
+  const data = await db`
+    INSERT INTO gastos_fijos_plantillas (descripcion, monto_estimado, orden)
+    VALUES (${p.descripcion}, ${p.monto_estimado}, ${Number(maxOrden[0].m) + 1})
+    RETURNING *
+  `
+  return data[0] as GastoFijoPlantilla
+}
+
+export async function updatePlantilla(id: string, p: { descripcion?: string; monto_estimado?: number }) {
+  const db = getSQL()
+  const data = await db`
+    UPDATE gastos_fijos_plantillas SET
+      descripcion    = COALESCE(${p.descripcion ?? null}, descripcion),
+      monto_estimado = COALESCE(${p.monto_estimado ?? null}, monto_estimado)
+    WHERE id = ${id}
+    RETURNING *
+  `
+  return data[0] as GastoFijoPlantilla
+}
+
+export async function deletePlantilla(id: string) {
+  const db = getSQL()
+  await db`DELETE FROM gastos_fijos_plantillas WHERE id = ${id}`
+}
