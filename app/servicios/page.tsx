@@ -25,7 +25,7 @@ export default function ServicesPage() {
   const [serviciosOpen, setServiciosOpen] = useState(true)
   const [presupuestosOpen, setPresupuestosOpen] = useState(true)
 
-  const ESTADOS_ACTIVOS = ["En Cola", "En Proceso", "En Reparación", "Esperando Repuestos", "Por Cobrar"]
+  const ESTADOS_ACTIVOS = ["En Cola", "En Proceso", "En Reparación", "Esperando Repuestos", "Control de Calidad", "Listo para Entrega", "Entregado", "Por Cobrar"]
 
   const loadData = useCallback(async () => {
     setLoading(true)
