@@ -27,12 +27,8 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   function drawLogo(logoBase64: string) {
     const lx = ML, ly = 6, lw = CW, lh = 34
 
-    // Light gray background
-    doc.setFillColor(255, 255, 255)
-    doc.roundedRect(lx, ly, lw, lh, 2, 2, "F")
-
     // Company logo image on the left
-    doc.addImage(logoBase64, "PNG", lx + 2, ly + 2, 30, 30)
+    if (logoBase64) doc.addImage(logoBase64, "PNG", lx + 2, ly + 2, 30, 30)
 
     // ── Right: contact info inside banner ──
     const rx = lx + lw - 2
