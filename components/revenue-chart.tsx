@@ -35,7 +35,8 @@ export function RevenueChart() {
           // Ingresos = todos los servicios facturados (sin importar estado)
           monthlyData[key].ingresos += Number(s.monto_total_sin_iva || 0)
           // Costos internos = todos los servicios
-          const costosArr = Array.isArray(s.costos) ? s.costos : (typeof s.costos === "string" && s.costos ? JSON.parse(s.costos) : [])
+          const rawCostos = typeof s.costos === "string" && s.costos ? (() => { try { const p = JSON.parse(s.costos as string); return Array.isArray(p) ? p : [] } catch { return [] } })() : (Array.isArray(s.costos) ? s.costos : [])
+          const costosArr = rawCostos
           const costoServicio = costosArr.reduce((sum: number, c: any) => sum + (Number(c.monto) || 0), 0)
           monthlyData[key].gastos += costoServicio
         }

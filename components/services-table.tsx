@@ -11,8 +11,18 @@ import { useToast } from "@/hooks/use-toast"
 import { api, type Servicio } from "@/lib/api-client"
 import { FileText, Trash2, Edit, Calendar, User, Car, Wrench, ClipboardList, List, AlignJustify, TrendingUp } from "lucide-react"
 
-const parseArr = (v: any): any[] =>
-  Array.isArray(v) ? v : (typeof v === "string" && v ? JSON.parse(v) : [])
+const parseArr = (v: any): any[] => {
+  if (Array.isArray(v)) return v
+  if (typeof v === "string" && v) {
+    try {
+      const parsed = JSON.parse(v)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  }
+  return []
+}
 
 function calcGanancia(servicio: Servicio) {
   const ingreso = Number(servicio.monto_total_sin_iva || 0)

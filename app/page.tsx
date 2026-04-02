@@ -77,7 +77,13 @@ export default function DashboardPage() {
   }
 
   const calculateKPIs = (servicios: Servicio[], gastos: Gasto[], empleados: Empleado[]) => {
-    const parseArr = (v: any) => Array.isArray(v) ? v : (typeof v === "string" && v ? JSON.parse(v) : [])
+    const parseArr = (v: any): any[] => {
+      if (Array.isArray(v)) return v
+      if (typeof v === "string" && v) {
+        try { const p = JSON.parse(v); return Array.isArray(p) ? p : [] } catch { return [] }
+      }
+      return []
+    }
 
     const serviciosCerrados = servicios.filter((s) => s.estado === "Cerrado/Pagado")
 
