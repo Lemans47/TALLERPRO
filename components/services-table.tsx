@@ -9,7 +9,38 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { api, type Servicio } from "@/lib/api-client"
-import { FileText, Trash2, Edit, Calendar, User, Car, Wrench, ClipboardList, List, AlignJustify } from "lucide-react"
+import { FileText, Trash2, Edit, Calendar, User, Car, Wrench, ClipboardList, List, AlignJustify, TrendingUp } from "lucide-react"
+
+const parseArr = (v: any): any[] =>
+  Array.isArray(v) ? v : (typeof v === "string" && v ? JSON.parse(v) : [])
+
+function calcGanancia(servicio: Servicio) {
+  const ingreso = Number(servicio.monto_total_sin_iva || 0)
+  const costos = parseArr(servicio.costos)
+  if (costos.length === 0) return null
+  const totalCostos = costos.reduce((s: number, c: any) => s + Number(c.monto || 0), 0)
+  const ganancia = ingreso - totalCostos
+  const margen = ingreso > 0 ? (ganancia / ingreso) * 100 : 0
+  return { ganancia, margen }
+}
+
+function getGananciaStyles(margen: number) {
+  if (margen >= 45) return {
+    box: "bg-success/10 border border-success/30",
+    text: "text-success",
+    badge: "bg-success/20 text-success",
+  }
+  if (margen >= 30) return {
+    box: "bg-warning/10 border border-warning/30",
+    text: "text-warning",
+    badge: "bg-warning/20 text-warning",
+  }
+  return {
+    box: "bg-destructive/10 border border-destructive/30",
+    text: "text-destructive",
+    badge: "bg-destructive/20 text-destructive",
+  }
+}
 import { generarPDFPresupuesto } from "@/lib/pdf-presupuesto"
 import { generarOrdenTrabajo } from "@/lib/pdf-orden-trabajo"
 
@@ -287,7 +318,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4 pt-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2">
                     <div className="p-2 rounded-lg bg-secondary/50">
                       <p className="text-xs text-muted-foreground">Total</p>
                       <p className="font-semibold">${Number(servicio.monto_total).toLocaleString("es-CL")}</p>
@@ -304,12 +335,31 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                       className={`p-2 rounded-lg ${Number(servicio.saldo_pendiente) > 0 ? "bg-warning/5 border border-warning/20" : "bg-success/5 border border-success/20"}`}
                     >
                       <p className="text-xs text-muted-foreground">Saldo Pendiente</p>
-                      <p
-                        className={`font-semibold ${Number(servicio.saldo_pendiente) > 0 ? "text-warning" : "text-success"}`}
-                      >
+                      <p className={`font-semibold ${Number(servicio.saldo_pendiente) > 0 ? "text-warning" : "text-success"}`}>
                         ${Number(servicio.saldo_pendiente).toLocaleString("es-CL")}
                       </p>
                     </div>
+                    {(() => {
+                      const g = calcGanancia(servicio)
+                      if (!g) return (
+                        <div className="p-2 rounded-lg bg-secondary/30 border border-border/40">
+                          <p className="text-xs text-muted-foreground flex items-center gap-1">
+                            <TrendingUp className="w-3 h-3" /> Ganancia
+                          </p>
+                          <p className="font-semibold text-muted-foreground text-xs mt-1">Sin costos</p>
+                        </div>
+                      )
+                      const s = getGananciaStyles(g.margen)
+                      return (
+                        <div className={`p-2 rounded-lg ${s.box}`}>
+                          <p className={`text-xs flex items-center gap-1 ${s.text}`}>
+                            <TrendingUp className="w-3 h-3" /> Ganancia
+                          </p>
+                          <p className={`font-semibold ${s.text}`}>${g.ganancia.toLocaleString("es-CL")}</p>
+                          <p className={`text-[10px] font-medium mt-0.5 ${s.text}`}>{g.margen.toFixed(1)}% margen</p>
+                        </div>
+                      )
+                    })()}
                   </div>
                 </div>
 
