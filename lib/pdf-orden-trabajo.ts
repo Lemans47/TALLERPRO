@@ -15,48 +15,15 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
   const black  = () => doc.setTextColor(0, 0, 0)
   const up     = (s: string) => (s || "").toUpperCase()
 
-  function drawLogo() {
+  function drawLogo(logoBase64: string) {
     const lx = ML, ly = 6, lw = CW, lh = 34
-    const cx = lx + 15, cy = ly + lh / 2
-    const ro = 11.5, rm = 9.5, ri = 8.0
 
     doc.setFillColor(235, 235, 235)
     doc.roundedRect(lx, ly, lw, lh, 2, 2, "F")
-    doc.setFillColor(20, 20, 20)
-    doc.roundedRect(lx, ly, 1.2, lh, 1, 1, "F")
-    doc.roundedRect(lx + lw - 1.2, ly, 1.2, lh, 1, 1, "F")
 
-    doc.setFillColor(200, 0, 0)
-    doc.circle(cx, cy, ro, "F")
-    doc.setDrawColor(20, 20, 20); doc.setLineWidth(1.8)
-    doc.circle(cx, cy, ro, "S")
-    doc.setFillColor(160, 0, 0)
-    doc.circle(cx, cy, rm, "F")
-    doc.setFillColor(20, 20, 20)
-    doc.circle(cx, cy, ri, "F")
-    doc.setFillColor(40, 40, 40)
-    doc.circle(cx, cy - 1.5, ri * 0.65, "F")
-    doc.setFillColor(20, 20, 20)
-    doc.circle(cx, cy, ri * 0.5, "F")
-    doc.setTextColor(255, 255, 255)
-    doc.setFont("helvetica", "bold"); doc.setFontSize(11)
-    doc.text("RS", cx, cy + 3.8, { align: "center" })
-
-    const contactW = 60
-    const emblemRight = cx + ro + 4
-    const contactLeft = lx + lw - contactW
-    const tcx = (emblemRight + contactLeft) / 2
-
-    doc.setTextColor(20, 20, 20)
-    doc.setFont("helvetica", "normal"); doc.setFontSize(7)
-    doc.text("A U T O M O T O R A", tcx, ly + 8, { align: "center" })
-    doc.setFont("helvetica", "bold"); doc.setFontSize(22)
-    doc.text("RS", tcx, ly + 21, { align: "center" })
-    doc.setTextColor(90, 90, 90)
-    doc.setFont("helvetica", "normal"); doc.setFontSize(6)
-    doc.text("DESABOLLADURA & PINTURA", tcx, ly + 27, { align: "center" })
-    doc.setTextColor(140, 140, 140); doc.setFontSize(5)
-    doc.text("CALIDAD  \u00B7  PRECISION  \u00B7  CONFIANZA", tcx, ly + 32, { align: "center" })
+    if (logoBase64) {
+      doc.addImage(logoBase64, "PNG", lx + 2, ly + 2, 30, 30)
+    }
 
     const rx = lx + lw - 2
     doc.setTextColor(80, 80, 80)
@@ -71,6 +38,21 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
     doc.setDrawColor(0, 0, 0); doc.setTextColor(0, 0, 0); doc.setLineWidth(0.3)
   }
 
+  // ── Load logo ───────────────────────────────────────────────────
+  const logoBase64 = await new Promise<string>((resolve) => {
+    const img = new window.Image()
+    img.crossOrigin = "anonymous"
+    img.onload = () => {
+      const canvas = document.createElement("canvas")
+      canvas.width = img.width
+      canvas.height = img.height
+      canvas.getContext("2d")!.drawImage(img, 0, 0)
+      resolve(canvas.toDataURL("image/png"))
+    }
+    img.onerror = () => resolve("")
+    img.src = "https://res.cloudinary.com/dzjtujwor/image/upload/v1775100136/LOGO_AUTOMOTORA_RS_narpoz.png"
+  })
+
   // ── Page counter and Y tracker ──────────────────────────────────
   let y = 0
   let currentPage = 1
@@ -78,7 +60,7 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
   function newPage() {
     doc.addPage()
     currentPage++
-    y = drawHeader(currentPage)
+    y = drawHeader(currentPage, logoBase64)
   }
 
   function need(h: number) {
@@ -86,8 +68,8 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
   }
 
   // ── Header ──────────────────────────────────────────────────────
-  function drawHeader(pg: number): number {
-    drawLogo()
+  function drawHeader(pg: number, logo: string): number {
+    drawLogo(logo)
 
     black(); bold(); doc.setFontSize(16)
     if (pg === 1) {
@@ -121,7 +103,7 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
   }
 
   // ── Start page 1 ────────────────────────────────────────────────
-  y = drawHeader(1)
+  y = drawHeader(1, logoBase64)
 
   // ── Client info ─────────────────────────────────────────────────
   const RH = 6

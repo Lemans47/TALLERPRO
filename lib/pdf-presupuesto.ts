@@ -23,71 +23,16 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     return (!yr || !m || !d) ? raw : `${d}-${m}-${yr}`
   })()
 
-  // ─── DRAW LOGO (jsPDF primitives, no image needed) ────────────────
-  function drawLogo() {
+  // ─── DRAW LOGO ────────────────────────────────────────────────────
+  function drawLogo(logoBase64: string) {
     const lx = ML, ly = 6, lw = CW, lh = 34
-    const cx = lx + 15, cy = ly + lh / 2
 
     // Light gray background
     doc.setFillColor(235, 235, 235)
     doc.roundedRect(lx, ly, lw, lh, 2, 2, "F")
 
-    // Red left border strip only (no right strip)
-    doc.setFillColor(200, 0, 0)
-    doc.roundedRect(lx, ly, 2.5, lh, 1, 1, "F")
-
-    // ── Circular emblem ──
-    const ro = 11.5, rm = 9.5, ri = 8.0
-
-    // Outer ring — now RED
-    doc.setFillColor(200, 0, 0)
-    doc.circle(cx, cy, ro, "F")
-    // Black outer ring stroke
-    doc.setDrawColor(20, 20, 20); doc.setLineWidth(1.8)
-    doc.circle(cx, cy, ro, "S")
-    // Mid ring — darker red
-    doc.setFillColor(160, 0, 0)
-    doc.circle(cx, cy, rm, "F")
-    // Center fill — black
-    doc.setFillColor(20, 20, 20)
-    doc.circle(cx, cy, ri, "F")
-    // Highlight — dark gray
-    doc.setFillColor(40, 40, 40)
-    doc.circle(cx, cy - 1.5, ri * 0.65, "F")
-    // Re-blend — black
-    doc.setFillColor(20, 20, 20)
-    doc.circle(cx, cy, ri * 0.5, "F")
-
-    // RS text in emblem
-    doc.setTextColor(255, 255, 255)
-    doc.setFont("helvetica", "bold")
-    doc.setFontSize(11)
-    doc.text("RS", cx, cy + 3.8, { align: "center" })
-
-    // ── Center: AUTOMOTORA RS branding ──
-    const contactW = 60
-    const emblemRight = cx + ro + 4
-    const contactLeft = lx + lw - contactW
-    const tcx = (emblemRight + contactLeft) / 2
-
-    doc.setTextColor(20, 20, 20)
-    doc.setFont("helvetica", "normal")
-    doc.setFontSize(7)
-    doc.text("A U T O M O T O R A", tcx, ly + 8, { align: "center" })
-
-    doc.setTextColor(20, 20, 20)
-    doc.setFont("helvetica", "bold")
-    doc.setFontSize(22)
-    doc.text("RS", tcx, ly + 21, { align: "center" })
-
-    doc.setTextColor(200, 0, 0)
-    doc.setFont("helvetica", "bold")
-    doc.setFontSize(6)
-    doc.text("DESABOLLADURA & PINTURA", tcx, ly + 27, { align: "center" })
-
-    doc.setTextColor(140, 140, 140)
-    doc.setFontSize(5)
-    doc.text("CALIDAD  \u00B7  PRECISION  \u00B7  CONFIANZA", tcx, ly + 32, { align: "center" })
+    // Company logo image on the left
+    doc.addImage(logoBase64, "PNG", lx + 2, ly + 2, 30, 30)
 
     // ── Right: contact info inside banner ──
     const rx = lx + lw - 2
@@ -110,8 +55,8 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   }
 
   // ─── DRAW PAGE HEADER ─────────────────────────────────────────────
-  function drawPageHeader(pageNum: number): number {
-    drawLogo()
+  function drawPageHeader(pageNum: number, logoBase64: string): number {
+    drawLogo(logoBase64)
 
     // Red separator line below logo + thin gray line below with small gap
     doc.setDrawColor(200, 0, 0); doc.setLineWidth(1.2)
@@ -139,15 +84,30 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     return pageNum === 1 ? 62 : 60
   }
 
+  // ─── LOAD LOGO ────────────────────────────────────────────────────
+  const logoBase64 = await new Promise<string>((resolve) => {
+    const img = new window.Image()
+    img.crossOrigin = "anonymous"
+    img.onload = () => {
+      const canvas = document.createElement("canvas")
+      canvas.width = img.width
+      canvas.height = img.height
+      canvas.getContext("2d")!.drawImage(img, 0, 0)
+      resolve(canvas.toDataURL("image/png"))
+    }
+    img.onerror = () => resolve("")
+    img.src = "https://res.cloudinary.com/dzjtujwor/image/upload/v1775100136/LOGO_AUTOMOTORA_RS_narpoz.png"
+  })
+
   // ─── PAGE 1 ───────────────────────────────────────────────────────
-  let y = drawPageHeader(1)
+  let y = drawPageHeader(1, logoBase64)
   let pageNum = 1
 
   function checkPageBreak(needed: number): void {
     if (y + needed > PAGE_H - 15) {
       doc.addPage()
       pageNum++
-      y = drawPageHeader(pageNum)
+      y = drawPageHeader(pageNum, logoBase64)
     }
   }
 

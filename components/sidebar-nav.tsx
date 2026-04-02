@@ -2,7 +2,8 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Wrench, Receipt, BarChart3, Settings, Menu, X, Car, LogOut, Users, UserCheck, ExternalLink } from "lucide-react"
+import { LayoutDashboard, Wrench, Receipt, BarChart3, Settings, Menu, X, LogOut, Users, UserCheck, ExternalLink } from "lucide-react"
+import Image from "next/image"
 import { useState } from "react"
 import { MonthSelector } from "@/components/month-selector"
 import { useAuth } from "@/lib/auth-context"
@@ -57,10 +58,14 @@ export function SidebarNav() {
       {/* Mobile Header */}
       <header className="md:hidden fixed top-0 left-0 right-0 h-16 bg-sidebar backdrop-blur-md border-b border-sidebar-border flex items-center justify-between px-4 z-50">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-primary rounded-lg flex items-center justify-center">
-            <Car className="w-5 h-5 text-sidebar-primary-foreground" />
-          </div>
-          <span className="text-lg font-semibold text-sidebar-foreground">TallerPro</span>
+          <Image
+            src="https://res.cloudinary.com/dzjtujwor/image/upload/v1775100136/LOGO_AUTOMOTORA_RS_narpoz.png"
+            alt="Automotora RS"
+            width={36}
+            height={36}
+            className="rounded-lg"
+          />
+          <span className="text-lg font-semibold text-sidebar-foreground">Automotora RS</span>
         </div>
         <button
           onClick={() => setIsOpen(!isOpen)}
@@ -101,11 +106,15 @@ export function SidebarNav() {
         {/* Logo */}
         <div className="p-5 border-b border-sidebar-border">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-black/20">
-              <Car className="w-6 h-6 text-sidebar-primary-foreground" />
-            </div>
+            <Image
+              src="https://res.cloudinary.com/dzjtujwor/image/upload/v1775100136/LOGO_AUTOMOTORA_RS_narpoz.png"
+              alt="Automotora RS"
+              width={40}
+              height={40}
+              className="rounded-xl"
+            />
             <div>
-              <h1 className="text-lg font-bold text-sidebar-foreground">TallerPro</h1>
+              <h1 className="text-lg font-bold text-sidebar-foreground">Automotora RS</h1>
               <p className="text-xs text-sidebar-foreground/50">Gestión Automotriz</p>
             </div>
           </div>
@@ -151,7 +160,7 @@ export function SidebarNav() {
             Cerrar sesión
           </button>
           <div className="flex items-center justify-between text-xs text-sidebar-foreground/40 px-2">
-            <span>© 2025 TallerPro</span>
+            <span>© 2025 Automotora RS</span>
             <span className="px-2 py-1 bg-primary/20 text-primary rounded-md text-[10px] font-medium">v2.0</span>
           </div>
         </div>

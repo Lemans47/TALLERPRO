@@ -1,25 +1,42 @@
 import jsPDF from "jspdf"
 import type { Servicio, Presupuesto } from "./database"
 
-export function generateServicioPDF(data: Servicio | Presupuesto) {
+export async function generateServicioPDF(data: Servicio | Presupuesto) {
   const doc = new jsPDF()
 
-  // Header - Empresa
+  // Load logo
+  const logoBase64 = await new Promise<string>((resolve) => {
+    const img = new window.Image()
+    img.crossOrigin = "anonymous"
+    img.onload = () => {
+      const canvas = document.createElement("canvas")
+      canvas.width = img.width
+      canvas.height = img.height
+      canvas.getContext("2d")!.drawImage(img, 0, 0)
+      resolve(canvas.toDataURL("image/png"))
+    }
+    img.onerror = () => resolve("")
+    img.src = "https://res.cloudinary.com/dzjtujwor/image/upload/v1775100136/LOGO_AUTOMOTORA_RS_narpoz.png"
+  })
+
+  // Header - Logo + Empresa
+  if (logoBase64) {
+    doc.addImage(logoBase64, "PNG", 15, 8, 22, 22)
+  }
   doc.setFontSize(16)
   doc.setFont("helvetica", "bold")
   doc.text("AUTOMOTORA RS", 105, 15, { align: "center" })
 
   doc.setFontSize(10)
   doc.setFont("helvetica", "normal")
-  doc.text("AUTOMOTORA RS SPA", 105, 21, { align: "center" })
-  doc.text("RUT 76.858.081-2", 105, 26, { align: "center" })
-  doc.text("FRANKLIN 605 - FONO +569 91390267", 105, 31, { align: "center" })
-  doc.text("mail: automotora.rs@gmail.com", 105, 36, { align: "center" })
+  doc.text("RUT 76.858.081-2", 105, 21, { align: "center" })
+  doc.text("FRANKLIN 605 - FONO +569 91390267", 105, 26, { align: "center" })
+  doc.text("mail: automotora.rs@gmail.com", 105, 31, { align: "center" })
 
   // Título PRESUPUESTO
   doc.setFontSize(18)
   doc.setFont("helvetica", "bold")
-  doc.text("PRESUPUESTO", 105, 48, { align: "center" })
+  doc.text("PRESUPUESTO", 105, 43, { align: "center" })
 
   // Fecha
   doc.setFontSize(10)

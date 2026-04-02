@@ -3,7 +3,8 @@
 import { useState } from "react"
 import { createClient } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
-import { Car, Eye, EyeOff } from "lucide-react"
+import { Eye, EyeOff } from "lucide-react"
+import Image from "next/image"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -34,10 +35,14 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-primary/20">
-            <Car className="w-9 h-9 text-primary-foreground" />
-          </div>
-          <h1 className="text-2xl font-bold text-foreground">TallerPro</h1>
+          <Image
+            src="https://res.cloudinary.com/dzjtujwor/image/upload/v1775100136/LOGO_AUTOMOTORA_RS_narpoz.png"
+            alt="Automotora RS"
+            width={80}
+            height={80}
+            className="mx-auto mb-4 rounded-2xl"
+          />
+          <h1 className="text-2xl font-bold text-foreground">Automotora RS</h1>
           <p className="text-muted-foreground text-sm mt-1">Ingresa a tu cuenta</p>
         </div>
 
@@ -98,7 +103,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-xs text-muted-foreground mt-6">
-          © 2025 TallerPro · Gestión Automotriz
+          © 2025 Automotora RS · Gestión Automotriz
         </p>
       </div>
     </div>
