@@ -10,7 +10,7 @@ import { PendingPaymentsAlert } from "@/components/pending-payments-alert"
 import { DollarSign, TrendingUp, TrendingDown, Wrench, AlertCircle, Plus, RefreshCw, Activity } from "lucide-react"
 import { useMonth } from "@/lib/month-context"
 import { fetchDashboardData } from "@/lib/api-client"
-import type { Servicio, Gasto } from "@/lib/database"
+import type { Servicio, Gasto, Empleado } from "@/lib/database"
 import { useAuth } from "@/lib/auth-context"
 
 interface KPIs {
@@ -57,10 +57,10 @@ export default function DashboardPage() {
     setLoading(true)
     try {
       const [year, month] = selectedMonth.split("-").map(Number)
-      const { servicios: serviciosData, gastos: gastosData } = await fetchDashboardData(year, month)
+      const { servicios: serviciosData, gastos: gastosData, empleados: empleadosData } = await fetchDashboardData(year, month)
 
       setServicios(serviciosData)
-      calculateKPIs(serviciosData, gastosData)
+      calculateKPIs(serviciosData, gastosData, empleadosData)
     } catch (error) {
       console.error("Error loading dashboard data:", error)
     } finally {
@@ -68,30 +68,39 @@ export default function DashboardPage() {
     }
   }
 
-  const calculateKPIs = (servicios: Servicio[], gastos: Gasto[]) => {
+  const calculateKPIs = (servicios: Servicio[], gastos: Gasto[], empleados: Empleado[]) => {
     const serviciosCerrados = servicios.filter((s) => s.estado === "Cerrado/Pagado")
 
     // Ingresos
     const ingresosFacturado = servicios.reduce((sum, s) => sum + Number(s.monto_total_sin_iva || 0), 0)
     const ingresosCobrado = serviciosCerrados.reduce((sum, s) => sum + Number(s.monto_total_sin_iva || 0), 0)
 
-    // Gastos operacionales del mes
-    const gastosOperacionales = gastos.reduce((sum, g) => sum + Number(g.monto || 0), 0)
+    // Sueldos comprometidos: suma de sueldo_base de todos los empleados activos
+    // (independiente de si se ha pagado o no en el mes)
+    const sueldosComprometidos = empleados
+      .filter((e) => e.activo)
+      .reduce((sum, e) => sum + Number(e.sueldo_base || 0), 0)
 
-    // Costos internos de servicios cerrados (match con ingresosCobrado)
+    // Gastos operacionales del mes EXCLUYENDO sueldos
+    // (los sueldos ya se cuentan por sueldo_base, no por abonos registrados)
+    const gastosOperacionales = gastos
+      .filter((g) => g.categoria !== "Sueldos")
+      .reduce((sum, g) => sum + Number(g.monto || 0), 0)
+
+    const gastosConSueldos = gastosOperacionales + sueldosComprometidos
+
+    // Costos internos de servicios
     const parseArr = (v: any) => Array.isArray(v) ? v : (typeof v === "string" && v ? JSON.parse(v) : [])
     const costosCerrados = serviciosCerrados.reduce((sum, s) => {
       return sum + parseArr(s.costos).reduce((c: number, costo: any) => c + Number(costo.monto || 0), 0)
     }, 0)
-
-    // Costos internos de todos los servicios (para utilidad estimada)
     const costosTotal = servicios.reduce((sum, s) => {
       return sum + parseArr(s.costos).reduce((c: number, costo: any) => c + Number(costo.monto || 0), 0)
     }, 0)
 
     // Utilidades
-    const utilidadRealizada = ingresosCobrado - costosCerrados - gastosOperacionales
-    const utilidadEstimada = ingresosFacturado - costosTotal - gastosOperacionales
+    const utilidadRealizada = ingresosCobrado - costosCerrados - gastosConSueldos
+    const utilidadEstimada = ingresosFacturado - costosTotal - gastosConSueldos
     const margenRealizado = ingresosCobrado > 0 ? (utilidadRealizada / ingresosCobrado) * 100 : 0
     const margenEstimado = ingresosFacturado > 0 ? (utilidadEstimada / ingresosFacturado) * 100 : 0
 
@@ -104,7 +113,7 @@ export default function DashboardPage() {
     setKpis({
       ingresosFacturado,
       ingresosCobrado,
-      totalGastos: gastosOperacionales + costosCerrados,
+      totalGastos: gastosConSueldos + costosCerrados,
       utilidadRealizada,
       utilidadEstimada,
       margenRealizado,
