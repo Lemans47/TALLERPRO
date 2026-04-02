@@ -59,7 +59,7 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     // Watermark — large centered logo behind all content
     if (watermarkBase64) {
       const wmSize = 130
-      doc.addImage(watermarkBase64, "PNG", (210 - wmSize) / 2, (297 - wmSize) / 2, wmSize, wmSize)
+      doc.addImage(watermarkBase64, "PNG", (210 - wmSize) / 2, 110, wmSize, wmSize)
     }
     drawLogo(logoBase64)
 
