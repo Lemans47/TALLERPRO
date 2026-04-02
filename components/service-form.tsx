@@ -659,13 +659,16 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
     const d = desc.toLowerCase()
     return d.includes("mano de obra") || d.includes("materiales pintura")
   }
-  const costosManualPintura = safeArr(costos.pintura)
-    .filter((item) => !isAutoItem(item.descripcion))
-    .reduce((sum, item) => sum + (Number(item.monto) || 0), 0)
   const costosOtros = [...safeArr(costos.desmontar), ...safeArr(costos.desabolladura), ...safeArr(costos.reparar), ...safeArr(costos.mecanica), ...safeArr(costos.repuestos), ...safeArr(costos.otros)]
     .reduce((sum, item) => sum + (Number(item.monto) || 0), 0)
 
-  const totalCostos = costosManualPintura + costosOtros + autoCostoManoObra + autoCostoMateriales
+  // Al editar: usar costos.pintura guardados tal cual (incluye mano obra y materiales ya calculados)
+  // Al crear: excluir auto-items y agregar los recalculados desde config actual
+  const totalCostoPintura = servicioAEditar
+    ? safeArr(costos.pintura).reduce((sum, item) => sum + (Number(item.monto) || 0), 0)
+    : safeArr(costos.pintura).filter((item) => !isAutoItem(item.descripcion)).reduce((sum, item) => sum + (Number(item.monto) || 0), 0) + autoCostoManoObra + autoCostoMateriales
+
+  const totalCostos = totalCostoPintura + costosOtros
 
   const cobroTotal = totalPiezasPintura + totalCobros
   const montoConIva = formData.iva === "con" ? Math.round(cobroTotal * 1.19) : cobroTotal
