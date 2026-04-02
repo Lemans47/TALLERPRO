@@ -14,8 +14,8 @@ import type { Servicio, Gasto } from "@/lib/database"
 import { useAuth } from "@/lib/auth-context"
 
 interface KPIs {
-  ingresosSinIVA: number
-  ingresosConIVA: number
+  ingresosFacturado: number  // todos los servicios del mes, sin IVA
+  ingresosCobrado: number    // solo Cerrado/Pagado, sin IVA
   totalGastos: number
   utilidadOperacional: number
   margenPromedio: number
@@ -28,8 +28,8 @@ export default function DashboardPage() {
   const { role } = useAuth()
   const isOperador = role === "operador"
   const [kpis, setKpis] = useState<KPIs>({
-    ingresosSinIVA: 0,
-    ingresosConIVA: 0,
+    ingresosFacturado: 0,
+    ingresosCobrado: 0,
     totalGastos: 0,
     utilidadOperacional: 0,
     margenPromedio: 0,
@@ -61,28 +61,30 @@ export default function DashboardPage() {
   }
 
   const calculateKPIs = (servicios: Servicio[], gastos: Gasto[]) => {
-    const serviciosCerrados = servicios.filter((s) => s.estado === "Cerrado/Pagado")
-    const ingresosSinIVA = serviciosCerrados.reduce((sum, s) => sum + Number(s.monto_total_sin_iva || 0), 0)
-    // Ingresos brutos = todos los servicios del mes (facturado total, pagado o no)
-    const ingresosConIVA = servicios.reduce((sum, s) => sum + Number(s.monto_total || 0), 0)
-    const totalGastos = gastos.reduce((sum, g) => sum + Number(g.monto || 0), 0)
+    // Todos los servicios del mes, sin IVA (facturado total)
+    const ingresosFacturado = servicios.reduce((sum, s) => sum + Number(s.monto_total_sin_iva || 0), 0)
+    // Solo los pagados, sin IVA
+    const ingresosCobrado = servicios
+      .filter((s) => s.estado === "Cerrado/Pagado")
+      .reduce((sum, s) => sum + Number(s.monto_total_sin_iva || 0), 0)
 
+    const totalGastos = gastos.reduce((sum, g) => sum + Number(g.monto || 0), 0)
     const costosServicios = servicios.reduce((sum, s) => {
       const costos = Array.isArray(s.costos) ? s.costos : (typeof s.costos === "string" && s.costos ? JSON.parse(s.costos) : [])
       return sum + costos.reduce((c: number, costo: any) => c + Number(costo.monto || 0), 0)
     }, 0)
 
     const gastosTotal = totalGastos + costosServicios
-    const utilidadOperacional = ingresosSinIVA - gastosTotal
-    const margenPromedio = ingresosSinIVA > 0 ? (utilidadOperacional / ingresosSinIVA) * 100 : 0
+    const utilidadOperacional = ingresosCobrado - gastosTotal
+    const margenPromedio = ingresosCobrado > 0 ? (utilidadOperacional / ingresosCobrado) * 100 : 0
 
     const porCobrar = servicios
       .filter((s) => Number(s.saldo_pendiente || 0) > 0)
       .reduce((sum, s) => sum + Number(s.saldo_pendiente || 0), 0)
 
     setKpis({
-      ingresosSinIVA,
-      ingresosConIVA,
+      ingresosFacturado,
+      ingresosCobrado,
       totalGastos: gastosTotal,
       utilidadOperacional,
       margenPromedio,
@@ -130,11 +132,11 @@ export default function DashboardPage() {
       {/* KPIs principales */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
-          title="Ingresos Netos"
-          value={formatCurrency(kpis.ingresosSinIVA)}
-          description="Sin IVA"
+          title="Facturado"
+          value={formatCurrency(kpis.ingresosFacturado)}
+          description="Todos los servicios, sin IVA"
           icon={<DollarSign className="w-5 h-5" />}
-          variant="success"
+          variant="default"
         />
         <KPICard
           title="Gastos Totales"
@@ -192,15 +194,13 @@ export default function DashboardPage() {
           icon={<AlertCircle className="w-5 h-5" />}
           variant={kpis.porCobrar > 0 ? "warning" : "success"}
         />
-        {!isOperador && (
-          <KPICard
-            title="Ingresos Brutos"
-            value={formatCurrency(kpis.ingresosConIVA)}
-            description="Con IVA incluido"
-            icon={<DollarSign className="w-5 h-5" />}
-            variant="default"
-          />
-        )}
+        <KPICard
+          title="Cobrado"
+          value={formatCurrency(kpis.ingresosCobrado)}
+          description="Solo servicios pagados, sin IVA"
+          icon={<DollarSign className="w-5 h-5" />}
+          variant="success"
+        />
       </div>
     </div>
   )
