@@ -297,7 +297,7 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   placed.forEach((r) => {
     doc.setPage(r.pg)
     if (r.type === "category") {
-      doc.setFillColor(200, 0, 0)
+      doc.setFillColor(210, 60, 60)
       doc.rect(ML, r.ry, CW, r.rh, "F")
     } else if (r.type === "subtotal") {
       doc.setFillColor(232, 232, 232)
