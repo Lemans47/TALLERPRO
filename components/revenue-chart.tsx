@@ -32,14 +32,12 @@ export function RevenueChart() {
         const fecha = new Date(s.fecha_ingreso)
         const key = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}`
         if (monthlyData[key]) {
-          if (s.estado === "Cerrado/Pagado") {
-            monthlyData[key].ingresos += Number(s.monto_total_sin_iva || 0)
-          }
-          if (s.estado === "Cerrado/Pagado") {
-            const costosArr = Array.isArray(s.costos) ? s.costos : (typeof s.costos === "string" && s.costos ? JSON.parse(s.costos) : [])
-            const costoServicio = costosArr.reduce((sum: number, c: any) => sum + (Number(c.monto) || 0), 0)
-            monthlyData[key].gastos += costoServicio
-          }
+          // Ingresos = todos los servicios facturados (sin importar estado)
+          monthlyData[key].ingresos += Number(s.monto_total_sin_iva || 0)
+          // Costos internos = todos los servicios
+          const costosArr = Array.isArray(s.costos) ? s.costos : (typeof s.costos === "string" && s.costos ? JSON.parse(s.costos) : [])
+          const costoServicio = costosArr.reduce((sum: number, c: any) => sum + (Number(c.monto) || 0), 0)
+          monthlyData[key].gastos += costoServicio
         }
       })
 
@@ -82,7 +80,7 @@ export function RevenueChart() {
             <TrendingUp className="w-5 h-5 text-primary" />
             Ingresos vs Gastos
           </h3>
-          <p className="text-sm text-muted-foreground">Desde Abril 2026</p>
+          <p className="text-sm text-muted-foreground">Facturado · Desde Abril 2026</p>
         </div>
         <div className="flex items-center gap-4 text-sm">
           <div className="flex items-center gap-2">
