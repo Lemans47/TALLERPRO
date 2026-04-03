@@ -1,5 +1,15 @@
 import postgres from "postgres"
 
+// Unwrap any over-encoded JSONB string values, then re-encode once cleanly.
+// Prevents double/triple encoding when values come back from postgres as strings.
+function safeJson(v: any): string {
+  let val = v
+  while (typeof val === "string" && val) {
+    try { val = JSON.parse(val) } catch { break }
+  }
+  return JSON.stringify(val ?? null)
+}
+
 function getSQL() {
   const connectionString =
     process.env.DATABASE_URL ||
@@ -175,11 +185,11 @@ export async function createServicio(servicio: Omit<Servicio, "id" | "created_at
       ${servicio.fecha_ingreso}, ${servicio.patente}, ${servicio.marca}, ${servicio.modelo},
       ${servicio.color || null}, ${servicio.kilometraje || null}, ${servicio.año || null},
       ${servicio.cliente}, ${servicio.telefono}, ${servicio.observaciones},
-      ${servicio.mano_obra_pintura}, ${JSON.stringify(servicio.cobros)}, ${JSON.stringify(servicio.costos)},
-      ${JSON.stringify(servicio.piezas_pintura)}, ${servicio.estado}, ${servicio.iva},
+      ${servicio.mano_obra_pintura}, ${safeJson(servicio.cobros)}, ${safeJson(servicio.costos)},
+      ${safeJson(servicio.piezas_pintura)}, ${servicio.estado}, ${servicio.iva},
       ${servicio.anticipo}, ${servicio.saldo_pendiente}, ${servicio.monto_total},
-      ${servicio.monto_total_sin_iva}, ${JSON.stringify(servicio.observaciones_checkboxes)},
-      ${JSON.stringify(servicio.fotos_ingreso || [])}, ${JSON.stringify(servicio.fotos_entrega || [])}
+      ${servicio.monto_total_sin_iva}, ${safeJson(servicio.observaciones_checkboxes)},
+      ${safeJson(servicio.fotos_ingreso || [])}, ${safeJson(servicio.fotos_entrega || [])}
     ) RETURNING *
   `
   return data[0] as Servicio
@@ -200,18 +210,18 @@ export async function updateServicio(id: string, servicio: Partial<Servicio>) {
       telefono = COALESCE(${servicio.telefono ?? null}, telefono),
       observaciones = COALESCE(${servicio.observaciones ?? null}, observaciones),
       mano_obra_pintura = COALESCE(${servicio.mano_obra_pintura ?? null}, mano_obra_pintura),
-      cobros = COALESCE(${servicio.cobros ? JSON.stringify(servicio.cobros) : null}::jsonb, cobros),
-      costos = COALESCE(${servicio.costos ? JSON.stringify(servicio.costos) : null}::jsonb, costos),
-      piezas_pintura = COALESCE(${servicio.piezas_pintura ? JSON.stringify(servicio.piezas_pintura) : null}::jsonb, piezas_pintura),
+      cobros = COALESCE(${servicio.cobros != null ? safeJson(servicio.cobros) : null}::jsonb, cobros),
+      costos = COALESCE(${servicio.costos != null ? safeJson(servicio.costos) : null}::jsonb, costos),
+      piezas_pintura = COALESCE(${servicio.piezas_pintura != null ? safeJson(servicio.piezas_pintura) : null}::jsonb, piezas_pintura),
       estado = COALESCE(${servicio.estado ?? null}, estado),
       iva = COALESCE(${servicio.iva ?? null}, iva),
       anticipo = COALESCE(${servicio.anticipo ?? null}, anticipo),
       saldo_pendiente = COALESCE(${servicio.saldo_pendiente ?? null}, saldo_pendiente),
       monto_total = COALESCE(${servicio.monto_total ?? null}, monto_total),
       monto_total_sin_iva = COALESCE(${servicio.monto_total_sin_iva ?? null}, monto_total_sin_iva),
-      observaciones_checkboxes = COALESCE(${servicio.observaciones_checkboxes ? JSON.stringify(servicio.observaciones_checkboxes) : null}::jsonb, observaciones_checkboxes),
-      fotos_ingreso = COALESCE(${servicio.fotos_ingreso ? JSON.stringify(servicio.fotos_ingreso) : null}::jsonb, fotos_ingreso),
-      fotos_entrega = COALESCE(${servicio.fotos_entrega ? JSON.stringify(servicio.fotos_entrega) : null}::jsonb, fotos_entrega),
+      observaciones_checkboxes = COALESCE(${servicio.observaciones_checkboxes != null ? safeJson(servicio.observaciones_checkboxes) : null}::jsonb, observaciones_checkboxes),
+      fotos_ingreso = COALESCE(${servicio.fotos_ingreso != null ? safeJson(servicio.fotos_ingreso) : null}::jsonb, fotos_ingreso),
+      fotos_entrega = COALESCE(${servicio.fotos_entrega != null ? safeJson(servicio.fotos_entrega) : null}::jsonb, fotos_entrega),
       updated_at = NOW()
     WHERE id = ${id}
     RETURNING *
@@ -269,9 +279,9 @@ export async function createPresupuesto(presupuesto: Omit<Presupuesto, "id" | "c
       ${presupuesto.fecha_ingreso}, ${presupuesto.patente}, ${presupuesto.marca}, ${presupuesto.modelo},
       ${presupuesto.color || null}, ${presupuesto.kilometraje || null}, ${presupuesto.año || null},
       ${presupuesto.cliente}, ${presupuesto.telefono}, ${presupuesto.observaciones},
-      ${presupuesto.mano_obra_pintura}, ${JSON.stringify(presupuesto.cobros)}, ${JSON.stringify(presupuesto.costos)},
-      ${JSON.stringify(presupuesto.piezas_pintura)}, ${presupuesto.iva},
-      ${presupuesto.monto_total}, ${presupuesto.monto_total_sin_iva}, ${JSON.stringify(presupuesto.observaciones_checkboxes)}
+      ${presupuesto.mano_obra_pintura}, ${safeJson(presupuesto.cobros)}, ${safeJson(presupuesto.costos)},
+      ${safeJson(presupuesto.piezas_pintura)}, ${presupuesto.iva},
+      ${presupuesto.monto_total}, ${presupuesto.monto_total_sin_iva}, ${safeJson(presupuesto.observaciones_checkboxes)}
     ) RETURNING *
   `
   return data[0] as Presupuesto
@@ -292,13 +302,13 @@ export async function updatePresupuesto(id: string, presupuesto: Partial<Presupu
       telefono = COALESCE(${presupuesto.telefono ?? null}, telefono),
       observaciones = COALESCE(${presupuesto.observaciones ?? null}, observaciones),
       mano_obra_pintura = COALESCE(${presupuesto.mano_obra_pintura ?? null}, mano_obra_pintura),
-      cobros = COALESCE(${presupuesto.cobros ? JSON.stringify(presupuesto.cobros) : null}::jsonb, cobros),
-      costos = COALESCE(${presupuesto.costos ? JSON.stringify(presupuesto.costos) : null}::jsonb, costos),
-      piezas_pintura = COALESCE(${presupuesto.piezas_pintura ? JSON.stringify(presupuesto.piezas_pintura) : null}::jsonb, piezas_pintura),
+      cobros = COALESCE(${presupuesto.cobros != null ? safeJson(presupuesto.cobros) : null}::jsonb, cobros),
+      costos = COALESCE(${presupuesto.costos != null ? safeJson(presupuesto.costos) : null}::jsonb, costos),
+      piezas_pintura = COALESCE(${presupuesto.piezas_pintura != null ? safeJson(presupuesto.piezas_pintura) : null}::jsonb, piezas_pintura),
       iva = COALESCE(${presupuesto.iva ?? null}, iva),
       monto_total = COALESCE(${presupuesto.monto_total ?? null}, monto_total),
       monto_total_sin_iva = COALESCE(${presupuesto.monto_total_sin_iva ?? null}, monto_total_sin_iva),
-      observaciones_checkboxes = COALESCE(${presupuesto.observaciones_checkboxes ? JSON.stringify(presupuesto.observaciones_checkboxes) : null}::jsonb, observaciones_checkboxes),
+      observaciones_checkboxes = COALESCE(${presupuesto.observaciones_checkboxes != null ? safeJson(presupuesto.observaciones_checkboxes) : null}::jsonb, observaciones_checkboxes),
       updated_at = NOW()
     WHERE id = ${id}
     RETURNING *
@@ -321,13 +331,6 @@ export async function convertPresupuestoToServicio(presupuestoId: string) {
 
   if (!presupuesto) throw new Error("Presupuesto no encontrado")
 
-  // Unwrap any over-encoded JSONB string values before re-storing
-  const unwrap = (v: any): any => {
-    let val = v
-    while (typeof val === "string" && val) { try { val = JSON.parse(val) } catch { break } }
-    return val
-  }
-
   // Create servicio from presupuesto
   const newServicio = await db`
     INSERT INTO servicios (
@@ -339,10 +342,10 @@ export async function convertPresupuestoToServicio(presupuestoId: string) {
       CURRENT_DATE, ${presupuesto.patente}, ${presupuesto.marca}, ${presupuesto.modelo},
       ${presupuesto.kilometraje || null}, ${presupuesto.año || null},
       ${presupuesto.cliente}, ${presupuesto.telefono}, ${presupuesto.observaciones},
-      ${presupuesto.mano_obra_pintura}, ${JSON.stringify(unwrap(presupuesto.cobros))}, ${JSON.stringify(unwrap(presupuesto.costos))},
-      ${JSON.stringify(unwrap(presupuesto.piezas_pintura))}, 'En Cola', ${presupuesto.iva},
+      ${presupuesto.mano_obra_pintura}, ${safeJson(presupuesto.cobros)}, ${safeJson(presupuesto.costos)},
+      ${safeJson(presupuesto.piezas_pintura)}, 'En Cola', ${presupuesto.iva},
       0, ${presupuesto.monto_total}, ${presupuesto.monto_total}, ${presupuesto.monto_total_sin_iva},
-      ${JSON.stringify(unwrap(presupuesto.observaciones_checkboxes))},
+      ${safeJson(presupuesto.observaciones_checkboxes)},
       '[]'::jsonb, '[]'::jsonb
     ) RETURNING *
   `
