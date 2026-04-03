@@ -11,9 +11,9 @@ export const metadata: Metadata = {
   description: "Sistema profesional de gestión para talleres de reparación de vehículos",
   generator: "v0.app",
   icons: {
-    icon: "/logo-taller.svg",
-    shortcut: "/logo-taller.svg",
-    apple: "/logo-taller.svg",
+    icon: "/logo-taller.png",
+    shortcut: "/logo-taller.png",
+    apple: "/logo-taller.png",
   },
 }
 
