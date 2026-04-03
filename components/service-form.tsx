@@ -399,11 +399,23 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         repuestos: [],
         otros: [],
       }
-      cobrosData.forEach((c: { categoria: string; descripcion: string; monto: number }) => {
-        const cat = c.categoria as keyof ItemsPorCategoria
-        if (cat in newCobros) {
-          newCobros[cat].push({ id: crypto.randomUUID(), descripcion: c.descripcion, monto: c.monto })
+      const normalizeCat = (raw: string | undefined): keyof ItemsPorCategoria => {
+        if (!raw) return "otros"
+        const s = raw.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        const map: Record<string, keyof ItemsPorCategoria> = {
+          desmontar: "desmontar", "desmontar y montar": "desmontar",
+          desabolladura: "desabolladura",
+          reparar: "reparar",
+          pintura: "pintura",
+          mecanica: "mecanica",
+          repuestos: "repuestos",
+          otros: "otros",
         }
+        return map[s] ?? "otros"
+      }
+      cobrosData.forEach((c: { categoria?: string; descripcion: string; monto: number }) => {
+        const cat = normalizeCat(c.categoria)
+        newCobros[cat].push({ id: crypto.randomUUID(), descripcion: c.descripcion, monto: c.monto })
       })
       console.log("[v0] newCobros after mapping:", newCobros)
       setCobros(newCobros)
@@ -423,10 +435,8 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       costosData.forEach((c: { categoria?: string; descripcion: string; monto: number }) => {
         // Skip auto-generated pintura cost items — they'll be recalculated from selected piezas
         if (isAutoItem(c.descripcion)) return
-        const cat = (c.categoria || "otros") as keyof ItemsPorCategoria
-        if (cat in newCostos) {
-          newCostos[cat].push({ id: crypto.randomUUID(), descripcion: c.descripcion, monto: c.monto })
-        }
+        const cat = normalizeCat(c.categoria)
+        newCostos[cat].push({ id: crypto.randomUUID(), descripcion: c.descripcion, monto: c.monto })
       })
       console.log("[v0] newCostos after mapping:", newCostos)
       setCostos(newCostos)
