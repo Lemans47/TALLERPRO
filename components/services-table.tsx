@@ -12,14 +12,13 @@ import { api, type Servicio } from "@/lib/api-client"
 import { FileText, Trash2, Edit, Calendar, User, Car, Wrench, ClipboardList, List, AlignJustify, TrendingUp } from "lucide-react"
 
 const parseArr = (v: any): any[] => {
-  if (Array.isArray(v)) return v
+  let val = v
   if (typeof v === "string" && v) {
-    try {
-      const parsed = JSON.parse(v)
-      return Array.isArray(parsed) ? parsed : []
-    } catch {
-      return []
-    }
+    try { val = JSON.parse(v) } catch { return [] }
+  }
+  if (Array.isArray(val)) return val
+  if (val && typeof val === "object") {
+    return Object.values(val).flatMap((items: any) => Array.isArray(items) ? items : [])
   }
   return []
 }

@@ -378,11 +378,14 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
 
       // Cargar cobros por categoría
       const parseToFlatArray = (v: any): any[] => {
-        const parsed = Array.isArray(v) ? v : (typeof v === "string" && v ? JSON.parse(v) : v)
-        if (Array.isArray(parsed)) return parsed
-        if (parsed && typeof parsed === "object") {
+        let val = v
+        if (typeof v === "string" && v) {
+          try { val = JSON.parse(v) } catch { return [] }
+        }
+        if (Array.isArray(val)) return val
+        if (val && typeof val === "object") {
           // Old format: {pintura: [...], mecanica: [...]} → flatten to [{categoria, descripcion, monto}]
-          return Object.entries(parsed).flatMap(([cat, items]: [string, any]) =>
+          return Object.entries(val).flatMap(([cat, items]: [string, any]) =>
             Array.isArray(items) ? items.map((i: any) => ({ ...i, categoria: cat })) : []
           )
         }
