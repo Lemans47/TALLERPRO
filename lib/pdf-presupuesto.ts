@@ -177,9 +177,18 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     | { type: "subtotal"; label: string; monto: number }
 
   const parseArr = (v: any): any[] => {
-    if (Array.isArray(v)) return v
+    // Resolve string → object/array first
+    let val = v
     if (typeof v === "string" && v) {
-      try { const p = JSON.parse(v); return Array.isArray(p) ? p : [] } catch { return [] }
+      try { val = JSON.parse(v) } catch { return [] }
+    }
+    // Flat array: [{categoria, descripcion, monto}]
+    if (Array.isArray(val)) return val
+    // Old ItemsPorCategoria format: {pintura: [{descripcion, monto}], mecanica: [...]}
+    if (val && typeof val === "object") {
+      return Object.entries(val).flatMap(([cat, items]: [string, any]) =>
+        Array.isArray(items) ? items.map((i: any) => ({ ...i, categoria: cat })) : []
+      )
     }
     return []
   }
@@ -258,7 +267,7 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
 
   function placeRow(type: PlacedRow["type"], rh: number, label?: string, desc?: string, monto?: number) {
     if (cy + rh > PAGE_H - 15) {
-      doc.addPage(); cp++; cy = drawPageHeader(cp)
+      doc.addPage(); cp++; cy = drawPageHeader(cp, logoBase64)
       doc.setFillColor(20, 20, 20)
       doc.rect(ML, cy, DESC_W, 7, "F")
       doc.rect(ML + DESC_W, cy, MONTO_W, 7, "F")
