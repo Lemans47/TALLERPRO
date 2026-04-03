@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast"
 import { FileText, Trash2, CheckCircle, Edit, Car, User, Calendar, AlignJustify, List } from "lucide-react"
 import { api, type Presupuesto } from "@/lib/api-client"
 import { generarPDFPresupuesto } from "@/lib/pdf-presupuesto"
+import { PDFPreviewModal } from "@/components/pdf-preview-modal"
 
 interface PresupuestosTableProps {
   presupuestos: Presupuesto[]
@@ -20,6 +21,7 @@ export function PresupuestosTable({ presupuestos, onEditPresupuesto, onConverted
   const { toast } = useToast()
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false)
   const [presupuestoParaPdf, setPresupuestoParaPdf] = useState<Presupuesto | null>(null)
+  const [pdfPreview, setPdfPreview] = useState<{ url: string; fileName: string } | null>(null)
 
   const handleDelete = async (presupuesto: Presupuesto) => {
     if (!confirm(`¿Eliminar presupuesto de ${presupuesto.patente}?`)) return
@@ -62,6 +64,15 @@ export function PresupuestosTable({ presupuestos, onEditPresupuesto, onConverted
 
   return (
     <>
+      {/* PDF Preview Modal */}
+      {pdfPreview && (
+        <PDFPreviewModal
+          url={pdfPreview.url}
+          fileName={pdfPreview.fileName}
+          onClose={() => setPdfPreview(null)}
+        />
+      )}
+
       {/* PDF format picker dialog */}
       <Dialog open={pdfDialogOpen} onOpenChange={setPdfDialogOpen}>
         <DialogContent className="bg-card border-border max-w-sm">
@@ -72,7 +83,11 @@ export function PresupuestosTable({ presupuestos, onEditPresupuesto, onConverted
           <div className="grid grid-cols-2 gap-3 pt-1">
             <button
               className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-colors text-left"
-              onClick={() => { generarPDFPresupuesto(presupuestoParaPdf! as any, false); setPdfDialogOpen(false) }}
+              onClick={async () => {
+                const { blobUrl, fileName } = await generarPDFPresupuesto(presupuestoParaPdf! as any, false)
+                setPdfPreview({ url: blobUrl, fileName })
+                setPdfDialogOpen(false)
+              }}
             >
               <AlignJustify className="w-6 h-6 text-primary" />
               <span className="font-semibold text-sm">Con detalle</span>
@@ -80,7 +95,11 @@ export function PresupuestosTable({ presupuestos, onEditPresupuesto, onConverted
             </button>
             <button
               className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-colors text-left"
-              onClick={() => { generarPDFPresupuesto(presupuestoParaPdf! as any, true); setPdfDialogOpen(false) }}
+              onClick={async () => {
+                const { blobUrl, fileName } = await generarPDFPresupuesto(presupuestoParaPdf! as any, true)
+                setPdfPreview({ url: blobUrl, fileName })
+                setPdfDialogOpen(false)
+              }}
             >
               <List className="w-6 h-6 text-primary" />
               <span className="font-semibold text-sm">Solo totales</span>

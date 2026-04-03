@@ -968,8 +968,8 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
             <button
               className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-colors"
               onClick={async () => {
-                const result = await generarPDFPresupuesto(savedPresupuesto, false)
-                setPdfPreview(result)
+                const { blobUrl, fileName } = await generarPDFPresupuesto(savedPresupuesto, false)
+                setPdfPreview({ url: blobUrl, fileName })
                 setPdfFormatDialog(false)
               }}
             >
@@ -980,8 +980,8 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
             <button
               className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-colors"
               onClick={async () => {
-                const result = await generarPDFPresupuesto(savedPresupuesto, true)
-                setPdfPreview(result)
+                const { blobUrl, fileName } = await generarPDFPresupuesto(savedPresupuesto, true)
+                setPdfPreview({ url: blobUrl, fileName })
                 setPdfFormatDialog(false)
               }}
             >

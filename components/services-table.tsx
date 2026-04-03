@@ -53,6 +53,7 @@ function getGananciaStyles(margen: number) {
 }
 import { generarPDFPresupuesto } from "@/lib/pdf-presupuesto"
 import { generarOrdenTrabajo } from "@/lib/pdf-orden-trabajo"
+import { PDFPreviewModal } from "@/components/pdf-preview-modal"
 
 interface ServicesTableProps {
   servicios: Servicio[]
@@ -83,6 +84,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
   const [servicioSeleccionado, setServicioSeleccionado] = useState<Servicio | null>(null)
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false)
   const [servicioParaPdf, setServicioParaPdf] = useState<Servicio | null>(null)
+  const [pdfPreview, setPdfPreview] = useState<{ url: string; fileName: string } | null>(null)
 
   const handleEstadoChange = async (id: string, nuevoEstado: string) => {
     try {
@@ -196,6 +198,15 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
 
   return (
     <>
+      {/* PDF Preview Modal */}
+      {pdfPreview && (
+        <PDFPreviewModal
+          url={pdfPreview.url}
+          fileName={pdfPreview.fileName}
+          onClose={() => setPdfPreview(null)}
+        />
+      )}
+
       {/* PDF format picker dialog */}
       <Dialog open={pdfDialogOpen} onOpenChange={setPdfDialogOpen}>
         <DialogContent className="bg-card border-border max-w-sm">
@@ -206,7 +217,11 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
           <div className="grid grid-cols-2 gap-3 pt-1">
             <button
               className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-colors text-left"
-              onClick={() => { generarPDFPresupuesto(servicioParaPdf!, false); setPdfDialogOpen(false) }}
+              onClick={async () => {
+                const { blobUrl, fileName } = await generarPDFPresupuesto(servicioParaPdf!, false)
+                setPdfPreview({ url: blobUrl, fileName })
+                setPdfDialogOpen(false)
+              }}
             >
               <AlignJustify className="w-6 h-6 text-primary" />
               <span className="font-semibold text-sm">Con detalle</span>
@@ -214,7 +229,11 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
             </button>
             <button
               className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-colors text-left"
-              onClick={() => { generarPDFPresupuesto(servicioParaPdf!, true); setPdfDialogOpen(false) }}
+              onClick={async () => {
+                const { blobUrl, fileName } = await generarPDFPresupuesto(servicioParaPdf!, true)
+                setPdfPreview({ url: blobUrl, fileName })
+                setPdfDialogOpen(false)
+              }}
             >
               <List className="w-6 h-6 text-primary" />
               <span className="font-semibold text-sm">Solo totales</span>
