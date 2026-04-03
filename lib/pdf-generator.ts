@@ -117,7 +117,7 @@ export async function generateServicioPDF(data: Servicio | Presupuesto) {
       cobrosPorCategoria["Pintura"].push({ categoria: "Pintura", descripcion: pieza.nombre, monto: pieza.precio || 0 })
     })
   }
-  const cobrosArr = Array.isArray(data.cobros) ? data.cobros : (typeof data.cobros === "string" ? JSON.parse(data.cobros) : [])
+  const cobrosArr: any[] = Array.isArray(data.cobros) ? data.cobros : (typeof data.cobros === "string" && data.cobros ? (() => { try { const p = JSON.parse(data.cobros as string); return Array.isArray(p) ? p : [] } catch { return [] } })() : [])
   cobrosArr.forEach((cobro: any) => {
     const key = CAT_LABELS[cobro.categoria?.toLowerCase().trim()] || cobro.categoria
     if (!cobrosPorCategoria[key]) {

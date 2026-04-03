@@ -155,7 +155,13 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
   const grouped: Record<string, string[]> = {}
   const order: string[] = []
 
-  const parseArr = (v: any) => Array.isArray(v) ? v : (typeof v === "string" && v ? JSON.parse(v) : [])
+  const parseArr = (v: any): any[] => {
+    if (Array.isArray(v)) return v
+    if (typeof v === "string" && v) {
+      try { const p = JSON.parse(v); return Array.isArray(p) ? p : [] } catch { return [] }
+    }
+    return []
+  }
   const cobrosOT = parseArr(servicio.cobros)
   const piezasOT = parseArr(servicio.piezas_pintura)
 

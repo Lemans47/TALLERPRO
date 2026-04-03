@@ -176,7 +176,13 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     | { type: "item"; desc: string; monto: number }
     | { type: "subtotal"; label: string; monto: number }
 
-  const parseArr = (v: any) => Array.isArray(v) ? v : (typeof v === "string" && v ? JSON.parse(v) : [])
+  const parseArr = (v: any): any[] => {
+    if (Array.isArray(v)) return v
+    if (typeof v === "string" && v) {
+      try { const p = JSON.parse(v); return Array.isArray(p) ? p : [] } catch { return [] }
+    }
+    return []
+  }
   const cobros = parseArr(servicio.cobros)
   const piezas = parseArr(servicio.piezas_pintura)
   const grouped: Record<string, { descripcion: string; monto: number }[]> = {}
