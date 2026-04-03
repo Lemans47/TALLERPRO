@@ -47,6 +47,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { generateServicioPDF } from "@/lib/pdf-generator"
 import { generarPDFPresupuesto } from "@/lib/pdf-presupuesto"
+import { PDFPreviewModal } from "@/components/pdf-preview-modal"
 
 interface ServiceFormProps {
   servicioAEditar?: (Servicio & { isPresupuesto?: boolean }) | null
@@ -184,6 +185,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   const [loading, setLoading] = useState(false)
   const [pdfFormatDialog, setPdfFormatDialog] = useState(false)
   const [savedPresupuesto, setSavedPresupuesto] = useState<any>(null)
+  const [pdfPreview, setPdfPreview] = useState<{ url: string; fileName: string } | null>(null)
   const [preciosPintura, setPreciosPintura] = useState<PrecioPintura[]>([])
   const [piezasSeleccionadas, setPiezasSeleccionadas] = useState<PiezaPintura[]>([])
 
@@ -946,6 +948,15 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
 
   return (
     <TooltipProvider>
+      {/* PDF Preview Modal */}
+      {pdfPreview && (
+        <PDFPreviewModal
+          url={pdfPreview.url}
+          fileName={pdfPreview.fileName}
+          onClose={() => setPdfPreview(null)}
+        />
+      )}
+
       {/* PDF format picker dialog */}
       <Dialog open={pdfFormatDialog} onOpenChange={setPdfFormatDialog}>
         <DialogContent className="bg-card border-border max-w-sm">
@@ -956,7 +967,11 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
           <div className="grid grid-cols-2 gap-3 pt-1">
             <button
               className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-colors"
-              onClick={() => { generarPDFPresupuesto(savedPresupuesto, false); setPdfFormatDialog(false) }}
+              onClick={async () => {
+                const result = await generarPDFPresupuesto(savedPresupuesto, false)
+                setPdfPreview(result)
+                setPdfFormatDialog(false)
+              }}
             >
               <AlignJustify className="w-6 h-6 text-primary" />
               <span className="font-semibold text-sm">Con detalle</span>
@@ -964,7 +979,11 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
             </button>
             <button
               className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-colors"
-              onClick={() => { generarPDFPresupuesto(savedPresupuesto, true); setPdfFormatDialog(false) }}
+              onClick={async () => {
+                const result = await generarPDFPresupuesto(savedPresupuesto, true)
+                setPdfPreview(result)
+                setPdfFormatDialog(false)
+              }}
             >
               <List className="w-6 h-6 text-primary" />
               <span className="font-semibold text-sm">Solo totales</span>

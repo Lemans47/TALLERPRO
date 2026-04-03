@@ -429,5 +429,7 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     .map(s => (s || "").toUpperCase().replace(/\s+/g, "_"))
     .filter(Boolean)
     .join("-")
-  doc.save(`${nombreArchivo}.pdf`)
+  const fileName = `${nombreArchivo}.pdf`
+  const blobUrl = String(doc.output("bloburl"))
+  return { blobUrl, fileName }
 }
