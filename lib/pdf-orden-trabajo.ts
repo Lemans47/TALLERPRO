@@ -156,10 +156,10 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
   const order: string[] = []
 
   const parseArr = (v: any): any[] => {
-    if (Array.isArray(v)) return v
-    if (typeof v === "string" && v) {
-      try { const p = JSON.parse(v); return Array.isArray(p) ? p : [] } catch { return [] }
-    }
+    let val = v
+    while (typeof val === "string" && val) { try { val = JSON.parse(val) } catch { return [] } }
+    if (Array.isArray(val)) return val
+    if (val && typeof val === "object") return Object.entries(val).flatMap(([cat, items]: [string, any]) => Array.isArray(items) ? items.map((i: any) => ({ ...i, categoria: cat })) : [])
     return []
   }
   const cobrosOT = parseArr(servicio.cobros)

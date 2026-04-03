@@ -117,7 +117,14 @@ export async function generateServicioPDF(data: Servicio | Presupuesto) {
       cobrosPorCategoria["Pintura"].push({ categoria: "Pintura", descripcion: pieza.nombre, monto: pieza.precio || 0 })
     })
   }
-  const cobrosArr: any[] = Array.isArray(data.cobros) ? data.cobros : (typeof data.cobros === "string" && data.cobros ? (() => { try { const p = JSON.parse(data.cobros as string); return Array.isArray(p) ? p : [] } catch { return [] } })() : [])
+  const parseCobros = (v: any): any[] => {
+    let val = v
+    while (typeof val === "string" && val) { try { val = JSON.parse(val) } catch { return [] } }
+    if (Array.isArray(val)) return val
+    if (val && typeof val === "object") return Object.values(val).flatMap((items: any) => Array.isArray(items) ? items : [])
+    return []
+  }
+  const cobrosArr: any[] = parseCobros(data.cobros)
   cobrosArr.forEach((cobro: any) => {
     const key = CAT_LABELS[cobro.categoria?.toLowerCase().trim()] || cobro.categoria
     if (!cobrosPorCategoria[key]) {

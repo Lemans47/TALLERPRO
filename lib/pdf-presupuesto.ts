@@ -177,14 +177,11 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     | { type: "subtotal"; label: string; monto: number }
 
   const parseArr = (v: any): any[] => {
-    // Resolve string → object/array first
     let val = v
-    if (typeof v === "string" && v) {
-      try { val = JSON.parse(v) } catch { return [] }
+    while (typeof val === "string" && val) {
+      try { val = JSON.parse(val) } catch { return [] }
     }
-    // Flat array: [{categoria, descripcion, monto}]
     if (Array.isArray(val)) return val
-    // Old ItemsPorCategoria format: {pintura: [{descripcion, monto}], mecanica: [...]}
     if (val && typeof val === "object") {
       return Object.entries(val).flatMap(([cat, items]: [string, any]) =>
         Array.isArray(items) ? items.map((i: any) => ({ ...i, categoria: cat })) : []

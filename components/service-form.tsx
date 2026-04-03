@@ -379,8 +379,9 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       // Cargar cobros por categoría
       const parseToFlatArray = (v: any): any[] => {
         let val = v
-        if (typeof v === "string" && v) {
-          try { val = JSON.parse(v) } catch { return [] }
+        // Unwrap all layers of JSON string encoding (data may be double/triple encoded)
+        while (typeof val === "string" && val) {
+          try { val = JSON.parse(val) } catch { return [] }
         }
         if (Array.isArray(val)) return val
         if (val && typeof val === "object") {

@@ -321,6 +321,13 @@ export async function convertPresupuestoToServicio(presupuestoId: string) {
 
   if (!presupuesto) throw new Error("Presupuesto no encontrado")
 
+  // Unwrap any over-encoded JSONB string values before re-storing
+  const unwrap = (v: any): any => {
+    let val = v
+    while (typeof val === "string" && val) { try { val = JSON.parse(val) } catch { break } }
+    return val
+  }
+
   // Create servicio from presupuesto
   const newServicio = await db`
     INSERT INTO servicios (
@@ -332,10 +339,10 @@ export async function convertPresupuestoToServicio(presupuestoId: string) {
       CURRENT_DATE, ${presupuesto.patente}, ${presupuesto.marca}, ${presupuesto.modelo},
       ${presupuesto.kilometraje || null}, ${presupuesto.año || null},
       ${presupuesto.cliente}, ${presupuesto.telefono}, ${presupuesto.observaciones},
-      ${presupuesto.mano_obra_pintura}, ${JSON.stringify(presupuesto.cobros)}, ${JSON.stringify(presupuesto.costos)},
-      ${JSON.stringify(presupuesto.piezas_pintura)}, 'En Cola', ${presupuesto.iva},
+      ${presupuesto.mano_obra_pintura}, ${JSON.stringify(unwrap(presupuesto.cobros))}, ${JSON.stringify(unwrap(presupuesto.costos))},
+      ${JSON.stringify(unwrap(presupuesto.piezas_pintura))}, 'En Cola', ${presupuesto.iva},
       0, ${presupuesto.monto_total}, ${presupuesto.monto_total}, ${presupuesto.monto_total_sin_iva},
-      ${JSON.stringify(presupuesto.observaciones_checkboxes)},
+      ${JSON.stringify(unwrap(presupuesto.observaciones_checkboxes))},
       '[]'::jsonb, '[]'::jsonb
     ) RETURNING *
   `

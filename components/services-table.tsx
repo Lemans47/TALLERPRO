@@ -13,8 +13,8 @@ import { FileText, Trash2, Edit, Calendar, User, Car, Wrench, ClipboardList, Lis
 
 const parseArr = (v: any): any[] => {
   let val = v
-  if (typeof v === "string" && v) {
-    try { val = JSON.parse(v) } catch { return [] }
+  while (typeof val === "string" && val) {
+    try { val = JSON.parse(val) } catch { return [] }
   }
   if (Array.isArray(val)) return val
   if (val && typeof val === "object") {
