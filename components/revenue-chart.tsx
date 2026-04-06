@@ -85,7 +85,7 @@ export function RevenueChart() {
         </div>
         <div className="flex items-center gap-4 text-sm">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-[#f59e0b]" />
+            <div className="w-3 h-3 rounded-full bg-[#10b981]" />
             <span className="text-muted-foreground">Ingresos</span>
           </div>
           <div className="flex items-center gap-2">
@@ -147,7 +147,7 @@ export function RevenueChart() {
               labelStyle={{ color: "#e2e8f0", fontWeight: 600 }}
               cursor={{ fill: "#334155", opacity: 0.5 }}
             />
-            <Bar yAxisId="left" dataKey="ingresos" fill="#f59e0b" radius={[6, 6, 0, 0]} />
+            <Bar yAxisId="left" dataKey="ingresos" fill="#10b981" radius={[6, 6, 0, 0]} />
             <Bar yAxisId="left" dataKey="gastos" fill="#dc2626" radius={[6, 6, 0, 0]} />
             <Line
               yAxisId="right"

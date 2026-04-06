@@ -10,7 +10,7 @@ import { VehiclePipeline } from "@/components/vehicle-pipeline"
 import { AverageTicketChart } from "@/components/average-ticket-chart"
 import { MonthSelector } from "@/components/month-selector"
 import {
-  Car, ArrowUpDown, TrendingUp, AlertCircle,
+  Car, ArrowUpDown, TrendingUp, CheckCircle2,
   Activity, Clock, Wrench, Plus, RefreshCw,
 } from "lucide-react"
 import { useMonth } from "@/lib/month-context"
@@ -29,6 +29,7 @@ interface KPIs {
   ingresosFacturado: number
   porCobrar: number
   porCobrarDesglose: string
+  entregadosEsteMes: number
   serviciosActivos: number
   serviciosTotal: number
   serviciosCerrados: number
@@ -50,6 +51,7 @@ export default function DashboardPage() {
     ingresosFacturado: 0,
     porCobrar: 0,
     porCobrarDesglose: "",
+    entregadosEsteMes: 0,
     serviciosActivos: 0,
     serviciosTotal: 0,
     serviciosCerrados: 0,
@@ -88,7 +90,8 @@ export default function DashboardPage() {
     }
 
     const serviciosCerrados = servicios.filter((s) => s.estado === "Cerrado/Pagado")
-    const serviciosFacturados = servicios.filter((s) => s.estado === "Cerrado/Pagado" || s.estado === "Entregado")
+    // Facturado = todos los servicios con monto asignado (igual que el gráfico)
+    const serviciosFacturados = servicios.filter((s) => Number(s.monto_total_sin_iva || 0) > 0)
 
     // Ingresos
     const ingresosCobrado = serviciosCerrados.reduce((sum, s) => sum + Number(s.monto_total_sin_iva || 0), 0)
@@ -113,16 +116,21 @@ export default function DashboardPage() {
       .reduce((sum, g) => sum + Number(g.monto || 0), 0)
 
     // ---- KPI 1: Vehículos en taller ----
+    const PIPELINE_STAGES = ["En Cola", "En Proceso", "En Reparación", "Esperando Repuestos", "Control de Calidad"]
     const vehiculosEnTaller = servicios.filter(
       (s) => s.estado !== "Cerrado/Pagado" && s.estado !== "Entregado",
     )
-    const estadosActivos = ["En Reparación", "En Proceso", "Esperando Repuestos", "En Cola", "Listo para Entrega", "Control de Calidad"]
-    const desgloseParts = estadosActivos
-      .map((e) => ({ e, n: vehiculosEnTaller.filter((s) => s.estado === e).length }))
+    // El contador principal = suma exacta de las etapas del pipeline (sin "Listo para Entrega")
+    const vehiculosEnTallerCount = PIPELINE_STAGES.reduce(
+      (sum, estado) => sum + servicios.filter((s) => s.estado === estado).length, 0
+    )
+    const desgloseParts = PIPELINE_STAGES
+      .map((e) => ({ e, n: servicios.filter((s) => s.estado === e).length }))
       .filter((x) => x.n > 0)
       .slice(0, 3)
       .map((x) => `${x.n} ${x.e.toLowerCase()}`)
     const vehiculosDesglose = desgloseParts.length > 0 ? desgloseParts.join(" · ") : "Sin vehículos activos"
+    const entregadosEsteMes = servicios.filter((s) => s.estado === "Entregado").length
 
     // ---- KPI 2: Flujo de caja ----
     const anticiposTotal = servicios.reduce((s, sv) => s + Number(sv.anticipo || 0), 0)
@@ -169,7 +177,7 @@ export default function DashboardPage() {
     const tasaCierre = serviciosTotal > 0 ? (serviciosCerradosCount / serviciosTotal) * 100 : 0
 
     setKpis({
-      vehiculosEnTaller: vehiculosEnTaller.length,
+      vehiculosEnTaller: vehiculosEnTallerCount,
       vehiculosDesglose,
       flujoCaja,
       flujoEntradas,
@@ -179,6 +187,7 @@ export default function DashboardPage() {
       ingresosFacturado,
       porCobrar,
       porCobrarDesglose,
+      entregadosEsteMes,
       serviciosActivos: vehiculosEnTaller.length,
       serviciosTotal,
       serviciosCerrados: serviciosCerradosCount,
@@ -211,6 +220,12 @@ export default function DashboardPage() {
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
+          <Link href="/servicios">
+            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm">
+              <Plus className="w-4 h-4 mr-2" />
+              Nuevo Servicio
+            </Button>
+          </Link>
         </div>
       </div>
 
@@ -238,11 +253,11 @@ export default function DashboardPage() {
           variant={margenVariant}
         />
         <KPICard
-          title="Por Cobrar"
-          value={formatCurrency(kpis.porCobrar)}
-          description={kpis.porCobrarDesglose}
-          icon={<AlertCircle className="w-5 h-5" />}
-          variant={kpis.porCobrar > 0 ? "warning" : "success"}
+          title="Entregados este Mes"
+          value={kpis.entregadosEsteMes.toString()}
+          description={kpis.entregadosEsteMes > 0 ? `${kpis.entregadosEsteMes} vehículo${kpis.entregadosEsteMes !== 1 ? "s" : ""} entregado${kpis.entregadosEsteMes !== 1 ? "s" : ""}` : "Sin entregas este mes"}
+          icon={<CheckCircle2 className="w-5 h-5" />}
+          variant={kpis.entregadosEsteMes > 0 ? "success" : "default"}
         />
       </div>
 
@@ -255,12 +270,6 @@ export default function DashboardPage() {
           <PendingPaymentsAlert servicios={servicios} maxItems={3} />
           <div className="rounded-xl border border-border bg-card p-4 space-y-2">
             <p className="text-sm font-semibold text-muted-foreground">Acciones Rápidas</p>
-            <Link href="/servicios">
-              <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm justify-start">
-                <Plus className="w-4 h-4 mr-2" />
-                Nuevo Servicio
-              </Button>
-            </Link>
             <Link href="/servicios">
               <Button variant="outline" className="w-full bg-transparent justify-start">
                 Ver Todos los Servicios

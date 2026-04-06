@@ -48,13 +48,13 @@ export function VehiclePipeline({ servicios }: VehiclePipelineProps) {
     const isBottleneck = count > 0 && count === maxCount
     if (count === 0) {
       return {
-        container: "bg-muted/50 border border-border",
+        container: "bg-secondary/40 border border-border/60",
         text: "text-muted-foreground",
         badge: "bg-muted text-muted-foreground",
       }
     }
     return {
-      container: `border ${isBottleneck ? "ring-2 ring-offset-1" : ""}`,
+      container: `bg-secondary/60 border ${isBottleneck ? "ring-2 ring-offset-1" : ""}`,
       text: "text-foreground font-medium",
       badge: "text-white",
       borderColor: stage.color,
