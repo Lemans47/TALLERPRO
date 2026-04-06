@@ -10,7 +10,14 @@ function safeJson(v: any): string {
   return JSON.stringify(val ?? null)
 }
 
+declare global {
+  // eslint-disable-next-line no-var
+  var _pgSql: ReturnType<typeof postgres> | undefined
+}
+
 function getSQL() {
+  if (global._pgSql) return global._pgSql as any
+
   const connectionString =
     process.env.DATABASE_URL ||
     process.env.POSTGRES_URL
@@ -19,7 +26,8 @@ function getSQL() {
     throw new Error("Database connection string not found")
   }
 
-  return postgres(connectionString, { ssl: "require", max: 1, prepare: false }) as any
+  global._pgSql = postgres(connectionString, { ssl: "require", max: 5, prepare: false })
+  return global._pgSql as any
 }
 
 // Types
