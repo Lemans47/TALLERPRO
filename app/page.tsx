@@ -26,6 +26,7 @@ interface KPIs {
   flujoSalidas: number
   margenGanancia: number
   ingresosCobrado: number
+  ingresosFacturado: number
   porCobrar: number
   porCobrarDesglose: string
   serviciosActivos: number
@@ -46,6 +47,7 @@ export default function DashboardPage() {
     flujoSalidas: 0,
     margenGanancia: 0,
     ingresosCobrado: 0,
+    ingresosFacturado: 0,
     porCobrar: 0,
     porCobrarDesglose: "",
     serviciosActivos: 0,
@@ -86,12 +88,17 @@ export default function DashboardPage() {
     }
 
     const serviciosCerrados = servicios.filter((s) => s.estado === "Cerrado/Pagado")
+    const serviciosFacturados = servicios.filter((s) => s.estado === "Cerrado/Pagado" || s.estado === "Entregado")
 
     // Ingresos
     const ingresosCobrado = serviciosCerrados.reduce((sum, s) => sum + Number(s.monto_total_sin_iva || 0), 0)
+    const ingresosFacturado = serviciosFacturados.reduce((sum, s) => sum + Number(s.monto_total_sin_iva || 0), 0)
 
     // Costos
     const costosCerrados = serviciosCerrados.reduce((sum, s) => {
+      return sum + parseArr(s.costos).reduce((c: number, costo: any) => c + Number(costo.monto || 0), 0)
+    }, 0)
+    const costosFacturados = serviciosFacturados.reduce((sum, s) => {
       return sum + parseArr(s.costos).reduce((c: number, costo: any) => c + Number(costo.monto || 0), 0)
     }, 0)
 
@@ -124,8 +131,8 @@ export default function DashboardPage() {
     const flujoCaja = flujoEntradas - flujoSalidas
 
     // ---- KPI 3: Margen de ganancia ----
-    const margenGanancia = ingresosCobrado > 0
-      ? ((ingresosCobrado - costosCerrados) / ingresosCobrado) * 100
+    const margenGanancia = ingresosFacturado > 0
+      ? ((ingresosFacturado - costosFacturados) / ingresosFacturado) * 100
       : 0
 
     // ---- KPI 4: Por cobrar con edad ----
@@ -169,6 +176,7 @@ export default function DashboardPage() {
       flujoSalidas,
       margenGanancia,
       ingresosCobrado,
+      ingresosFacturado,
       porCobrar,
       porCobrarDesglose,
       serviciosActivos: vehiculosEnTaller.length,
@@ -225,7 +233,7 @@ export default function DashboardPage() {
         <KPICard
           title="Margen de Ganancia"
           value={`${kpis.margenGanancia.toFixed(1)}%`}
-          description={`Sobre ${formatCurrency(kpis.ingresosCobrado)} cobrado`}
+          description={`Sobre ${formatCurrency(kpis.ingresosFacturado)} facturado`}
           icon={<TrendingUp className="w-5 h-5" />}
           variant={margenVariant}
         />
