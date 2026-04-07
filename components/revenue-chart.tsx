@@ -5,15 +5,19 @@ import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Respons
 import { TrendingUp } from "lucide-react"
 import { fetchChartData } from "@/lib/api-client"
 
+type Modo = "facturado" | "cobrado"
+
 export function RevenueChart() {
+  const [modo, setModo] = useState<Modo>("facturado")
   const [chartData, setChartData] = useState<Array<{ mes: string; ingresos: number; gastos: number; margen: number }>>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    loadChartData()
-  }, [])
+    loadChartData(modo)
+  }, [modo])
 
-  const loadChartData = async () => {
+  const loadChartData = async (modoActual: Modo) => {
+    setLoading(true)
     try {
       const { servicios, gastos } = await fetchChartData()
 
@@ -31,17 +35,39 @@ export function RevenueChart() {
       servicios.forEach((s) => {
         const fecha = new Date(s.fecha_ingreso)
         const key = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}`
-        if (monthlyData[key]) {
-          // Ingresos = todos los servicios facturados (sin importar estado)
+        if (!monthlyData[key]) return
+
+        // Ingresos según modo
+        const incluyeIngreso =
+          modoActual === "facturado"
+            ? Number(s.monto_total_sin_iva || 0) > 0
+            : s.estado === "Cerrado/Pagado"
+
+        if (incluyeIngreso) {
           monthlyData[key].ingresos += Number(s.monto_total_sin_iva || 0)
-          // Costos internos = todos los servicios
-          const rawCostos = typeof s.costos === "string" && s.costos ? (() => { try { const p = JSON.parse(s.costos as string); return Array.isArray(p) ? p : [] } catch { return [] } })() : (Array.isArray(s.costos) ? s.costos : [])
-          const costosArr = rawCostos
-          const costoServicio = costosArr.reduce((sum: number, c: any) => sum + (Number(c.monto) || 0), 0)
+        }
+
+        // Costos internos: excluir "Materiales Pintura" (evita doble conteo con Gastos de Pintura)
+        const incluyeCosto =
+          modoActual === "facturado"
+            ? Number(s.monto_total_sin_iva || 0) > 0
+            : s.estado === "Cerrado/Pagado"
+
+        if (incluyeCosto) {
+          const rawCostos =
+            typeof s.costos === "string" && s.costos
+              ? (() => { try { const p = JSON.parse(s.costos as string); return Array.isArray(p) ? p : [] } catch { return [] } })()
+              : Array.isArray(s.costos) ? s.costos : []
+
+          const costoServicio = (rawCostos as any[])
+            .filter((c) => !String(c.descripcion || "").toLowerCase().includes("materiales pintura"))
+            .reduce((sum: number, c: any) => sum + (Number(c.monto) || 0), 0)
+
           monthlyData[key].gastos += costoServicio
         }
       })
 
+      // Gastos operacionales (todos incluidos — "Gastos de Pintura" representa compras reales)
       gastos.forEach((g) => {
         const fecha = new Date(g.fecha)
         const key = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}`
@@ -81,7 +107,29 @@ export function RevenueChart() {
             <TrendingUp className="w-5 h-5 text-primary" />
             Ingresos vs Gastos
           </h3>
-          <p className="text-sm text-muted-foreground">Facturado · Desde Abril 2026</p>
+          <div className="flex items-center gap-2 mt-1">
+            <button
+              onClick={() => setModo("facturado")}
+              className={`text-xs px-2.5 py-1 rounded-full transition-colors ${
+                modo === "facturado"
+                  ? "bg-primary text-primary-foreground font-medium"
+                  : "text-muted-foreground hover:bg-secondary"
+              }`}
+            >
+              Facturado
+            </button>
+            <button
+              onClick={() => setModo("cobrado")}
+              className={`text-xs px-2.5 py-1 rounded-full transition-colors ${
+                modo === "cobrado"
+                  ? "bg-primary text-primary-foreground font-medium"
+                  : "text-muted-foreground hover:bg-secondary"
+              }`}
+            >
+              Cobrado
+            </button>
+            <span className="text-xs text-muted-foreground">· Desde Abril 2026</span>
+          </div>
         </div>
         <div className="flex items-center gap-4 text-sm">
           <div className="flex items-center gap-2">
