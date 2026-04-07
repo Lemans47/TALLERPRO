@@ -33,8 +33,9 @@ export function RevenueChart() {
       }
 
       servicios.forEach((s) => {
-        const fecha = new Date(s.fecha_ingreso)
-        const key = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}`
+        // Parsear fecha como string para evitar desfase de timezone (UTC vs local)
+        const [yearStr, monthStr] = s.fecha_ingreso.split("-")
+        const key = `${yearStr}-${monthStr}`
         if (!monthlyData[key]) return
 
         // Ingresos según modo
@@ -69,8 +70,8 @@ export function RevenueChart() {
 
       // Gastos operacionales (todos incluidos — "Gastos de Pintura" representa compras reales)
       gastos.forEach((g) => {
-        const fecha = new Date(g.fecha)
-        const key = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}`
+        const [yearStr, monthStr] = g.fecha.split("-")
+        const key = `${yearStr}-${monthStr}`
         if (monthlyData[key]) {
           monthlyData[key].gastos += Number(g.monto || 0)
         }
