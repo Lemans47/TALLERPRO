@@ -166,6 +166,16 @@ export async function getServicios() {
   return data as Servicio[]
 }
 
+export async function getActiveServicios() {
+  const db = getSQL()
+  const data = await db`
+    SELECT * FROM servicios
+    WHERE estado NOT IN ('Cerrado/Pagado', 'Entregado')
+    ORDER BY fecha_ingreso DESC
+  `
+  return data as Servicio[]
+}
+
 export async function getServiciosByMonth(year: number, month: number) {
   const db = getSQL()
   const startDate = `${year}-${String(month).padStart(2, "0")}-01`

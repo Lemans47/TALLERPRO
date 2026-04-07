@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getServiciosByMonth, getGastosByMonth, getEmpleados } from "@/lib/database"
+import { getServiciosByMonth, getGastosByMonth, getEmpleados, getActiveServicios } from "@/lib/database"
 
 export async function GET(request: Request) {
   try {
@@ -7,13 +7,14 @@ export async function GET(request: Request) {
     const year = Number.parseInt(searchParams.get("year") || new Date().getFullYear().toString())
     const month = Number.parseInt(searchParams.get("month") || (new Date().getMonth() + 1).toString())
 
-    const [servicios, gastos, empleados] = await Promise.all([
+    const [servicios, gastos, empleados, serviciosActivos] = await Promise.all([
       getServiciosByMonth(year, month),
       getGastosByMonth(year, month),
       getEmpleados(),
+      getActiveServicios(),
     ])
 
-    return NextResponse.json({ servicios, gastos, empleados })
+    return NextResponse.json({ servicios, gastos, empleados, serviciosActivos })
   } catch (error) {
     console.error("Dashboard API error:", error)
     return NextResponse.json({ error: "Error loading dashboard data" }, { status: 500 })

@@ -63,7 +63,7 @@ export function VehiclePipeline({ servicios }: VehiclePipelineProps) {
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card p-5 space-y-5">
+    <div className="rounded-xl border border-border bg-card p-5 space-y-5 w-full">
       {/* Header */}
       <div>
         <h3 className="font-semibold text-lg flex items-center gap-2">

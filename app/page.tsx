@@ -59,6 +59,7 @@ export default function DashboardPage() {
     tiempoPromedio: 0,
   })
   const [servicios, setServicios] = useState<Servicio[]>([])
+  const [serviciosActivos, setServiciosActivos] = useState<Servicio[]>([])
   const [loading, setLoading] = useState(true)
   const { selectedMonth } = useMonth()
 
@@ -70,9 +71,10 @@ export default function DashboardPage() {
     setLoading(true)
     try {
       const [year, month] = selectedMonth.split("-").map(Number)
-      const { servicios: serviciosData, gastos: gastosData, empleados: empleadosData } = await fetchDashboardData(year, month)
+      const { servicios: serviciosData, gastos: gastosData, empleados: empleadosData, serviciosActivos: activosData } = await fetchDashboardData(year, month)
       setServicios(serviciosData)
-      calculateKPIs(serviciosData, gastosData, empleadosData)
+      setServiciosActivos(activosData)
+      calculateKPIs(serviciosData, gastosData, empleadosData, activosData)
     } catch (error) {
       console.error("Error loading dashboard data:", error)
     } finally {
@@ -80,7 +82,7 @@ export default function DashboardPage() {
     }
   }
 
-  const calculateKPIs = (servicios: Servicio[], gastos: Gasto[], empleados: Empleado[]) => {
+  const calculateKPIs = (servicios: Servicio[], gastos: Gasto[], empleados: Empleado[], serviciosActivos: Servicio[]) => {
     const parseArr = (v: any): any[] => {
       if (Array.isArray(v)) return v
       if (typeof v === "string" && v) {
@@ -115,17 +117,14 @@ export default function DashboardPage() {
       .filter((g) => g.categoria !== "Sueldos")
       .reduce((sum, g) => sum + Number(g.monto || 0), 0)
 
-    // ---- KPI 1: Vehículos en taller ----
+    // ---- KPI 1: Vehículos en taller (usa TODOS los activos, no solo los del mes) ----
     const PIPELINE_STAGES = ["En Cola", "En Proceso", "En Reparación", "Esperando Repuestos", "Control de Calidad"]
-    const vehiculosEnTaller = servicios.filter(
-      (s) => s.estado !== "Cerrado/Pagado" && s.estado !== "Entregado",
-    )
-    // El contador principal = suma exacta de las etapas del pipeline (sin "Listo para Entrega")
+    const vehiculosEnTaller = serviciosActivos
     const vehiculosEnTallerCount = PIPELINE_STAGES.reduce(
-      (sum, estado) => sum + servicios.filter((s) => s.estado === estado).length, 0
+      (sum, estado) => sum + serviciosActivos.filter((s) => s.estado === estado).length, 0
     )
     const desgloseParts = PIPELINE_STAGES
-      .map((e) => ({ e, n: servicios.filter((s) => s.estado === e).length }))
+      .map((e) => ({ e, n: serviciosActivos.filter((s) => s.estado === e).length }))
       .filter((x) => x.n > 0)
       .slice(0, 3)
       .map((x) => `${x.n} ${x.e.toLowerCase()}`)
@@ -164,7 +163,7 @@ export default function DashboardPage() {
     const porCobrarDesglose = edadParts.join(" · ") || "Sin deuda pendiente"
 
     // ---- KPIs secundarios ----
-    const activosParaPromedio = servicios.filter((s) => !["Cerrado/Pagado", "Entregado"].includes(s.estado))
+    const activosParaPromedio = serviciosActivos
     const tiempoPromedio = activosParaPromedio.length > 0
       ? activosParaPromedio.reduce(
           (sum, s) => sum + Math.floor((hoy.getTime() - new Date(s.fecha_ingreso).getTime()) / 86400000),
@@ -263,11 +262,11 @@ export default function DashboardPage() {
 
       {/* ZONA 2: Operación y Alertas */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <VehiclePipeline servicios={servicios} />
+        <div className="lg:col-span-2 flex">
+          <VehiclePipeline servicios={serviciosActivos} />
         </div>
         <div className="flex flex-col gap-4">
-          <PendingPaymentsAlert servicios={servicios} maxItems={3} />
+          <PendingPaymentsAlert servicios={serviciosActivos} maxItems={3} />
           <div className="rounded-xl border border-border bg-card p-4 space-y-2">
             <p className="text-sm font-semibold text-muted-foreground">Acciones Rápidas</p>
             <Link href="/servicios">
