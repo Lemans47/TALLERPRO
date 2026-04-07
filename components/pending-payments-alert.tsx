@@ -2,7 +2,7 @@
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { AlertCircle, Clock, Phone, CheckCircle2, ChevronRight } from "lucide-react"
+import { AlertCircle, Clock, Phone, CheckCircle2, ChevronRight, MessageCircle } from "lucide-react"
 import Link from "next/link"
 import type { Servicio } from "@/lib/database"
 
@@ -104,6 +104,15 @@ export function PendingPaymentsAlert({ servicios, maxItems = 5 }: PendingPayment
                     <span className="flex items-center gap-1.5">
                       <Phone className="w-3.5 h-3.5" />
                       {pago.telefono}
+                      <a
+                        href={`https://wa.me/${pago.telefono.replace(/\D/g, "")}?text=${encodeURIComponent(`Hola ${pago.cliente}, le recordamos que tiene un saldo pendiente de $${Number(pago.saldo_pendiente).toLocaleString("es-CL")} por el servicio de su vehículo ${pago.marca} ${pago.modelo} (${pago.patente}). Quedo a su disposición para coordinar el pago. Saludos, TallerPro.`)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-muted-foreground hover:text-green-500 transition-colors"
+                        title="Contactar por WhatsApp"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                      </a>
                     </span>
                   )}
                   <span className="flex items-center gap-1.5">

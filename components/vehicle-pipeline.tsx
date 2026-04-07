@@ -1,7 +1,8 @@
 "use client"
 
-import { ChevronRight, Clock, CheckCircle2 } from "lucide-react"
+import { ChevronRight, Clock, CheckCircle2, AlertCircle } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import type { Servicio } from "@/lib/database"
 
 const PIPELINE_STAGES = [
@@ -99,9 +100,18 @@ export function VehiclePipeline({ servicios }: VehiclePipelineProps) {
                     {count}
                   </span>
                   {isBottleneck && (
-                    <span className="text-xs font-medium px-1 py-0.5 rounded" style={{ backgroundColor: stage.color + "22", color: stage.color }}>
-                      ⚠
-                    </span>
+                    <TooltipProvider delayDuration={200}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="text-xs font-medium px-1 py-0.5 rounded cursor-default" style={{ backgroundColor: stage.color + "22", color: stage.color }}>
+                            ⚠
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          <p>Cuello de botella detectado en la etapa de {stage.key}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   )}
                 </div>
               </div>
@@ -157,7 +167,19 @@ export function VehiclePipeline({ servicios }: VehiclePipelineProps) {
                   >
                     {s.estado}
                   </span>
-                  <span className="text-xs font-semibold text-warning whitespace-nowrap">{s.dias}d</span>
+                  <TooltipProvider delayDuration={200}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="flex items-center gap-1 text-xs font-semibold text-warning whitespace-nowrap cursor-default">
+                          <AlertCircle className="w-3.5 h-3.5" />
+                          {s.dias}d
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="left">
+                        <p>Este vehículo superó el tiempo estimado en la etapa de {s.estado}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
               </div>
             ))}

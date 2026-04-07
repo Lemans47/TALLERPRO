@@ -179,7 +179,11 @@ export function RevenueChart() {
             <YAxis
               yAxisId="left"
               tick={{ fontSize: 12, fill: "#6b7280" }}
-              tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+              tickFormatter={(v: number) => {
+                if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(v % 1_000_000 === 0 ? 0 : 1)}M`
+                if (v >= 1_000) return `$${(v / 1_000).toFixed(0)}k`
+                return `$${v}`
+              }}
               axisLine={false}
               tickLine={false}
             />
