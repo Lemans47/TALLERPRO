@@ -15,7 +15,7 @@ export function PendingPaymentsAlert({ servicios, maxItems = 5 }: PendingPayment
   const ahora = new Date()
 
   const pendingPayments = servicios
-    .filter((s) => Number(s.saldo_pendiente) > 0)
+    .filter((s) => Number(s.saldo_pendiente) > 0 && (s.estado === "Entregado" || s.estado === "Por Cobrar"))
     .map((servicio) => {
       const fechaIngreso = new Date(servicio.fecha_ingreso)
       const diasTranscurridos = Math.floor((ahora.getTime() - fechaIngreso.getTime()) / (1000 * 60 * 60 * 24))
