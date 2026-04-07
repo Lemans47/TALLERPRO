@@ -1,33 +1,116 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
-import { TrendingUp, TrendingDown } from "lucide-react"
+import { Skeleton } from "@/components/ui/skeleton"
+import { TrendingUp, TrendingDown, Minus } from "lucide-react"
+import { fetchDashboardData } from "@/lib/api-client"
+
+interface Kpis {
+  ingresoNeto: number
+  costosDirectos: number
+  gastosOperativos: number
+  utilidadNeta: number
+  margenPct: number
+  ingresoPromedio: number
+  costoPromedio: number
+  roi: number
+  serviciosFinalizados: number
+}
+
+function calcDelta(current: number, prev: number): { label: string; positive: boolean; neutral: boolean } {
+  if (prev === 0 && current === 0) return { label: "Sin datos", positive: true, neutral: true }
+  if (prev === 0) return { label: "Nuevo", positive: true, neutral: true }
+  const pct = ((current - prev) / Math.abs(prev)) * 100
+  const sign = pct >= 0 ? "+" : ""
+  return { label: `${sign}${pct.toFixed(1)}% vs mes ant.`, positive: pct >= 0, neutral: false }
+}
 
 export function ProfitabilityAnalysis() {
+  const [kpis, setKpis] = useState<Kpis | null>(null)
+  const [prevKpis, setPrevKpis] = useState<Kpis | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true)
+      try {
+        const now = new Date()
+        const year = now.getFullYear()
+        const month = now.getMonth() + 1
+
+        // Mes anterior
+        const prevDate = new Date(year, month - 2, 1)
+        const prevYear = prevDate.getFullYear()
+        const prevMonth = prevDate.getMonth() + 1
+
+        const [current, prev] = await Promise.all([
+          fetchDashboardData(year, month),
+          fetchDashboardData(prevYear, prevMonth),
+        ])
+
+        setKpis((current as any).kpis ?? null)
+        setPrevKpis((prev as any).kpis ?? null)
+      } catch (e) {
+        console.error("ProfitabilityAnalysis error:", e)
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Card key={i}>
+            <CardContent className="pt-6 space-y-3">
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-9 w-28" />
+              <Skeleton className="h-4 w-24" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    )
+  }
+
+  if (!kpis) {
+    return (
+      <div className="text-sm text-muted-foreground p-4">No se pudieron cargar los datos de rentabilidad.</div>
+    )
+  }
+
+  const fmt = (n: number) => `$${Math.round(n).toLocaleString("es-CL")}`
+  const fmtPct = (n: number) => `${n.toFixed(1)}%`
+
   const metrics = [
     {
       label: "Margen de Ganancia",
-      value: "42.3%",
-      change: "+5.2%",
-      positive: true,
+      value: fmtPct(kpis.margenPct),
+      delta: calcDelta(kpis.margenPct, prevKpis?.margenPct ?? 0),
+      // Costo positivo = margen > 0, negativo = pérdida
+      isPositive: kpis.margenPct >= 0,
     },
     {
       label: "ROI (Retorno de Inversión)",
-      value: "156%",
-      change: "+12.1%",
-      positive: true,
+      value: fmtPct(kpis.roi),
+      delta: calcDelta(kpis.roi, prevKpis?.roi ?? 0),
+      isPositive: kpis.roi >= 0,
     },
     {
       label: "Costo Promedio por Servicio",
-      value: "$450",
-      change: "-8.3%",
-      positive: true,
+      value: fmt(kpis.costoPromedio),
+      // Para costos, bajar es positivo
+      delta: calcDelta(kpis.costoPromedio, prevKpis?.costoPromedio ?? 0),
+      isPositive: kpis.costoPromedio <= (prevKpis?.costoPromedio ?? kpis.costoPromedio),
     },
     {
       label: "Ingreso Promedio por Servicio",
-      value: "$780",
-      change: "+3.5%",
-      positive: true,
+      value: fmt(kpis.ingresoPromedio),
+      delta: calcDelta(kpis.ingresoPromedio, prevKpis?.ingresoPromedio ?? 0),
+      isPositive: kpis.ingresoPromedio >= (prevKpis?.ingresoPromedio ?? kpis.ingresoPromedio),
     },
   ]
 
@@ -41,10 +124,22 @@ export function ProfitabilityAnalysis() {
               <div className="flex items-end justify-between">
                 <div className="text-3xl font-bold">{metric.value}</div>
                 <div
-                  className={`flex items-center gap-1 text-sm ${metric.positive ? "text-green-600" : "text-red-600"}`}
+                  className={`flex items-center gap-1 text-sm ${
+                    metric.delta.neutral
+                      ? "text-muted-foreground"
+                      : metric.isPositive
+                        ? "text-green-600"
+                        : "text-red-600"
+                  }`}
                 >
-                  {metric.positive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-                  {metric.change}
+                  {metric.delta.neutral ? (
+                    <Minus className="w-4 h-4" />
+                  ) : metric.isPositive ? (
+                    <TrendingUp className="w-4 h-4" />
+                  ) : (
+                    <TrendingDown className="w-4 h-4" />
+                  )}
+                  {metric.delta.label}
                 </div>
               </div>
             </div>
