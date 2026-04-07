@@ -19,7 +19,12 @@ export function RevenueChart() {
   const loadChartData = async (modoActual: Modo) => {
     setLoading(true)
     try {
-      const { servicios, gastos } = await fetchChartData()
+      const { servicios, gastos, empleados } = await fetchChartData()
+
+      // Sueldos comprometidos desde empleados activos (igual que KPI Flujo de Caja)
+      const sueldosTotal = empleados
+        .filter((e: any) => e.activo)
+        .reduce((sum: number, e: any) => sum + Number(e.sueldo_base || 0), 0)
 
       const monthlyData: Record<string, { ingresos: number; gastos: number }> = {}
       const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
@@ -68,13 +73,19 @@ export function RevenueChart() {
         }
       })
 
-      // Gastos operacionales (todos incluidos — "Gastos de Pintura" representa compras reales)
+      // Gastos operacionales — excluir "Sueldos" (se usan sueldo_base de empleados activos)
       gastos.forEach((g) => {
+        if (g.categoria === "Sueldos") return
         const [yearStr, monthStr] = g.fecha.split("-")
         const key = `${yearStr}-${monthStr}`
         if (monthlyData[key]) {
           monthlyData[key].gastos += Number(g.monto || 0)
         }
+      })
+
+      // Agregar sueldos comprometidos a cada mes del gráfico
+      Object.keys(monthlyData).forEach((key) => {
+        monthlyData[key].gastos += sueldosTotal
       })
 
       const data = Object.entries(monthlyData)

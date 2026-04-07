@@ -11,7 +11,7 @@ export async function fetchDashboardData(
 }
 
 // Chart data
-export async function fetchChartData(): Promise<{ servicios: Servicio[]; gastos: Gasto[] }> {
+export async function fetchChartData(): Promise<{ servicios: Servicio[]; gastos: Gasto[]; empleados: Empleado[] }> {
   const res = await fetch("/api/chart")
   if (!res.ok) throw new Error("Error fetching chart data")
   return res.json()

@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server"
-import { getServicios, getGastos } from "@/lib/database"
+import { getServicios, getGastos, getEmpleados } from "@/lib/database"
 
 export async function GET() {
   try {
-    const [servicios, gastos] = await Promise.all([getServicios(), getGastos()])
+    const [servicios, gastos, empleados] = await Promise.all([getServicios(), getGastos(), getEmpleados()])
 
-    return NextResponse.json({ servicios, gastos })
+    return NextResponse.json({ servicios, gastos, empleados })
   } catch (error) {
     console.error("Chart API error:", error)
     return NextResponse.json({ error: "Error loading chart data" }, { status: 500 })
