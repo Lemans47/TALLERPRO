@@ -36,6 +36,8 @@ interface KPIs {
   serviciosCerrados: number
   tasaCierre: number
   tiempoPromedio: number
+  puntoEquilibrio: number
+  serviciosConMonto: number
 }
 
 export default function DashboardPage() {
@@ -58,6 +60,8 @@ export default function DashboardPage() {
     serviciosCerrados: 0,
     tasaCierre: 0,
     tiempoPromedio: 0,
+    puntoEquilibrio: 0,
+    serviciosConMonto: 0,
   })
   const [servicios, setServicios] = useState<Servicio[]>([])
   const [serviciosActivos, setServiciosActivos] = useState<Servicio[]>([])
@@ -182,6 +186,13 @@ export default function DashboardPage() {
     ).length
     const tasaCierre = serviciosTotal > 0 ? (serviciosCompletadosCount / serviciosTotal) * 100 : 0
 
+    // ---- Punto de equilibrio ----
+    const gastosOperativosTotal = gastosOperacionales + sueldosComprometidos
+    const margenContribucion = ingresosFacturado - costosFacturados
+    const countConMonto = serviciosFacturados.length
+    const margenPorServicio = countConMonto > 0 ? margenContribucion / countConMonto : 0
+    const puntoEquilibrio = margenPorServicio > 0 ? Math.ceil(gastosOperativosTotal / margenPorServicio) : 0
+
     setKpis({
       vehiculosEnTaller: vehiculosEnTallerCount,
       vehiculosDesglose,
@@ -199,6 +210,8 @@ export default function DashboardPage() {
       serviciosCerrados: serviciosCerradosCount,
       tasaCierre,
       tiempoPromedio,
+      puntoEquilibrio,
+      serviciosConMonto: countConMonto,
     })
   }
 
@@ -295,6 +308,40 @@ export default function DashboardPage() {
           variant={kpis.entregadosEsteMes > 0 ? "success" : "default"}
         />
       </div>
+
+      {/* Punto de Equilibrio */}
+      {!isOperador && kpis.puntoEquilibrio > 0 && (() => {
+        const faltan = Math.max(0, kpis.puntoEquilibrio - kpis.serviciosConMonto)
+        const pct = Math.min(100, Math.round((kpis.serviciosConMonto / kpis.puntoEquilibrio) * 100))
+        return (
+          <div className="rounded-xl border border-border bg-card p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Punto de Equilibrio</p>
+                <p className="text-2xl font-bold mt-1">{kpis.puntoEquilibrio} servicios</p>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  {faltan > 0
+                    ? `Faltan ${faltan} servicio${faltan !== 1 ? "s" : ""} para cubrir los gastos fijos`
+                    : "Los gastos fijos están cubiertos este mes"}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-muted-foreground">Actualmente</p>
+                <p className="text-3xl font-bold">{kpis.serviciosConMonto}</p>
+                <p className={`text-xs font-medium mt-0.5 ${faltan === 0 ? "text-green-500" : "text-amber-500"}`}>
+                  {faltan === 0 ? "En zona rentable" : `${pct}% del objetivo`}
+                </p>
+              </div>
+            </div>
+            <div className="mt-3 w-full bg-muted rounded-full h-2">
+              <div
+                className={`h-2 rounded-full transition-all ${faltan === 0 ? "bg-green-500" : "bg-amber-500"}`}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ZONA 2: Operación y Alertas */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

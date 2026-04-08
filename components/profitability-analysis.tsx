@@ -105,8 +105,6 @@ export function ProfitabilityAnalysis() {
   const fmt = (n: number) => `$${Math.round(n).toLocaleString("es-CL")}`
   const fmtPct = (n: number) => `${n.toFixed(1)}%`
 
-  const faltanServicios = Math.max(0, kpis.puntoEquilibrio - kpis.serviciosCount)
-
   return (
     <div className="space-y-4">
 
@@ -200,40 +198,6 @@ export function ProfitabilityAnalysis() {
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Punto de equilibrio */}
-      <Card>
-        <CardContent className="pt-6">
-          <p className="text-sm font-medium text-muted-foreground mb-3">Punto de Equilibrio</p>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-3xl font-bold">{kpis.puntoEquilibrio} servicios</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                {faltanServicios > 0
-                  ? `Faltan ${faltanServicios} servicio${faltanServicios !== 1 ? "s" : ""} para cubrir los gastos fijos`
-                  : "Los gastos fijos están cubiertos este mes"}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-sm text-muted-foreground">Actualmente</p>
-              <p className="text-2xl font-bold">{kpis.serviciosCount}</p>
-              <p className={`text-xs font-medium mt-0.5 ${faltanServicios === 0 ? "text-green-500" : "text-amber-500"}`}>
-                {faltanServicios === 0 ? "En zona rentable" : `${Math.round((kpis.serviciosCount / kpis.puntoEquilibrio) * 100)}% del objetivo`}
-              </p>
-            </div>
-          </div>
-          {kpis.puntoEquilibrio > 0 && (
-            <div className="mt-3">
-              <div className="w-full bg-muted rounded-full h-2">
-                <div
-                  className={`h-2 rounded-full transition-all ${faltanServicios === 0 ? "bg-green-500" : "bg-amber-500"}`}
-                  style={{ width: `${Math.min(100, (kpis.serviciosCount / kpis.puntoEquilibrio) * 100)}%` }}
-                />
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
 
