@@ -76,10 +76,11 @@ export default function DashboardPage() {
     setLoading(true)
     try {
       const [year, month] = selectedMonth.split("-").map(Number)
-      const { servicios: serviciosData, gastos: gastosData, empleados: empleadosData, serviciosActivos: activosData } = await fetchDashboardData(year, month)
+      const response = await fetchDashboardData(year, month)
+      const { servicios: serviciosData, gastos: gastosData, empleados: empleadosData, serviciosActivos: activosData, kpis: apiKpis } = response as any
       setServicios(serviciosData)
       setServiciosActivos(activosData)
-      calculateKPIs(serviciosData, gastosData, empleadosData, activosData)
+      calculateKPIs(serviciosData, gastosData, empleadosData, activosData, apiKpis)
     } catch (error) {
       console.error("Error loading dashboard data:", error)
     } finally {
@@ -87,7 +88,7 @@ export default function DashboardPage() {
     }
   }
 
-  const calculateKPIs = (servicios: Servicio[], gastos: Gasto[], empleados: Empleado[], serviciosActivos: Servicio[]) => {
+  const calculateKPIs = (servicios: Servicio[], gastos: Gasto[], empleados: Empleado[], serviciosActivos: Servicio[], apiKpis?: any) => {
     const parseArr = (v: any): any[] => {
       if (Array.isArray(v)) return v
       if (typeof v === "string" && v) {
@@ -186,12 +187,9 @@ export default function DashboardPage() {
     ).length
     const tasaCierre = serviciosTotal > 0 ? (serviciosCompletadosCount / serviciosTotal) * 100 : 0
 
-    // ---- Punto de equilibrio ----
-    const gastosOperativosTotal = gastosOperacionales + sueldosComprometidos
-    const margenContribucion = ingresosFacturado - costosFacturados
-    const countConMonto = serviciosFacturados.length
-    const margenPorServicio = countConMonto > 0 ? margenContribucion / countConMonto : 0
-    const puntoEquilibrio = margenPorServicio > 0 ? Math.ceil(gastosOperativosTotal / margenPorServicio) : 0
+    // ---- Punto de equilibrio (desde API para consistencia) ----
+    const puntoEquilibrio = apiKpis?.puntoEquilibrio ?? 0
+    const countConMonto = apiKpis?.serviciosCount ?? serviciosFacturados.length
 
     setKpis({
       vehiculosEnTaller: vehiculosEnTallerCount,
