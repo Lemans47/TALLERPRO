@@ -53,13 +53,9 @@ export function RevenueChart() {
           monthlyData[key].ingresos += Number(s.monto_total_sin_iva || 0)
         }
 
-        // Costos internos: excluir "Materiales Pintura" (evita doble conteo con Gastos de Pintura)
-        const incluyeCosto =
-          modoActual === "facturado"
-            ? Number(s.monto_total_sin_iva || 0) > 0
-            : s.estado === "Cerrado/Pagado"
-
-        if (incluyeCosto) {
+        // Costos internos: siempre se incluyen todos los servicios con monto (los costos se incurren
+        // independientemente de si el cliente pagó o no)
+        if (Number(s.monto_total_sin_iva || 0) > 0) {
           const rawCostos =
             typeof s.costos === "string" && s.costos
               ? (() => { try { const p = JSON.parse(s.costos as string); return Array.isArray(p) ? p : [] } catch { return [] } })()
