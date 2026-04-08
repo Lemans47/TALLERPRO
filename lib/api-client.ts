@@ -4,7 +4,7 @@ import type { Servicio, Presupuesto, Gasto, PrecioPintura, PiezaPintura, FotoSer
 export async function fetchDashboardData(
   year: number,
   month: number,
-): Promise<{ servicios: Servicio[]; gastos: Gasto[]; empleados: Empleado[]; serviciosActivos: Servicio[] }> {
+): Promise<{ servicios: Servicio[]; gastos: Gasto[]; empleados: Empleado[]; serviciosActivos: Servicio[]; kpis: any }> {
   const res = await fetch(`/api/dashboard?year=${year}&month=${month}`)
   if (!res.ok) throw new Error("Error fetching dashboard data")
   return res.json()

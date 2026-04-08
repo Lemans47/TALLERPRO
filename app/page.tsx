@@ -77,7 +77,7 @@ export default function DashboardPage() {
     try {
       const [year, month] = selectedMonth.split("-").map(Number)
       const response = await fetchDashboardData(year, month)
-      const { servicios: serviciosData, gastos: gastosData, empleados: empleadosData, serviciosActivos: activosData, kpis: apiKpis } = response as any
+      const { servicios: serviciosData, gastos: gastosData, empleados: empleadosData, serviciosActivos: activosData, kpis: apiKpis } = response
       setServicios(serviciosData)
       setServiciosActivos(activosData)
       calculateKPIs(serviciosData, gastosData, empleadosData, activosData, apiKpis)
