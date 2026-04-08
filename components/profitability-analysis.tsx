@@ -16,6 +16,8 @@ interface Kpis {
   costoPromedio: number
   roi: number
   serviciosFinalizados: number
+  tasaAbsorcion: number
+  ingresosManoObra: number
 }
 
 function calcDelta(current: number, prev: number): { label: string; positive: boolean; neutral: boolean } {
@@ -62,8 +64,8 @@ export function ProfitabilityAnalysis() {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {Array.from({ length: 4 }).map((_, i) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {Array.from({ length: 5 }).map((_, i) => (
           <Card key={i}>
             <CardContent className="pt-6 space-y-3">
               <Skeleton className="h-4 w-40" />
@@ -112,10 +114,16 @@ export function ProfitabilityAnalysis() {
       delta: calcDelta(kpis.ingresoPromedio, prevKpis?.ingresoPromedio ?? 0),
       isPositive: kpis.ingresoPromedio >= (prevKpis?.ingresoPromedio ?? kpis.ingresoPromedio),
     },
+    {
+      label: "Tasa de Absorción",
+      value: fmtPct(kpis.tasaAbsorcion),
+      delta: calcDelta(kpis.tasaAbsorcion, prevKpis?.tasaAbsorcion ?? 0),
+      isPositive: kpis.tasaAbsorcion >= (prevKpis?.tasaAbsorcion ?? kpis.tasaAbsorcion),
+    },
   ]
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {metrics.map((metric, index) => (
         <Card key={index}>
           <CardContent className="pt-6">

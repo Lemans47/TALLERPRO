@@ -48,6 +48,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { generateServicioPDF } from "@/lib/pdf-generator"
 import { generarPDFPresupuesto } from "@/lib/pdf-presupuesto"
 import { PDFPreviewModal } from "@/components/pdf-preview-modal"
+import { roundMoney } from "@/lib/utils"
 
 interface ServiceFormProps {
   servicioAEditar?: (Servicio & { isPresupuesto?: boolean }) | null
@@ -701,7 +702,8 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   const totalCostos = costosManualPintura + costosOtros + autoCostoManoObra + autoCostoMateriales
 
   const cobroTotal = totalPiezasPintura + totalCobros
-  const montoConIva = formData.iva === "con" ? Math.round(cobroTotal * 1.19) : cobroTotal
+  const montoIVA = formData.iva === "con" ? roundMoney(cobroTotal * 0.19) : 0
+  const montoConIva = cobroTotal + montoIVA
   const utilidad = cobroTotal - totalCostos
 
   const validateRequiredFields = () => {

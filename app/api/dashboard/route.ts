@@ -1,23 +1,35 @@
 import { NextResponse } from "next/server"
 import { getServiciosByMonth, getGastosByMonth, getEmpleados, getActiveServicios } from "@/lib/database"
+import { safeDivide, safeCalculateMargin, calculateAbsorptionRate } from "@/lib/utils"
 
 function computeKpis(
   servicios: Awaited<ReturnType<typeof getServiciosByMonth>>,
   gastos: Awaited<ReturnType<typeof getGastosByMonth>>,
   empleados: Awaited<ReturnType<typeof getEmpleados>>,
 ) {
+  // Helper: parsea campo JSONB que puede llegar como string o array ya parseado
+  function parseJsonbArray<T>(raw: unknown): T[] {
+    if (Array.isArray(raw)) return raw as T[]
+    if (typeof raw === "string" && raw) {
+      try {
+        const parsed = JSON.parse(raw)
+        return Array.isArray(parsed) ? parsed : []
+      } catch {
+        return []
+      }
+    }
+    return []
+  }
+
   const ESTADOS_FINALIZADOS = ["Cerrado/Pagado", "Entregado", "Por Cobrar"]
   const finalizados = servicios.filter((s) => ESTADOS_FINALIZADOS.includes(s.estado))
 
   // Ingresos netos (sin IVA) de servicios finalizados
   const ingresoNeto = finalizados.reduce((sum, sv) => sum + Number(sv.monto_total_sin_iva || 0), 0)
 
-  // Costos directos desde JSONB costos[], excluyendo "materiales pintura" (evita doble conteo con gastos de pintura)
+  // Costos directos desde JSONB costos[], excluyendo "materiales pintura" (evita doble conteo)
   const costosDirectos = finalizados.reduce((sum, sv) => {
-    const raw = sv.costos
-    const costos: { descripcion?: string; monto?: number }[] = Array.isArray(raw)
-      ? raw
-      : (() => { try { const p = JSON.parse(raw as unknown as string); return Array.isArray(p) ? p : [] } catch { return [] } })()
+    const costos = parseJsonbArray<{ descripcion?: string; monto?: number }>(sv.costos)
     return (
       sum +
       costos
@@ -26,8 +38,7 @@ function computeKpis(
     )
   }, 0)
 
-  // Gastos operativos: excluir "Sueldos" de tabla gastos (los abonos ya crean esas filas)
-  // y usar sueldo_base de empleados activos — misma lógica que revenue-chart.tsx
+  // Gastos operativos: excluir "Sueldos" de tabla gastos y usar sueldo_base de empleados activos
   const gastosTabla = gastos
     .filter((g) => g.categoria !== "Sueldos")
     .reduce((s, g) => s + Number(g.monto || 0), 0)
@@ -38,13 +49,28 @@ function computeKpis(
 
   const gastosOperativos = gastosTabla + sueldosComprometidos
 
+  // Ingresos de mano de obra: cobros excl. "repuestos" + piezas_pintura (precio ya es total por pieza)
+  const ingresosManoObra = finalizados.reduce((sum, sv) => {
+    const cobros = parseJsonbArray<{ categoria?: string; monto?: number }>(sv.cobros)
+    const laborCobros = cobros
+      .filter((c) => c.categoria !== "repuestos")
+      .reduce((s, c) => s + Number(c.monto || 0), 0)
+
+    const piezas = parseJsonbArray<{ precio?: number }>(sv.piezas_pintura)
+    const laborPiezas = piezas.reduce((s, p) => s + Number(p.precio || 0), 0)
+
+    return sum + laborCobros + laborPiezas
+  }, 0)
+
   const utilidadNeta = ingresoNeto - costosDirectos - gastosOperativos
-  const margenPct = ingresoNeto > 0 ? (utilidadNeta / ingresoNeto) * 100 : 0
-  const count = finalizados.length
-  const ingresoPromedio = count > 0 ? ingresoNeto / count : 0
   const costoTotal = costosDirectos + gastosOperativos
-  const costoPromedio = count > 0 ? costoTotal / count : 0
-  const roi = costoTotal > 0 ? (utilidadNeta / costoTotal) * 100 : 0
+  const count = finalizados.length
+
+  const margenPct = safeCalculateMargin(ingresoNeto, costosDirectos + gastosOperativos)
+  const roi = safeDivide(utilidadNeta, costoTotal) * 100
+  const ingresoPromedio = safeDivide(ingresoNeto, count)
+  const costoPromedio = safeDivide(costoTotal, count)
+  const tasaAbsorcion = calculateAbsorptionRate(ingresosManoObra, gastosOperativos)
 
   return {
     ingresoNeto,
@@ -56,6 +82,8 @@ function computeKpis(
     costoPromedio,
     roi,
     serviciosFinalizados: count,
+    tasaAbsorcion,
+    ingresosManoObra,
   }
 }
 
