@@ -12,7 +12,7 @@ import { ProfitabilityAnalysis } from "@/components/profitability-analysis"
 import { MonthSelector } from "@/components/month-selector"
 import {
   Car, ArrowUpDown, TrendingUp, CheckCircle2,
-  Activity, Clock, Wrench, Plus, RefreshCw,
+  Activity, Clock, Wrench, Plus, RefreshCw, ChevronDown, ChevronUp,
 } from "lucide-react"
 import { useMonth } from "@/lib/month-context"
 import { fetchDashboardData } from "@/lib/api-client"
@@ -70,6 +70,7 @@ export default function DashboardPage() {
   const [servicios, setServicios] = useState<Servicio[]>([])
   const [serviciosActivos, setServiciosActivos] = useState<Servicio[]>([])
   const [loading, setLoading] = useState(true)
+  const [showBreakeven, setShowBreakeven] = useState(false)
   const { selectedMonth } = useMonth()
 
   useEffect(() => {
@@ -352,12 +353,22 @@ export default function DashboardPage() {
               />
             </div>
             {kpis.puntoEquilibrio > 0 && (
-              <div className="mt-3 pt-3 border-t border-border flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                <span>Gastos fijos: <span className="text-foreground font-medium">{fmt(kpis.gastosOperativos)}</span></span>
-                <span className="text-border">÷</span>
-                <span>Margen por servicio: <span className="text-foreground font-medium">{fmt(margenPorServicio)}</span></span>
-                <span className="text-border">=</span>
-                <span className="text-foreground font-medium">{kpis.puntoEquilibrio} servicios necesarios</span>
+              <div className="mt-3 pt-3 border-t border-border">
+                <button
+                  onClick={() => setShowBreakeven(!showBreakeven)}
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showBreakeven ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                  Cómo se calcula
+                </button>
+                {showBreakeven && (
+                  <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                    <span>Gastos fijos: <span className="text-foreground font-medium">{fmt(kpis.gastosOperativos)}</span></span>
+                    <span>÷</span>
+                    <span>Margen prom. por servicio: <span className="text-foreground font-medium">{fmt(margenPorServicio)}</span></span>
+                    <span>= <span className="text-foreground font-medium">{kpis.puntoEquilibrio} servicios</span></span>
+                  </div>
+                )}
               </div>
             )}
           </div>
