@@ -44,13 +44,17 @@ export function RevenueChart() {
         if (!monthlyData[key]) return
 
         // Ingresos según modo
-        const incluyeIngreso =
-          modoActual === "facturado"
-            ? Number(s.monto_total_sin_iva || 0) > 0
-            : s.estado === "Cerrado/Pagado"
-
-        if (incluyeIngreso) {
-          monthlyData[key].ingresos += Number(s.monto_total_sin_iva || 0)
+        if (modoActual === "facturado") {
+          if (Number(s.monto_total_sin_iva || 0) > 0) {
+            monthlyData[key].ingresos += Number(s.monto_total_sin_iva || 0)
+          }
+        } else {
+          // Cobrado: monto completo si está cerrado/pagado, anticipo para el resto
+          if (s.estado === "Cerrado/Pagado") {
+            monthlyData[key].ingresos += Number(s.monto_total_sin_iva || 0)
+          } else {
+            monthlyData[key].ingresos += Number(s.anticipo || 0)
+          }
         }
 
         // Costos internos: siempre se incluyen todos los servicios con monto (los costos se incurren
