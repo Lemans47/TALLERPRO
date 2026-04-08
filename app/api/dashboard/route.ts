@@ -42,9 +42,22 @@ function computeKpis(
   }, 0)
 
   // Gastos operativos: excluir "Sueldos" de tabla gastos y usar sueldo_base de empleados activos
-  const gastosTabla = gastos
-    .filter((g) => g.categoria !== "Sueldos")
-    .reduce((s, g) => s + Number(g.monto || 0), 0)
+  const gastosNoSueldos = gastos.filter((g) => g.categoria !== "Sueldos")
+  const gastosTabla = gastosNoSueldos.reduce((s, g) => s + Number(g.monto || 0), 0)
+
+  // Desglose por categoría
+  const gastosDesglose = Object.values(
+    gastosNoSueldos.reduce<Record<string, { categoria: string; monto: number; items: { descripcion: string; monto: number }[] }>>(
+      (acc, g) => {
+        const cat = g.categoria || "Sin categoría"
+        if (!acc[cat]) acc[cat] = { categoria: cat, monto: 0, items: [] }
+        acc[cat].monto += Number(g.monto || 0)
+        acc[cat].items.push({ descripcion: g.descripcion, monto: Number(g.monto || 0) })
+        return acc
+      },
+      {},
+    ),
+  ).sort((a, b) => b.monto - a.monto)
 
   const sueldosComprometidos = (empleados as { activo: boolean; sueldo_base: number }[])
     .filter((e) => e.activo)
@@ -91,6 +104,7 @@ function computeKpis(
     costosDirectos,
     gastosOperativos,
     gastosTabla,
+    gastosDesglose,
     sueldosComprometidos,
     margenContribucion,
     margenContribucionPct,

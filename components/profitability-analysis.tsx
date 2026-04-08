@@ -3,14 +3,21 @@
 import { useEffect, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
-import { TrendingUp, TrendingDown, Minus } from "lucide-react"
+import { TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp } from "lucide-react"
 import { fetchDashboardData } from "@/lib/api-client"
+
+interface GastoCategoria {
+  categoria: string
+  monto: number
+  items: { descripcion: string; monto: number }[]
+}
 
 interface Kpis {
   ingresoNeto: number
   costosDirectos: number
   gastosOperativos: number
   gastosTabla: number
+  gastosDesglose: GastoCategoria[]
   sueldosComprometidos: number
   margenContribucion: number
   margenContribucionPct: number
@@ -49,6 +56,7 @@ export function ProfitabilityAnalysis() {
   const [kpis, setKpis] = useState<Kpis | null>(null)
   const [prevKpis, setPrevKpis] = useState<Kpis | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showGastosDesglose, setShowGastosDesglose] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -146,9 +154,31 @@ export function ProfitabilityAnalysis() {
             </div>
 
             {/* Gastos operacionales */}
-            <div className="flex items-center justify-between py-2">
-              <span className="text-sm text-muted-foreground">− Gastos operacionales</span>
-              <span className="text-base font-semibold text-red-400">{fmt(kpis.gastosTabla)}</span>
+            <div className="border-t border-border pt-2">
+              <button
+                onClick={() => setShowGastosDesglose(!showGastosDesglose)}
+                className="w-full flex items-center justify-between py-2 hover:opacity-80 transition-opacity"
+              >
+                <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                  − Gastos operacionales
+                  {showGastosDesglose ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </span>
+                <span className="text-base font-semibold text-red-400">{fmt(kpis.gastosTabla)}</span>
+              </button>
+              {showGastosDesglose && (
+                <div className="ml-4 mb-2 space-y-1.5">
+                  {kpis.gastosDesglose.length === 0 ? (
+                    <p className="text-xs text-muted-foreground py-1">Sin registros este mes</p>
+                  ) : (
+                    kpis.gastosDesglose.map((cat) => (
+                      <div key={cat.categoria} className="flex justify-between text-xs py-0.5">
+                        <span className="text-muted-foreground">{cat.categoria}</span>
+                        <span>{fmt(cat.monto)}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Resultado neto */}
