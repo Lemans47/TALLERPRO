@@ -310,19 +310,23 @@ export default function DashboardPage() {
       </div>
 
       {/* Punto de Equilibrio */}
-      {!isOperador && kpis.puntoEquilibrio > 0 && (() => {
-        const faltan = Math.max(0, kpis.puntoEquilibrio - kpis.serviciosConMonto)
-        const pct = Math.min(100, Math.round((kpis.serviciosConMonto / kpis.puntoEquilibrio) * 100))
+      {!isOperador && (() => {
+        const faltan = kpis.puntoEquilibrio > 0 ? Math.max(0, kpis.puntoEquilibrio - kpis.serviciosConMonto) : 0
+        const pct = kpis.puntoEquilibrio > 0 ? Math.min(100, Math.round((kpis.serviciosConMonto / kpis.puntoEquilibrio) * 100)) : 0
         return (
           <div className="rounded-xl border border-border bg-card p-5">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Punto de Equilibrio</p>
-                <p className="text-2xl font-bold mt-1">{kpis.puntoEquilibrio} servicios</p>
+                <p className="text-2xl font-bold mt-1">
+                  {kpis.puntoEquilibrio > 0 ? `${kpis.puntoEquilibrio} servicios` : "—"}
+                </p>
                 <p className="text-sm text-muted-foreground mt-0.5">
-                  {faltan > 0
-                    ? `Faltan ${faltan} servicio${faltan !== 1 ? "s" : ""} para cubrir los gastos fijos`
-                    : "Los gastos fijos están cubiertos este mes"}
+                  {kpis.puntoEquilibrio === 0
+                    ? "Sin datos suficientes para calcular"
+                    : faltan > 0
+                      ? `Faltan ${faltan} servicio${faltan !== 1 ? "s" : ""} para cubrir los gastos fijos`
+                      : "Los gastos fijos están cubiertos este mes"}
                 </p>
               </div>
               <div className="text-right">
