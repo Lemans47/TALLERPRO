@@ -8,7 +8,6 @@ import { RevenueChart } from "@/components/revenue-chart"
 import { PendingPaymentsAlert } from "@/components/pending-payments-alert"
 import { VehiclePipeline } from "@/components/vehicle-pipeline"
 import { AverageTicketChart } from "@/components/average-ticket-chart"
-import { ProfitabilityAnalysis } from "@/components/profitability-analysis"
 import { MonthSelector } from "@/components/month-selector"
 import {
   Car, ArrowUpDown, TrendingUp, CheckCircle2,
@@ -402,17 +401,6 @@ export default function DashboardPage() {
           <AverageTicketChart />
         </div>
       </div>
-
-      {/* Análisis de Rentabilidad (solo no-operador) */}
-      {!isOperador && (
-        <div className="rounded-xl border border-border bg-card p-5 space-y-4">
-          <h3 className="font-semibold text-lg flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-primary" />
-            Análisis de Rentabilidad
-          </h3>
-          <ProfitabilityAnalysis />
-        </div>
-      )}
 
       {/* KPIs secundarios (solo no-operador) */}
       {!isOperador && (

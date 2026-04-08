@@ -12,6 +12,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
 import { Download, FileSpreadsheet, TrendingUp, TrendingDown, DollarSign, Wrench, RefreshCw, Users, ArrowUpRight, ArrowDownRight, Minus } from "lucide-react"
+import { ProfitabilityAnalysis } from "@/components/profitability-analysis"
 import { useMonth } from "@/lib/month-context"
 import { api, type Servicio, type Gasto } from "@/lib/api-client"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
@@ -75,7 +76,9 @@ export default function ReportsPage() {
   // Costos de servicios
   const parseArr = (v: any) => Array.isArray(v) ? v : (typeof v === "string" && v ? JSON.parse(v) : [])
   const costosServicios = servicios.reduce((sum, s) => {
-    return sum + parseArr(s.costos).reduce((c: number, costo: any) => c + Number(costo.monto), 0)
+    return sum + parseArr(s.costos)
+      .filter((c: any) => !String(c.descripcion || "").toLowerCase().includes("materiales pintura"))
+      .reduce((c: number, costo: any) => c + Number(costo.monto), 0)
   }, 0)
 
   const utilidadNeta = ingresosTotales - totalGastos - costosServicios
@@ -118,7 +121,7 @@ export default function ReportsPage() {
   // Top clientes
   const topClientes = (() => {
     const map: Record<string, { cliente: string; total: number; count: number }> = {}
-    for (const s of servicios) {
+    for (const s of serviciosCerrados) {
       const key = s.cliente || "Sin nombre"
       if (!map[key]) map[key] = { cliente: key, total: 0, count: 0 }
       map[key].total += Number(s.monto_total_sin_iva) || 0
@@ -138,7 +141,7 @@ export default function ReportsPage() {
   // Comparison KPIs
   const compIngresos = compServicios.filter(s => s.estado === "Cerrado/Pagado").reduce((sum, s) => sum + Number(s.monto_total_sin_iva), 0)
   const compGastosTot = compGastos.reduce((sum, g) => sum + Number(g.monto), 0)
-  const compCostos = compServicios.reduce((sum, s) => sum + parseArr(s.costos).reduce((c: number, x: any) => c + Number(x.monto), 0), 0)
+  const compCostos = compServicios.reduce((sum, s) => sum + parseArr(s.costos).filter((x: any) => !String(x.descripcion || "").toLowerCase().includes("materiales pintura")).reduce((c: number, x: any) => c + Number(x.monto), 0), 0)
   const compUtilidad = compIngresos - compGastosTot - compCostos
 
   const [selYear, selMonth] = selectedMonth.split("-").map(Number)
@@ -284,6 +287,7 @@ export default function ReportsPage() {
 
         <TabsList className="mb-4">
           <TabsTrigger value="resumen">Resumen</TabsTrigger>
+          <TabsTrigger value="rentabilidad">Rentabilidad</TabsTrigger>
           <TabsTrigger value="clientes">Top Clientes</TabsTrigger>
           <TabsTrigger value="comparar">Comparar meses</TabsTrigger>
         </TabsList>
@@ -300,6 +304,7 @@ export default function ReportsPage() {
               <div>
                 <p className="text-xs text-muted-foreground">Ingresos Netos</p>
                 <p className="text-xl font-bold">${ingresosTotales.toLocaleString("es-CL")}</p>
+                <p className="text-xs text-muted-foreground">Solo cerrados/pagados</p>
               </div>
             </div>
           </CardContent>
@@ -475,6 +480,11 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
       </div>
+        </TabsContent>
+
+        {/* ── RENTABILIDAD ── */}
+        <TabsContent value="rentabilidad">
+          <ProfitabilityAnalysis />
         </TabsContent>
 
         {/* ── TOP CLIENTES ── */}
