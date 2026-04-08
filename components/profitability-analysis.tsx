@@ -33,7 +33,8 @@ interface Kpis {
   ingresosManoObra: number
 }
 
-function calcDelta(current: number, prev: number): { label: string; positive: boolean; neutral: boolean } {
+function calcDelta(current: number, prev: number | null): { label: string; positive: boolean; neutral: boolean } {
+  if (prev === null) return { label: "Sin datos ant.", positive: true, neutral: true }
   if (prev === 0 && current === 0) return { label: "Sin datos", positive: true, neutral: true }
   if (prev === 0) return { label: "Nuevo", positive: true, neutral: true }
   const pct = ((current - prev) / Math.abs(prev)) * 100
@@ -71,7 +72,8 @@ export function ProfitabilityAnalysis() {
           fetchDashboardData(prevDate.getFullYear(), prevDate.getMonth() + 1),
         ])
         setKpis((current as any).kpis ?? null)
-        setPrevKpis((prev as any).kpis ?? null)
+        const prevData = (prev as any).kpis ?? null
+        setPrevKpis(prevData?.serviciosCount > 0 ? prevData : null)
       } catch (e) {
         console.error("ProfitabilityAnalysis error:", e)
       } finally {
@@ -139,7 +141,7 @@ export function ProfitabilityAnalysis() {
                   {fmt(kpis.margenContribucion)}
                 </span>
                 <DeltaBadge
-                  delta={calcDelta(kpis.margenContribucion, prevKpis?.margenContribucion ?? 0)}
+                  delta={calcDelta(kpis.margenContribucion, prevKpis?.margenContribucion ?? null)}
                   isPositive={kpis.margenContribucion >= (prevKpis?.margenContribucion ?? kpis.margenContribucion)}
                 />
               </div>
@@ -192,7 +194,7 @@ export function ProfitabilityAnalysis() {
                   {fmt(kpis.utilidadNeta)}
                 </span>
                 <DeltaBadge
-                  delta={calcDelta(kpis.utilidadNeta, prevKpis?.utilidadNeta ?? 0)}
+                  delta={calcDelta(kpis.utilidadNeta, prevKpis?.utilidadNeta ?? null)}
                   isPositive={kpis.utilidadNeta >= (prevKpis?.utilidadNeta ?? kpis.utilidadNeta)}
                 />
               </div>
@@ -207,25 +209,25 @@ export function ProfitabilityAnalysis() {
           {
             label: "ROI",
             value: fmtPct(kpis.roi),
-            delta: calcDelta(kpis.roi, prevKpis?.roi ?? 0),
+            delta: calcDelta(kpis.roi, prevKpis?.roi ?? null),
             isPositive: kpis.roi >= 0,
           },
           {
             label: "Tasa de Absorción",
             value: fmtPct(kpis.tasaAbsorcion),
-            delta: calcDelta(kpis.tasaAbsorcion, prevKpis?.tasaAbsorcion ?? 0),
+            delta: calcDelta(kpis.tasaAbsorcion, prevKpis?.tasaAbsorcion ?? null),
             isPositive: kpis.tasaAbsorcion >= (prevKpis?.tasaAbsorcion ?? kpis.tasaAbsorcion),
           },
           {
             label: "Ingreso Promedio por Servicio",
             value: fmt(kpis.ingresoPromedio),
-            delta: calcDelta(kpis.ingresoPromedio, prevKpis?.ingresoPromedio ?? 0),
+            delta: calcDelta(kpis.ingresoPromedio, prevKpis?.ingresoPromedio ?? null),
             isPositive: kpis.ingresoPromedio >= (prevKpis?.ingresoPromedio ?? kpis.ingresoPromedio),
           },
           {
             label: "Costo Directo Promedio por Servicio",
             value: fmt(kpis.costoDirectoPromedio),
-            delta: calcDelta(kpis.costoDirectoPromedio, prevKpis?.costoDirectoPromedio ?? 0),
+            delta: calcDelta(kpis.costoDirectoPromedio, prevKpis?.costoDirectoPromedio ?? null),
             isPositive: kpis.costoDirectoPromedio <= (prevKpis?.costoDirectoPromedio ?? kpis.costoDirectoPromedio),
           },
         ].map((metric, index) => (
