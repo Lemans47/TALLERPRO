@@ -205,7 +205,7 @@ export default function DashboardPage() {
       entregadosEsteMes,
       serviciosActivos: vehiculosEnTaller.length,
       serviciosTotal,
-      serviciosCerrados: serviciosCerradosCount,
+      serviciosCerrados: serviciosCompletadosCount,
       tasaCierre,
       tiempoPromedio,
       puntoEquilibrio,
