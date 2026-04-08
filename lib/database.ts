@@ -560,9 +560,26 @@ export async function createAbono(a: { empleado_id: string; mes: number; año: n
   return data[0] as AbonoEmpleado
 }
 
+export async function getAbonoById(id: string) {
+  const db = getSQL()
+  const data = await db`
+    SELECT a.*, e.nombre AS empleado_nombre
+    FROM abonos_empleados a
+    JOIN empleados e ON e.id = a.empleado_id
+    WHERE a.id = ${id}
+  `
+  return data[0] as AbonoEmpleado | undefined
+}
+
 export async function deleteAbono(id: string) {
   const db = getSQL()
   await db`DELETE FROM abonos_empleados WHERE id = ${id}`
+}
+
+export async function deleteGastosSueldoByPattern(nombre: string, mes: number, año: number) {
+  const db = getSQL()
+  const pattern = `Abono sueldo ${nombre} ${String(mes).padStart(2, "0")}/${año}`
+  await db`DELETE FROM gastos WHERE categoria = 'Sueldos' AND descripcion = ${pattern}`
 }
 
 // Dashboard KPIs

@@ -24,6 +24,7 @@ export default function ReportsPage() {
   const { selectedMonth } = useMonth()
   const [servicios, setServicios] = useState<Servicio[]>([])
   const [gastos, setGastos] = useState<Gasto[]>([])
+  const [abonos, setAbonos] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   // Comparison month
@@ -35,18 +36,21 @@ export default function ReportsPage() {
   const [compMonth, setCompMonth] = useState(prevMonth)
   const [compServicios, setCompServicios] = useState<Servicio[]>([])
   const [compGastos, setCompGastos] = useState<Gasto[]>([])
+  const [compAbonos, setCompAbonos] = useState<any[]>([])
   const [compLoading, setCompLoading] = useState(false)
 
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
       const [year, month] = selectedMonth.split("-").map(Number)
-      const [serviciosData, gastosData] = await Promise.all([
+      const [serviciosData, gastosData, abonosData] = await Promise.all([
         api.servicios.getByMonth(year, month),
         api.gastos.getByMonth(year, month),
+        api.abonos.getByMonth(year, month),
       ])
       setServicios(serviciosData)
       setGastos(gastosData)
+      setAbonos(abonosData)
     } catch (error) {
       console.error("Error loading data:", error)
     } finally {
@@ -70,8 +74,8 @@ export default function ReportsPage() {
   const gastosMiscelaneos = gastos
     .filter((g) => g.categoria === "Gastos Misceláneos")
     .reduce((sum, g) => sum + Number(g.monto), 0)
-  const gastosSueldos = gastos.filter((g) => g.categoria === "Sueldos").reduce((sum, g) => sum + Number(g.monto), 0)
-  const totalGastos = gastos.reduce((sum, g) => sum + Number(g.monto), 0)
+  const gastosSueldos = abonos.reduce((sum, a) => sum + Number(a.monto), 0)
+  const totalGastos = gastos.filter((g) => g.categoria !== "Sueldos").reduce((sum, g) => sum + Number(g.monto), 0) + gastosSueldos
 
   // Costos de servicios
   const parseArr = (v: any) => Array.isArray(v) ? v : (typeof v === "string" && v ? JSON.parse(v) : [])
@@ -108,9 +112,10 @@ export default function ReportsPage() {
     setCompLoading(true)
     try {
       const [y, m] = compMonth.split("-").map(Number)
-      const [s, g] = await Promise.all([api.servicios.getByMonth(y, m), api.gastos.getByMonth(y, m)])
+      const [s, g, a] = await Promise.all([api.servicios.getByMonth(y, m), api.gastos.getByMonth(y, m), api.abonos.getByMonth(y, m)])
       setCompServicios(s)
       setCompGastos(g)
+      setCompAbonos(a)
     } catch (e) {
       console.error(e)
     } finally {
@@ -140,7 +145,7 @@ export default function ReportsPage() {
 
   // Comparison KPIs
   const compIngresos = compServicios.filter(s => s.estado === "Cerrado/Pagado").reduce((sum, s) => sum + Number(s.monto_total_sin_iva), 0)
-  const compGastosTot = compGastos.reduce((sum, g) => sum + Number(g.monto), 0)
+  const compGastosTot = compGastos.filter(g => g.categoria !== "Sueldos").reduce((sum, g) => sum + Number(g.monto), 0) + compAbonos.reduce((sum, a) => sum + Number(a.monto), 0)
   const compCostos = compServicios.reduce((sum, s) => sum + parseArr(s.costos).filter((x: any) => !String(x.descripcion || "").toLowerCase().includes("materiales pintura")).reduce((c: number, x: any) => c + Number(x.monto), 0), 0)
   const compUtilidad = compIngresos - compGastosTot - compCostos
 

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getAbonosByMonth, createAbono, deleteAbono, createGasto } from "@/lib/database"
+import { getAbonosByMonth, createAbono, deleteAbono, getAbonoById, deleteGastosSueldoByPattern } from "@/lib/database"
 
 export async function GET(request: Request) {
   try {
@@ -24,13 +24,6 @@ export async function POST(request: Request) {
       fecha: data.fecha,
       notas: data.notas,
     })
-    // Auto-create gasto entry
-    await createGasto({
-      fecha: data.fecha,
-      categoria: "Sueldos",
-      descripcion: `Abono sueldo ${data.empleado_nombre || ""} ${String(data.mes).padStart(2, "0")}/${data.año}`,
-      monto: data.monto,
-    })
     return NextResponse.json(abono)
   } catch (e) {
     return NextResponse.json({ error: "Error creating abono" }, { status: 500 })
@@ -42,6 +35,10 @@ export async function DELETE(request: Request) {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
     if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 })
+    const abono = await getAbonoById(id)
+    if (abono) {
+      await deleteGastosSueldoByPattern(abono.empleado_nombre ?? "", abono.mes, abono.año)
+    }
     await deleteAbono(id)
     return NextResponse.json({ success: true })
   } catch (e) {

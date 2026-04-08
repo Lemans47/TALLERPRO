@@ -5,7 +5,7 @@ import { ExpenseForm } from "@/components/expense-form"
 import { ExpensesTable } from "@/components/expenses-table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { RefreshCw, Receipt, Paintbrush, Wrench, Home, Users } from "lucide-react"
+import { RefreshCw, Receipt, Paintbrush, Wrench, Home } from "lucide-react"
 import { useMonth } from "@/lib/month-context"
 import { api, type Gasto } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth-context"
@@ -15,7 +15,6 @@ const ALL_CATEGORIAS = [
   { id: "Gastos de Pintura", label: "Pintura", icon: Paintbrush, color: "text-purple-400", roles: ["admin", "supervisor", "operador"] },
   { id: "Gastos Misceláneos", label: "Misceláneos", icon: Wrench, color: "text-blue-400", roles: ["admin", "supervisor", "operador"] },
   { id: "Gastos Fijos", label: "Fijos", icon: Home, color: "text-orange-400", roles: ["admin", "supervisor"] },
-  { id: "Sueldos", label: "Sueldos", icon: Users, color: "text-green-400", roles: ["admin", "supervisor"] },
 ]
 
 export default function ExpensesPage() {
