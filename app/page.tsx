@@ -38,6 +38,8 @@ interface KPIs {
   tiempoPromedio: number
   puntoEquilibrio: number
   serviciosConMonto: number
+  gastosOperativos: number
+  margenContribucion: number
 }
 
 export default function DashboardPage() {
@@ -62,6 +64,8 @@ export default function DashboardPage() {
     tiempoPromedio: 0,
     puntoEquilibrio: 0,
     serviciosConMonto: 0,
+    gastosOperativos: 0,
+    margenContribucion: 0,
   })
   const [servicios, setServicios] = useState<Servicio[]>([])
   const [serviciosActivos, setServiciosActivos] = useState<Servicio[]>([])
@@ -190,6 +194,8 @@ export default function DashboardPage() {
     // ---- Punto de equilibrio (desde API para consistencia) ----
     const puntoEquilibrio = apiKpis?.puntoEquilibrio ?? 0
     const countConMonto = apiKpis?.serviciosCount ?? serviciosFacturados.length
+    const gastosOperativosApi = apiKpis?.gastosOperativos ?? 0
+    const margenContribucionApi = apiKpis?.margenContribucion ?? 0
 
     setKpis({
       vehiculosEnTaller: vehiculosEnTallerCount,
@@ -210,6 +216,8 @@ export default function DashboardPage() {
       tiempoPromedio,
       puntoEquilibrio,
       serviciosConMonto: countConMonto,
+      gastosOperativos: gastosOperativosApi,
+      margenContribucion: margenContribucionApi,
     })
   }
 
@@ -311,6 +319,8 @@ export default function DashboardPage() {
       {!isOperador && (() => {
         const faltan = kpis.puntoEquilibrio > 0 ? Math.max(0, kpis.puntoEquilibrio - kpis.serviciosConMonto) : 0
         const pct = kpis.puntoEquilibrio > 0 ? Math.min(100, Math.round((kpis.serviciosConMonto / kpis.puntoEquilibrio) * 100)) : 0
+        const margenPorServicio = kpis.serviciosConMonto > 0 ? Math.round(kpis.margenContribucion / kpis.serviciosConMonto) : 0
+        const fmt = (n: number) => `$${Math.round(n).toLocaleString("es-CL")}`
         return (
           <div className="rounded-xl border border-border bg-card p-5">
             <div className="flex items-center justify-between">
@@ -341,6 +351,15 @@ export default function DashboardPage() {
                 style={{ width: `${pct}%` }}
               />
             </div>
+            {kpis.puntoEquilibrio > 0 && (
+              <div className="mt-3 pt-3 border-t border-border flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                <span>Gastos fijos: <span className="text-foreground font-medium">{fmt(kpis.gastosOperativos)}</span></span>
+                <span className="text-border">÷</span>
+                <span>Margen por servicio: <span className="text-foreground font-medium">{fmt(margenPorServicio)}</span></span>
+                <span className="text-border">=</span>
+                <span className="text-foreground font-medium">{kpis.puntoEquilibrio} servicios necesarios</span>
+              </div>
+            )}
           </div>
         )
       })()}
