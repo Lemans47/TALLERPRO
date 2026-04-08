@@ -119,7 +119,7 @@ export default function DashboardPage() {
       .reduce((sum, g) => sum + Number(g.monto || 0), 0)
 
     // ---- KPI 1: Vehículos en taller (usa TODOS los activos, no solo los del mes) ----
-    const PIPELINE_STAGES = ["En Cola", "En Proceso", "En Reparación", "Esperando Repuestos", "Control de Calidad"]
+    const PIPELINE_STAGES = ["En Cola", "En Proceso", "En Reparación", "Esperando Repuestos", "Control de Calidad", "Listo para Entrega"]
     const vehiculosEnTaller = serviciosActivos
     const vehiculosEnTallerCount = PIPELINE_STAGES.reduce(
       (sum, estado) => sum + serviciosActivos.filter((s) => s.estado === estado).length, 0
