@@ -12,10 +12,14 @@ interface Kpis {
   gastosOperativos: number
   gastosTabla: number
   sueldosComprometidos: number
+  margenContribucion: number
+  margenContribucionPct: number
   utilidadNeta: number
   margenPct: number
   ingresoPromedio: number
-  costoPromedio: number
+  costoDirectoPromedio: number
+  puntoEquilibrio: number
+  serviciosCount: number
   roi: number
   serviciosFinalizados: number
   tasaAbsorcion: number
@@ -30,6 +34,17 @@ function calcDelta(current: number, prev: number): { label: string; positive: bo
   return { label: `${sign}${pct.toFixed(1)}% vs mes ant.`, positive: pct >= 0, neutral: false }
 }
 
+function DeltaBadge({ delta, isPositive }: { delta: ReturnType<typeof calcDelta>; isPositive: boolean }) {
+  return (
+    <div className={`flex items-center gap-1 text-sm ${
+      delta.neutral ? "text-muted-foreground" : isPositive ? "text-green-500" : "text-red-500"
+    }`}>
+      {delta.neutral ? <Minus className="w-3 h-3" /> : isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+      {delta.label}
+    </div>
+  )
+}
+
 export function ProfitabilityAnalysis() {
   const [kpis, setKpis] = useState<Kpis | null>(null)
   const [prevKpis, setPrevKpis] = useState<Kpis | null>(null)
@@ -42,17 +57,11 @@ export function ProfitabilityAnalysis() {
         const now = new Date()
         const year = now.getFullYear()
         const month = now.getMonth() + 1
-
-        // Mes anterior
         const prevDate = new Date(year, month - 2, 1)
-        const prevYear = prevDate.getFullYear()
-        const prevMonth = prevDate.getMonth() + 1
-
         const [current, prev] = await Promise.all([
           fetchDashboardData(year, month),
-          fetchDashboardData(prevYear, prevMonth),
+          fetchDashboardData(prevDate.getFullYear(), prevDate.getMonth() + 1),
         ])
-
         setKpis((current as any).kpis ?? null)
         setPrevKpis((prev as any).kpis ?? null)
       } catch (e) {
@@ -66,134 +75,177 @@ export function ProfitabilityAnalysis() {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <Card key={i}>
-            <CardContent className="pt-6 space-y-3">
-              <Skeleton className="h-4 w-40" />
-              <Skeleton className="h-9 w-28" />
-              <Skeleton className="h-4 w-24" />
-            </CardContent>
-          </Card>
-        ))}
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Card key={i}><CardContent className="pt-6 space-y-3">
+              <Skeleton className="h-4 w-40" /><Skeleton className="h-9 w-28" />
+            </CardContent></Card>
+          ))}
+        </div>
+        <Card><CardContent className="pt-6 space-y-3">
+          <Skeleton className="h-4 w-40" /><Skeleton className="h-20 w-full" />
+        </CardContent></Card>
       </div>
     )
   }
 
-  if (!kpis) {
-    return (
-      <div className="text-sm text-muted-foreground p-4">No se pudieron cargar los datos de rentabilidad.</div>
-    )
-  }
+  if (!kpis) return (
+    <div className="text-sm text-muted-foreground p-4">No se pudieron cargar los datos de rentabilidad.</div>
+  )
 
   const fmt = (n: number) => `$${Math.round(n).toLocaleString("es-CL")}`
   const fmtPct = (n: number) => `${n.toFixed(1)}%`
 
-  const metrics = [
-    {
-      label: "Margen de Ganancia",
-      value: fmtPct(kpis.margenPct),
-      delta: calcDelta(kpis.margenPct, prevKpis?.margenPct ?? 0),
-      // Costo positivo = margen > 0, negativo = pérdida
-      isPositive: kpis.margenPct >= 0,
-    },
-    {
-      label: "ROI (Retorno de Inversión)",
-      value: fmtPct(kpis.roi),
-      delta: calcDelta(kpis.roi, prevKpis?.roi ?? 0),
-      isPositive: kpis.roi >= 0,
-    },
-    {
-      label: "Costo Promedio por Servicio",
-      value: fmt(kpis.costoPromedio),
-      // Para costos, bajar es positivo
-      delta: calcDelta(kpis.costoPromedio, prevKpis?.costoPromedio ?? 0),
-      isPositive: kpis.costoPromedio <= (prevKpis?.costoPromedio ?? kpis.costoPromedio),
-    },
-    {
-      label: "Ingreso Promedio por Servicio",
-      value: fmt(kpis.ingresoPromedio),
-      delta: calcDelta(kpis.ingresoPromedio, prevKpis?.ingresoPromedio ?? 0),
-      isPositive: kpis.ingresoPromedio >= (prevKpis?.ingresoPromedio ?? kpis.ingresoPromedio),
-    },
-    {
-      label: "Tasa de Absorción",
-      value: fmtPct(kpis.tasaAbsorcion),
-      delta: calcDelta(kpis.tasaAbsorcion, prevKpis?.tasaAbsorcion ?? 0),
-      isPositive: kpis.tasaAbsorcion >= (prevKpis?.tasaAbsorcion ?? kpis.tasaAbsorcion),
-    },
-  ]
-
-  const costoTotal = kpis.costosDirectos + kpis.gastosOperativos
+  const faltanServicios = Math.max(0, kpis.puntoEquilibrio - kpis.serviciosCount)
 
   return (
     <div className="space-y-4">
+
+      {/* Cascada financiera */}
+      <Card>
+        <CardContent className="pt-6">
+          <p className="text-sm font-medium text-muted-foreground mb-4">Resultado del Mes</p>
+          <div className="space-y-3">
+
+            {/* Ingresos */}
+            <div className="flex items-center justify-between py-2">
+              <span className="text-sm text-muted-foreground">Ingresos facturados ({kpis.serviciosCount} servicios)</span>
+              <span className="text-base font-semibold text-green-500">{fmt(kpis.ingresoNeto)}</span>
+            </div>
+
+            {/* Costos directos */}
+            <div className="flex items-center justify-between py-2 border-t border-border">
+              <span className="text-sm text-muted-foreground">− Costos directos (variables)</span>
+              <span className="text-base font-semibold text-red-400">{fmt(kpis.costosDirectos)}</span>
+            </div>
+
+            {/* Margen de contribución */}
+            <div className={`flex items-center justify-between py-2.5 px-3 rounded-lg ${
+              kpis.margenContribucion >= 0 ? "bg-green-500/10" : "bg-red-500/10"
+            }`}>
+              <div>
+                <span className="text-sm font-medium">= Margen de contribución</span>
+                <span className="text-xs text-muted-foreground ml-2">({fmtPct(kpis.margenContribucionPct)})</span>
+              </div>
+              <div className="text-right">
+                <span className={`text-base font-bold ${kpis.margenContribucion >= 0 ? "text-green-500" : "text-red-500"}`}>
+                  {fmt(kpis.margenContribucion)}
+                </span>
+                <DeltaBadge
+                  delta={calcDelta(kpis.margenContribucion, prevKpis?.margenContribucion ?? 0)}
+                  isPositive={kpis.margenContribucion >= (prevKpis?.margenContribucion ?? kpis.margenContribucion)}
+                />
+              </div>
+            </div>
+
+            {/* Sueldos */}
+            <div className="flex items-center justify-between py-2 border-t border-border">
+              <span className="text-sm text-muted-foreground">− Sueldos comprometidos</span>
+              <span className="text-base font-semibold text-red-400">{fmt(kpis.sueldosComprometidos)}</span>
+            </div>
+
+            {/* Gastos operacionales */}
+            <div className="flex items-center justify-between py-2">
+              <span className="text-sm text-muted-foreground">− Gastos operacionales</span>
+              <span className="text-base font-semibold text-red-400">{fmt(kpis.gastosTabla)}</span>
+            </div>
+
+            {/* Resultado neto */}
+            <div className={`flex items-center justify-between py-2.5 px-3 rounded-lg border ${
+              kpis.utilidadNeta >= 0 ? "bg-green-500/10 border-green-500/30" : "bg-red-500/10 border-red-500/30"
+            }`}>
+              <div>
+                <span className="text-sm font-medium">= Resultado neto</span>
+                <span className="text-xs text-muted-foreground ml-2">({fmtPct(kpis.margenPct)})</span>
+              </div>
+              <div className="text-right">
+                <span className={`text-lg font-bold ${kpis.utilidadNeta >= 0 ? "text-green-500" : "text-red-500"}`}>
+                  {fmt(kpis.utilidadNeta)}
+                </span>
+                <DeltaBadge
+                  delta={calcDelta(kpis.utilidadNeta, prevKpis?.utilidadNeta ?? 0)}
+                  isPositive={kpis.utilidadNeta >= (prevKpis?.utilidadNeta ?? kpis.utilidadNeta)}
+                />
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Punto de equilibrio */}
+      <Card>
+        <CardContent className="pt-6">
+          <p className="text-sm font-medium text-muted-foreground mb-3">Punto de Equilibrio</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-3xl font-bold">{kpis.puntoEquilibrio} servicios</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                {faltanServicios > 0
+                  ? `Faltan ${faltanServicios} servicio${faltanServicios !== 1 ? "s" : ""} para cubrir los gastos fijos`
+                  : "Los gastos fijos están cubiertos este mes"}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-muted-foreground">Actualmente</p>
+              <p className="text-2xl font-bold">{kpis.serviciosCount}</p>
+              <p className={`text-xs font-medium mt-0.5 ${faltanServicios === 0 ? "text-green-500" : "text-amber-500"}`}>
+                {faltanServicios === 0 ? "En zona rentable" : `${Math.round((kpis.serviciosCount / kpis.puntoEquilibrio) * 100)}% del objetivo`}
+              </p>
+            </div>
+          </div>
+          {kpis.puntoEquilibrio > 0 && (
+            <div className="mt-3">
+              <div className="w-full bg-muted rounded-full h-2">
+                <div
+                  className={`h-2 rounded-full transition-all ${faltanServicios === 0 ? "bg-green-500" : "bg-amber-500"}`}
+                  style={{ width: `${Math.min(100, (kpis.serviciosCount / kpis.puntoEquilibrio) * 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* KPIs secundarios */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {metrics.map((metric, index) => (
+        {[
+          {
+            label: "ROI",
+            value: fmtPct(kpis.roi),
+            delta: calcDelta(kpis.roi, prevKpis?.roi ?? 0),
+            isPositive: kpis.roi >= 0,
+          },
+          {
+            label: "Tasa de Absorción",
+            value: fmtPct(kpis.tasaAbsorcion),
+            delta: calcDelta(kpis.tasaAbsorcion, prevKpis?.tasaAbsorcion ?? 0),
+            isPositive: kpis.tasaAbsorcion >= (prevKpis?.tasaAbsorcion ?? kpis.tasaAbsorcion),
+          },
+          {
+            label: "Ingreso Promedio por Servicio",
+            value: fmt(kpis.ingresoPromedio),
+            delta: calcDelta(kpis.ingresoPromedio, prevKpis?.ingresoPromedio ?? 0),
+            isPositive: kpis.ingresoPromedio >= (prevKpis?.ingresoPromedio ?? kpis.ingresoPromedio),
+          },
+          {
+            label: "Costo Directo Promedio por Servicio",
+            value: fmt(kpis.costoDirectoPromedio),
+            delta: calcDelta(kpis.costoDirectoPromedio, prevKpis?.costoDirectoPromedio ?? 0),
+            isPositive: kpis.costoDirectoPromedio <= (prevKpis?.costoDirectoPromedio ?? kpis.costoDirectoPromedio),
+          },
+        ].map((metric, index) => (
           <Card key={index}>
             <CardContent className="pt-6">
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">{metric.label}</p>
-                <div className="flex items-end justify-between">
-                  <div className="text-3xl font-bold">{metric.value}</div>
-                  <div
-                    className={`flex items-center gap-1 text-sm ${
-                      metric.delta.neutral
-                        ? "text-muted-foreground"
-                        : metric.isPositive
-                          ? "text-green-600"
-                          : "text-red-600"
-                    }`}
-                  >
-                    {metric.delta.neutral ? (
-                      <Minus className="w-4 h-4" />
-                    ) : metric.isPositive ? (
-                      <TrendingUp className="w-4 h-4" />
-                    ) : (
-                      <TrendingDown className="w-4 h-4" />
-                    )}
-                    {metric.delta.label}
-                  </div>
-                </div>
+              <p className="text-sm text-muted-foreground">{metric.label}</p>
+              <div className="flex items-end justify-between mt-2">
+                <p className="text-2xl font-bold">{metric.value}</p>
+                <DeltaBadge delta={metric.delta} isPositive={metric.isPositive} />
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
-
-      {/* Desglose de costos */}
-      <Card>
-        <CardContent className="pt-6">
-          <p className="text-sm font-medium text-muted-foreground mb-3">Desglose de Costos del Mes</p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <p className="text-xs text-muted-foreground">Costos directos (servicios)</p>
-              <p className="text-lg font-semibold mt-0.5">{fmt(kpis.costosDirectos)}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {costoTotal > 0 ? ((kpis.costosDirectos / costoTotal) * 100).toFixed(1) : 0}% del total
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Sueldos comprometidos</p>
-              <p className="text-lg font-semibold mt-0.5">{fmt(kpis.sueldosComprometidos)}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {costoTotal > 0 ? ((kpis.sueldosComprometidos / costoTotal) * 100).toFixed(1) : 0}% del total
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Gastos operacionales</p>
-              <p className="text-lg font-semibold mt-0.5">{fmt(kpis.gastosTabla)}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {costoTotal > 0 ? ((kpis.gastosTabla / costoTotal) * 100).toFixed(1) : 0}% del total
-              </p>
-            </div>
-          </div>
-          <div className="border-t border-border mt-4 pt-3 flex justify-between items-center">
-            <p className="text-sm text-muted-foreground">Total costos</p>
-            <p className="text-lg font-bold">{fmt(costoTotal)}</p>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }

@@ -65,14 +65,25 @@ function computeKpis(
     return sum + laborCobros + laborPiezas
   }, 0)
 
-  const utilidadNeta = ingresoNeto - costosDirectos - gastosOperativos
-  const costoTotal = costosDirectos + gastosOperativos
   const count = serviciosConMonto.length
 
+  // Margen de contribución (ingresos - costos variables directos)
+  const margenContribucion = ingresoNeto - costosDirectos
+  const margenContribucionPct = safeCalculateMargin(ingresoNeto, costosDirectos)
+
+  // Resultado neto (margen de contribución - gastos fijos)
+  const utilidadNeta = margenContribucion - gastosOperativos
+
+  // Punto de equilibrio en número de servicios
+  const margenContribucionPorServicio = safeDivide(margenContribucion, count)
+  const puntoEquilibrio = margenContribucionPorServicio > 0
+    ? Math.ceil(safeDivide(gastosOperativos, margenContribucionPorServicio))
+    : 0
+
   const margenPct = safeCalculateMargin(ingresoNeto, costosDirectos + gastosOperativos)
-  const roi = safeDivide(utilidadNeta, costoTotal) * 100
+  const roi = safeDivide(utilidadNeta, gastosOperativos) * 100
   const ingresoPromedio = safeDivide(ingresoNeto, count)
-  const costoPromedio = safeDivide(costoTotal, count)
+  const costoDirectoPromedio = safeDivide(costosDirectos, count)
   const tasaAbsorcion = calculateAbsorptionRate(ingresosManoObra, gastosOperativos)
 
   return {
@@ -81,10 +92,14 @@ function computeKpis(
     gastosOperativos,
     gastosTabla,
     sueldosComprometidos,
+    margenContribucion,
+    margenContribucionPct,
     utilidadNeta,
     margenPct,
     ingresoPromedio,
-    costoPromedio,
+    costoDirectoPromedio,
+    puntoEquilibrio,
+    serviciosCount: count,
     roi,
     serviciosFinalizados: serviciosFinalizadosCount,
     tasaAbsorcion,
