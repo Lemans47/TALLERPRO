@@ -10,6 +10,8 @@ interface Kpis {
   ingresoNeto: number
   costosDirectos: number
   gastosOperativos: number
+  gastosTabla: number
+  sueldosComprometidos: number
   utilidadNeta: number
   margenPct: number
   ingresoPromedio: number
@@ -122,38 +124,76 @@ export function ProfitabilityAnalysis() {
     },
   ]
 
+  const costoTotal = kpis.costosDirectos + kpis.gastosOperativos
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {metrics.map((metric, index) => (
-        <Card key={index}>
-          <CardContent className="pt-6">
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">{metric.label}</p>
-              <div className="flex items-end justify-between">
-                <div className="text-3xl font-bold">{metric.value}</div>
-                <div
-                  className={`flex items-center gap-1 text-sm ${
-                    metric.delta.neutral
-                      ? "text-muted-foreground"
-                      : metric.isPositive
-                        ? "text-green-600"
-                        : "text-red-600"
-                  }`}
-                >
-                  {metric.delta.neutral ? (
-                    <Minus className="w-4 h-4" />
-                  ) : metric.isPositive ? (
-                    <TrendingUp className="w-4 h-4" />
-                  ) : (
-                    <TrendingDown className="w-4 h-4" />
-                  )}
-                  {metric.delta.label}
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {metrics.map((metric, index) => (
+          <Card key={index}>
+            <CardContent className="pt-6">
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">{metric.label}</p>
+                <div className="flex items-end justify-between">
+                  <div className="text-3xl font-bold">{metric.value}</div>
+                  <div
+                    className={`flex items-center gap-1 text-sm ${
+                      metric.delta.neutral
+                        ? "text-muted-foreground"
+                        : metric.isPositive
+                          ? "text-green-600"
+                          : "text-red-600"
+                    }`}
+                  >
+                    {metric.delta.neutral ? (
+                      <Minus className="w-4 h-4" />
+                    ) : metric.isPositive ? (
+                      <TrendingUp className="w-4 h-4" />
+                    ) : (
+                      <TrendingDown className="w-4 h-4" />
+                    )}
+                    {metric.delta.label}
+                  </div>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Desglose de costos */}
+      <Card>
+        <CardContent className="pt-6">
+          <p className="text-sm font-medium text-muted-foreground mb-3">Desglose de Costos del Mes</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <p className="text-xs text-muted-foreground">Costos directos (servicios)</p>
+              <p className="text-lg font-semibold mt-0.5">{fmt(kpis.costosDirectos)}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {costoTotal > 0 ? ((kpis.costosDirectos / costoTotal) * 100).toFixed(1) : 0}% del total
+              </p>
             </div>
-          </CardContent>
-        </Card>
-      ))}
+            <div>
+              <p className="text-xs text-muted-foreground">Sueldos comprometidos</p>
+              <p className="text-lg font-semibold mt-0.5">{fmt(kpis.sueldosComprometidos)}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {costoTotal > 0 ? ((kpis.sueldosComprometidos / costoTotal) * 100).toFixed(1) : 0}% del total
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Gastos operacionales</p>
+              <p className="text-lg font-semibold mt-0.5">{fmt(kpis.gastosTabla)}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {costoTotal > 0 ? ((kpis.gastosTabla / costoTotal) * 100).toFixed(1) : 0}% del total
+              </p>
+            </div>
+          </div>
+          <div className="border-t border-border mt-4 pt-3 flex justify-between items-center">
+            <p className="text-sm text-muted-foreground">Total costos</p>
+            <p className="text-lg font-bold">{fmt(costoTotal)}</p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

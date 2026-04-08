@@ -79,6 +79,8 @@ function computeKpis(
     ingresoNeto,
     costosDirectos,
     gastosOperativos,
+    gastosTabla,
+    sueldosComprometidos,
     utilidadNeta,
     margenPct,
     ingresoPromedio,
