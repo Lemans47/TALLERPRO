@@ -100,12 +100,16 @@ export default function DashboardPage() {
     const ingresosCobrado = serviciosCerrados.reduce((sum, s) => sum + Number(s.monto_total_sin_iva || 0), 0)
     const ingresosFacturado = serviciosFacturados.reduce((sum, s) => sum + Number(s.monto_total_sin_iva || 0), 0)
 
-    // Costos
+    // Costos (excluye "materiales pintura" para evitar doble conteo con gastos de pintura)
     const costosCerrados = serviciosCerrados.reduce((sum, s) => {
-      return sum + parseArr(s.costos).reduce((c: number, costo: any) => c + Number(costo.monto || 0), 0)
+      return sum + parseArr(s.costos)
+        .filter((c: any) => !String(c.descripcion || "").toLowerCase().includes("materiales pintura"))
+        .reduce((c: number, costo: any) => c + Number(costo.monto || 0), 0)
     }, 0)
     const costosFacturados = serviciosFacturados.reduce((sum, s) => {
-      return sum + parseArr(s.costos).reduce((c: number, costo: any) => c + Number(costo.monto || 0), 0)
+      return sum + parseArr(s.costos)
+        .filter((c: any) => !String(c.descripcion || "").toLowerCase().includes("materiales pintura"))
+        .reduce((c: number, costo: any) => c + Number(costo.monto || 0), 0)
     }, 0)
 
     // Sueldos comprometidos (empleados activos)
@@ -147,7 +151,7 @@ export default function DashboardPage() {
     const hoy = new Date()
     let edadVieja = 0, edadMedia = 0, edadReciente = 0
     const porCobrar = servicios
-      .filter((s) => Number(s.saldo_pendiente || 0) > 0)
+      .filter((s) => Number(s.saldo_pendiente || 0) > 0 && ["Entregado", "Por Cobrar"].includes(s.estado))
       .reduce((sum, s) => {
         const dias = Math.floor((hoy.getTime() - new Date(s.fecha_ingreso).getTime()) / 86400000)
         const monto = Number(s.saldo_pendiente)
@@ -173,8 +177,10 @@ export default function DashboardPage() {
       : 0
 
     const serviciosTotal = servicios.length
-    const serviciosCerradosCount = serviciosCerrados.length
-    const tasaCierre = serviciosTotal > 0 ? (serviciosCerradosCount / serviciosTotal) * 100 : 0
+    const serviciosCompletadosCount = servicios.filter((s) =>
+      ["Cerrado/Pagado", "Entregado", "Por Cobrar"].includes(s.estado)
+    ).length
+    const tasaCierre = serviciosTotal > 0 ? (serviciosCompletadosCount / serviciosTotal) * 100 : 0
 
     setKpis({
       vehiculosEnTaller: vehiculosEnTallerCount,
