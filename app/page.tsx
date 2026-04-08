@@ -238,13 +238,6 @@ export default function DashboardPage() {
           icon={<Car className="w-5 h-5" />}
           variant="default"
         />
-        <KPICard
-          title="Flujo de Caja"
-          value={`${kpis.flujoCaja < 0 ? "-" : ""}${formatCurrency(kpis.flujoCaja)}`}
-          description={`Entradas ${formatCurrency(kpis.flujoEntradas)} · Salidas ${formatCurrency(kpis.flujoSalidas)}`}
-          icon={<ArrowUpDown className="w-5 h-5" />}
-          variant={kpis.flujoCaja >= 0 ? "success" : "destructive"}
-        />
         {/* KPI Facturado del Mes con margen en esquina */}
         <div className={`rounded-xl border p-5 transition-all hover:shadow-lg hover:shadow-black/5 ${
           margenVariant === "success" ? "border-success/30 bg-success/5" :
@@ -281,6 +274,13 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+        <KPICard
+          title="Flujo de Caja"
+          value={`${kpis.flujoCaja < 0 ? "-" : ""}${formatCurrency(kpis.flujoCaja)}`}
+          description={`Entradas ${formatCurrency(kpis.flujoEntradas)} · Salidas ${formatCurrency(kpis.flujoSalidas)}`}
+          icon={<ArrowUpDown className="w-5 h-5" />}
+          variant={kpis.flujoCaja >= 0 ? "success" : "destructive"}
+        />
         <KPICard
           title="Entregados este Mes"
           value={kpis.entregadosEsteMes.toString()}
