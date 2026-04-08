@@ -21,14 +21,17 @@ function computeKpis(
     return []
   }
 
-  const ESTADOS_FINALIZADOS = ["Cerrado/Pagado", "Entregado", "Por Cobrar"]
-  const finalizados = servicios.filter((s) => ESTADOS_FINALIZADOS.includes(s.estado))
+  // Base: todos los servicios del mes con monto asignado (igual que "Facturado del Mes" en el dashboard)
+  const serviciosConMonto = servicios.filter((s) => Number(s.monto_total_sin_iva || 0) > 0)
+  const serviciosFinalizadosCount = servicios.filter((s) =>
+    ["Cerrado/Pagado", "Entregado", "Por Cobrar"].includes(s.estado),
+  ).length
 
-  // Ingresos netos (sin IVA) de servicios finalizados
-  const ingresoNeto = finalizados.reduce((sum, sv) => sum + Number(sv.monto_total_sin_iva || 0), 0)
+  // Ingresos netos (sin IVA)
+  const ingresoNeto = serviciosConMonto.reduce((sum, sv) => sum + Number(sv.monto_total_sin_iva || 0), 0)
 
   // Costos directos desde JSONB costos[], excluyendo "materiales pintura" (evita doble conteo)
-  const costosDirectos = finalizados.reduce((sum, sv) => {
+  const costosDirectos = serviciosConMonto.reduce((sum, sv) => {
     const costos = parseJsonbArray<{ descripcion?: string; monto?: number }>(sv.costos)
     return (
       sum +
@@ -49,8 +52,8 @@ function computeKpis(
 
   const gastosOperativos = gastosTabla + sueldosComprometidos
 
-  // Ingresos de mano de obra: cobros excl. "repuestos" + piezas_pintura (precio ya es total por pieza)
-  const ingresosManoObra = finalizados.reduce((sum, sv) => {
+  // Ingresos de mano de obra: cobros excl. "repuestos" + piezas_pintura
+  const ingresosManoObra = serviciosConMonto.reduce((sum, sv) => {
     const cobros = parseJsonbArray<{ categoria?: string; monto?: number }>(sv.cobros)
     const laborCobros = cobros
       .filter((c) => c.categoria !== "repuestos")
@@ -64,7 +67,7 @@ function computeKpis(
 
   const utilidadNeta = ingresoNeto - costosDirectos - gastosOperativos
   const costoTotal = costosDirectos + gastosOperativos
-  const count = finalizados.length
+  const count = serviciosConMonto.length
 
   const margenPct = safeCalculateMargin(ingresoNeto, costosDirectos + gastosOperativos)
   const roi = safeDivide(utilidadNeta, costoTotal) * 100
@@ -81,7 +84,7 @@ function computeKpis(
     ingresoPromedio,
     costoPromedio,
     roi,
-    serviciosFinalizados: count,
+    serviciosFinalizados: serviciosFinalizadosCount,
     tasaAbsorcion,
     ingresosManoObra,
   }
