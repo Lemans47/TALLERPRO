@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { api, type Servicio } from "@/lib/api-client"
-import { FileText, Trash2, Edit, Calendar, User, Car, Wrench, ClipboardList, List, AlignJustify, TrendingUp } from "lucide-react"
+import { FileText, Trash2, Edit, Calendar, User, Car, Wrench, ClipboardList, List, AlignJustify, TrendingUp, Receipt } from "lucide-react"
 
 const parseArr = (v: any): any[] => {
   let val = v
@@ -52,6 +52,7 @@ function getGananciaStyles(margen: number) {
 }
 import { generarPDFPresupuesto } from "@/lib/pdf-presupuesto"
 import { generarOrdenTrabajo } from "@/lib/pdf-orden-trabajo"
+import { generarReciboPDF } from "@/lib/pdf-recibo"
 import { PDFPreviewModal } from "@/components/pdf-preview-modal"
 
 interface ServicesTableProps {
@@ -463,6 +464,20 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                     >
                       <FileText className="w-3.5 h-3.5" />
                     </Button>
+                    {servicio.estado === "Cerrado/Pagado" && (
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-9 bg-green-500/5 border-green-500/30 text-green-400 hover:bg-green-500/10"
+                        onClick={async () => {
+                          const { blobUrl, fileName } = await generarReciboPDF(servicio)
+                          setPdfPreview({ url: blobUrl, fileName })
+                        }}
+                        title="Recibo de pago"
+                      >
+                        <Receipt className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       size="icon"
