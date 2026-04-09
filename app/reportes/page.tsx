@@ -88,6 +88,27 @@ export default function ReportsPage() {
   const utilidadNeta = ingresosTotales - totalGastos - costosServicios
   const margenUtilidad = ingresosTotales > 0 ? (utilidadNeta / ingresosTotales) * 100 : 0
 
+  // ── Resumen de Pintura ──
+  // Piezas pintadas: desglose por nombre desde piezas_pintura de todos los servicios del mes
+  const piezasResumen = servicios.reduce<Record<string, { nombre: string; veces: number; unidades: number; ingresos: number }>>((acc, s) => {
+    parseArr(s.piezas_pintura).forEach((p: any) => {
+      const nombre = p.nombre || "Sin nombre"
+      if (!acc[nombre]) acc[nombre] = { nombre, veces: 0, unidades: 0, ingresos: 0 }
+      acc[nombre].veces += 1
+      acc[nombre].unidades += Number(p.cantidad || 1)
+      acc[nombre].ingresos += Number(p.precio || 0)
+    })
+    return acc
+  }, {})
+  const piezasDetalle = Object.values(piezasResumen).sort((a, b) => b.unidades - a.unidades)
+  const totalUnidadesPintura = piezasDetalle.reduce((s, p) => s + p.unidades, 0)
+  const ingresosPiezas = piezasDetalle.reduce((s, p) => s + p.ingresos, 0)
+  // Materiales de pintura = gastos de categoría "Gastos de Pintura"
+  const materialesPinturaItems = gastos.filter((g) => g.categoria === "Gastos de Pintura")
+  const totalMaterialesPintura = materialesPinturaItems.reduce((s, g) => s + Number(g.monto || 0), 0)
+  const costoPorUnidad = totalUnidadesPintura > 0 ? totalMaterialesPintura / totalUnidadesPintura : 0
+  const margenPintura = ingresosPiezas > 0 ? ((ingresosPiezas - totalMaterialesPintura) / ingresosPiezas) * 100 : 0
+
   // Chart data
   const gastosChartData = [
     { name: "Fijos", value: gastosFijos, color: "#3b82f6" },
@@ -292,6 +313,7 @@ export default function ReportsPage() {
         <TabsList className="mb-4">
           <TabsTrigger value="resumen">Resumen</TabsTrigger>
           <TabsTrigger value="rentabilidad">Rentabilidad</TabsTrigger>
+          <TabsTrigger value="pintura">Pintura</TabsTrigger>
           <TabsTrigger value="clientes">Top Clientes</TabsTrigger>
           <TabsTrigger value="comparar">Comparar meses</TabsTrigger>
         </TabsList>
@@ -489,6 +511,124 @@ export default function ReportsPage() {
         {/* ── RENTABILIDAD ── */}
         <TabsContent value="rentabilidad">
           <ProfitabilityAnalysis />
+        </TabsContent>
+
+        {/* ── PINTURA ── */}
+        <TabsContent value="pintura" className="space-y-6">
+          {/* KPIs principales */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-sm text-muted-foreground">Unidades pintadas</p>
+                <p className="text-3xl font-bold mt-1">{totalUnidadesPintura.toLocaleString("es-CL")}</p>
+                <p className="text-xs text-muted-foreground mt-1">{piezasDetalle.length} tipos de piezas</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-sm text-muted-foreground">Materiales comprados</p>
+                <p className="text-3xl font-bold mt-1">${Math.round(totalMaterialesPintura).toLocaleString("es-CL")}</p>
+                <p className="text-xs text-muted-foreground mt-1">{materialesPinturaItems.length} compras registradas</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-sm text-muted-foreground">Ingresos por pintura</p>
+                <p className="text-3xl font-bold mt-1">${Math.round(ingresosPiezas).toLocaleString("es-CL")}</p>
+                <p className="text-xs text-muted-foreground mt-1">Cobros de piezas pintadas</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-sm text-muted-foreground">Costo material / unidad</p>
+                <p className="text-3xl font-bold mt-1">${Math.round(costoPorUnidad).toLocaleString("es-CL")}</p>
+                <p className={`text-xs mt-1 font-medium ${margenPintura >= 50 ? "text-green-500" : margenPintura >= 20 ? "text-yellow-500" : "text-red-500"}`}>
+                  Margen {margenPintura.toFixed(1)}%
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Desglose de piezas pintadas */}
+            <Card>
+              <CardHeader><CardTitle className="text-base">Piezas pintadas este mes</CardTitle></CardHeader>
+              <CardContent>
+                {piezasDetalle.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No hay piezas pintadas registradas este mes.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {piezasDetalle.map((p) => (
+                      <div key={p.nombre} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
+                        <div>
+                          <p className="text-sm font-medium">{p.nombre}</p>
+                          <p className="text-xs text-muted-foreground">{p.veces} servicio{p.veces !== 1 ? "s" : ""}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-semibold">{p.unidades % 1 === 0 ? p.unidades : p.unidades.toFixed(1)} ud.</p>
+                          <p className="text-xs text-muted-foreground">${Math.round(p.ingresos).toLocaleString("es-CL")}</p>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="flex justify-between pt-2 font-semibold text-sm">
+                      <span>Total</span>
+                      <span>{totalUnidadesPintura % 1 === 0 ? totalUnidadesPintura : totalUnidadesPintura.toFixed(1)} ud. — ${Math.round(ingresosPiezas).toLocaleString("es-CL")}</span>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Materiales comprados */}
+            <Card>
+              <CardHeader><CardTitle className="text-base">Materiales comprados (Gastos de Pintura)</CardTitle></CardHeader>
+              <CardContent>
+                {materialesPinturaItems.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No hay gastos de pintura registrados este mes.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {materialesPinturaItems.map((g) => (
+                      <div key={g.id} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
+                        <div>
+                          <p className="text-sm font-medium">{g.descripcion}</p>
+                          <p className="text-xs text-muted-foreground">{g.fecha}</p>
+                        </div>
+                        <p className="text-sm font-semibold">${Math.round(Number(g.monto)).toLocaleString("es-CL")}</p>
+                      </div>
+                    ))}
+                    <div className="flex justify-between pt-2 font-semibold text-sm">
+                      <span>Total materiales</span>
+                      <span>${Math.round(totalMaterialesPintura).toLocaleString("es-CL")}</span>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Relación materiales vs ingresos */}
+          {totalUnidadesPintura > 0 && totalMaterialesPintura > 0 && (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-medium">Relación materiales / ingresos pintura</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Gastaste ${Math.round(totalMaterialesPintura).toLocaleString("es-CL")} en materiales y facturaste ${Math.round(ingresosPiezas).toLocaleString("es-CL")} en piezas pintadas
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className={`text-2xl font-bold ${margenPintura >= 50 ? "text-green-500" : margenPintura >= 20 ? "text-yellow-500" : "text-red-500"}`}>
+                      {margenPintura.toFixed(1)}% margen
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      ${Math.round(costoPorUnidad).toLocaleString("es-CL")} material por unidad pintada
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* ── TOP CLIENTES ── */}
