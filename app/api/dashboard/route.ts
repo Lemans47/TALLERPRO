@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server"
-import { getServiciosByMonth, getGastosByMonth, getEmpleados, getActiveServicios } from "@/lib/database"
+import { getServiciosByMonth, getGastosByMonth, getEmpleados, getActiveServicios, getAbonosByMonth } from "@/lib/database"
 import { safeDivide, safeCalculateMargin, calculateAbsorptionRate } from "@/lib/utils"
 
 function computeKpis(
   servicios: Awaited<ReturnType<typeof getServiciosByMonth>>,
   gastos: Awaited<ReturnType<typeof getGastosByMonth>>,
   empleados: Awaited<ReturnType<typeof getEmpleados>>,
+  abonosMes?: Awaited<ReturnType<typeof getAbonosByMonth>>,
 ) {
   // Helper: parsea campo JSONB que puede llegar como string o array ya parseado
   function parseJsonbArray<T>(raw: unknown): T[] {
@@ -59,9 +60,12 @@ function computeKpis(
     ),
   ).sort((a, b) => b.monto - a.monto)
 
-  const sueldosComprometidos = (empleados as { activo: boolean; sueldo_base: number }[])
-    .filter((e) => e.activo)
-    .reduce((s, e) => s + Number(e.sueldo_base || 0), 0)
+  // sueldosComprometidos: sueldo_base proyectado (dashboard) o abonos reales del mes (reportes)
+  const sueldosComprometidos = abonosMes
+    ? abonosMes.reduce((s, a) => s + Number(a.monto || 0), 0)
+    : (empleados as { activo: boolean; sueldo_base: number }[])
+        .filter((e) => e.activo)
+        .reduce((s, e) => s + Number(e.sueldo_base || 0), 0)
 
   const gastosOperativos = gastosTabla + sueldosComprometidos
 
@@ -127,14 +131,17 @@ export async function GET(request: Request) {
     const year = Number.parseInt(searchParams.get("year") || new Date().getFullYear().toString())
     const month = Number.parseInt(searchParams.get("month") || (new Date().getMonth() + 1).toString())
 
-    const [servicios, gastos, empleados, serviciosActivos] = await Promise.all([
+    const useAbonos = searchParams.get("useAbonos") === "true"
+
+    const [servicios, gastos, empleados, serviciosActivos, abonosMes] = await Promise.all([
       getServiciosByMonth(year, month),
       getGastosByMonth(year, month),
       getEmpleados(),
       getActiveServicios(),
+      useAbonos ? getAbonosByMonth(year, month) : Promise.resolve(undefined),
     ])
 
-    const kpis = computeKpis(servicios, gastos, empleados)
+    const kpis = computeKpis(servicios, gastos, empleados, abonosMes ?? undefined)
 
     return NextResponse.json({ servicios, gastos, empleados, serviciosActivos, kpis })
   } catch (error) {

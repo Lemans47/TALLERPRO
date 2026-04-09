@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp } from "lucide-react"
 import { fetchDashboardData } from "@/lib/api-client"
+import { useMonth } from "@/lib/month-context"
 
 interface GastoCategoria {
   categoria: string
@@ -55,6 +56,7 @@ function DeltaBadge({ delta, isPositive }: { delta: ReturnType<typeof calcDelta>
 
 export function ProfitabilityAnalysis() {
   const [kpis, setKpis] = useState<Kpis | null>(null)
+  const { selectedMonth } = useMonth()
   const [prevKpis, setPrevKpis] = useState<Kpis | null>(null)
   const [loading, setLoading] = useState(true)
   const [showGastosDesglose, setShowGastosDesglose] = useState(false)
@@ -63,13 +65,11 @@ export function ProfitabilityAnalysis() {
     async function load() {
       setLoading(true)
       try {
-        const now = new Date()
-        const year = now.getFullYear()
-        const month = now.getMonth() + 1
+        const [year, month] = selectedMonth.split("-").map(Number)
         const prevDate = new Date(year, month - 2, 1)
         const [current, prev] = await Promise.all([
-          fetchDashboardData(year, month),
-          fetchDashboardData(prevDate.getFullYear(), prevDate.getMonth() + 1),
+          fetchDashboardData(year, month, { useAbonos: true }),
+          fetchDashboardData(prevDate.getFullYear(), prevDate.getMonth() + 1, { useAbonos: true }),
         ])
         setKpis((current as any).kpis ?? null)
         const prevData = (prev as any).kpis ?? null
@@ -81,7 +81,7 @@ export function ProfitabilityAnalysis() {
       }
     }
     load()
-  }, [])
+  }, [selectedMonth])
 
   if (loading) {
     return (
@@ -149,7 +149,7 @@ export function ProfitabilityAnalysis() {
 
             {/* Sueldos */}
             <div className="flex items-center justify-between py-2 border-t border-border">
-              <span className="text-sm text-muted-foreground">− Sueldos comprometidos</span>
+              <span className="text-sm text-muted-foreground">− Sueldos pagados (abonos del mes)</span>
               <span className="text-base font-semibold text-red-400">{fmt(kpis.sueldosComprometidos)}</span>
             </div>
 

@@ -24,7 +24,7 @@ export default function ReportsPage() {
   const { selectedMonth } = useMonth()
   const [servicios, setServicios] = useState<Servicio[]>([])
   const [gastos, setGastos] = useState<Gasto[]>([])
-  const [empleados, setEmpleados] = useState<any[]>([])
+  const [abonos, setAbonos] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   // Comparison month
@@ -42,14 +42,14 @@ export default function ReportsPage() {
     setLoading(true)
     try {
       const [year, month] = selectedMonth.split("-").map(Number)
-      const [serviciosData, gastosData, empleadosData] = await Promise.all([
+      const [serviciosData, gastosData, abonosData] = await Promise.all([
         api.servicios.getByMonth(year, month),
         api.gastos.getByMonth(year, month),
-        api.empleados.getAll(),
+        api.abonos.getByMonth(year, month),
       ])
       setServicios(serviciosData)
       setGastos(gastosData)
-      setEmpleados(empleadosData)
+      setAbonos(abonosData)
     } catch (error) {
       console.error("Error loading data:", error)
     } finally {
@@ -73,14 +73,15 @@ export default function ReportsPage() {
   const gastosMiscelaneos = gastos
     .filter((g) => g.categoria === "Gastos Misceláneos")
     .reduce((sum, g) => sum + Number(g.monto), 0)
-  const gastosSueldos = empleados.filter((e) => e.activo).reduce((sum: number, e: any) => sum + Number(e.sueldo_base || 0), 0)
+  // Sueldos reales pagados en el mes (abonos), no el sueldo_base proyectado
+  const gastosSueldos = abonos.reduce((sum: number, a: any) => sum + Number(a.monto || 0), 0)
   const totalGastos = gastos.filter((g) => g.categoria !== "Sueldos").reduce((sum, g) => sum + Number(g.monto), 0) + gastosSueldos
 
   // Costos de servicios
   const parseArr = (v: any) => Array.isArray(v) ? v : (typeof v === "string" && v ? JSON.parse(v) : [])
   const costosServicios = servicios.reduce((sum, s) => {
     return sum + parseArr(s.costos)
-      .filter((c: any) => !String(c.descripcion || "").toLowerCase().includes("materiales pintura"))
+      .filter((c: any) => !c.isAuto)
       .reduce((c: number, costo: any) => c + Number(costo.monto), 0)
   }, 0)
 
@@ -92,7 +93,7 @@ export default function ReportsPage() {
     { name: "Fijos", value: gastosFijos, color: "#3b82f6" },
     { name: "Pintura", value: gastosPintura, color: "#f59e0b" },
     { name: "Misceláneos", value: gastosMiscelaneos, color: "#8b5cf6" },
-    { name: "Sueldos", value: gastosSueldos, color: "#10b981" },
+    { name: "Sueldos pagados", value: gastosSueldos, color: "#10b981" },
     { name: "Servicios", value: costosServicios, color: "#ef4444" },
   ].filter((d) => d.value > 0)
 
