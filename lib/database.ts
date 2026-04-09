@@ -800,9 +800,16 @@ export interface Vehiculo {
   modelo?: string
   color?: string
   año?: number
+  vin?: string
   cliente_id?: string
   created_at: string
   updated_at: string
+}
+
+export async function getVehiculoByPatente(patente: string): Promise<Vehiculo | null> {
+  const db = getSQL()
+  const data = await db`SELECT * FROM vehiculos WHERE patente = ${patente.toUpperCase()} LIMIT 1`
+  return (data[0] as Vehiculo) || null
 }
 
 export async function getClientes() {
@@ -851,7 +858,7 @@ export async function upsertClienteYVehiculo(
   nombre: string,
   telefono: string,
   patente: string,
-  vehiculoData: { marca?: string; modelo?: string; color?: string; año?: number }
+  vehiculoData: { marca?: string; modelo?: string; color?: string; año?: number; vin?: string }
 ) {
   const db = getSQL()
 
@@ -882,15 +889,16 @@ export async function upsertClienteYVehiculo(
         modelo = COALESCE(${vehiculoData.modelo || null}, modelo),
         color = COALESCE(${vehiculoData.color || null}, color),
         año = COALESCE(${vehiculoData.año || null}, año),
+        vin = COALESCE(${vehiculoData.vin || null}, vin),
         cliente_id = ${cliente.id},
         updated_at = NOW()
       WHERE patente = ${patente.toUpperCase()}
     `
   } else {
     await db`
-      INSERT INTO vehiculos (patente, marca, modelo, color, año, cliente_id)
+      INSERT INTO vehiculos (patente, marca, modelo, color, año, vin, cliente_id)
       VALUES (${patente.toUpperCase()}, ${vehiculoData.marca || null}, ${vehiculoData.modelo || null},
-              ${vehiculoData.color || null}, ${vehiculoData.año || null}, ${cliente.id})
+              ${vehiculoData.color || null}, ${vehiculoData.año || null}, ${vehiculoData.vin || null}, ${cliente.id})
     `
   }
 

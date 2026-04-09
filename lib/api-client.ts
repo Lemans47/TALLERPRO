@@ -1,5 +1,23 @@
 import type { Servicio, Presupuesto, Gasto, PrecioPintura, PiezaPintura, FotoServicio, Cliente, Vehiculo, Empleado } from "./database"
 
+// Patentes Chile
+export interface VehiculoLookup {
+  patente: string
+  marca?: string
+  modelo?: string
+  año?: number
+  color?: string
+  vin?: string
+  fromCache?: boolean
+}
+
+export async function lookupPatente(patente: string): Promise<VehiculoLookup | null> {
+  const res = await fetch(`/api/lookup-patente?patente=${encodeURIComponent(patente)}`)
+  if (res.status === 404) return null
+  if (!res.ok) throw new Error("Error consultando patente")
+  return res.json()
+}
+
 // Dashboard
 export async function fetchDashboardData(
   year: number,

@@ -41,8 +41,9 @@ import {
   List,
   BookTemplate,
   BookMarked,
+  Loader2,
 } from "lucide-react"
-import { api, type Servicio, type Presupuesto, type PrecioPintura, type FotoServicio } from "@/lib/api-client"
+import { api, lookupPatente, type Servicio, type Presupuesto, type PrecioPintura, type FotoServicio } from "@/lib/api-client"
 import { useToast } from "@/components/ui/use-toast" // Import useToast hook
 import { Badge } from "@/components/ui/badge"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
@@ -214,6 +215,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   const clienteRef = useRef<HTMLInputElement>(null)
   const [patenteSugerencias, setPatenteSugerencias] = useState<any[]>([])
   const [mostrarSugerencias, setMostrarSugerencias] = useState(false)
+  const [lookingUpPatente, setLookingUpPatente] = useState(false)
   const [plantillas, setPlantillas] = useState<{ id: string; nombre: string; cobros: any; costos: any }[]>([])
   const [plantillasOpen, setPlantillasOpen] = useState(false)
   const [guardarPlantillaOpen, setGuardarPlantillaOpen] = useState(false)
@@ -226,6 +228,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
     marca: "",
     modelo: "",
     color: "",
+    vin: "",
     kilometraje: undefined as number | undefined,
     año: undefined as number | undefined,
     cliente: "",
@@ -375,6 +378,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         marca: servicioAEditar.marca || "",
         modelo: servicioAEditar.modelo || "",
         color: servicioAEditar.color || "",
+        vin: (servicioAEditar as any).vin || "",
         kilometraje: servicioAEditar.kilometraje,
         año: servicioAEditar.año,
         cliente: servicioAEditar.cliente,
@@ -497,6 +501,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       marca: "",
       modelo: "",
       color: "",
+      vin: "",
       kilometraje: undefined,
       año: undefined,
       cliente: "",
@@ -1384,21 +1389,50 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   <div className="space-y-1 relative">
                     <Label className={`text-xs ${fieldErrors.patente ? "text-destructive" : ""}`}>Patente *</Label>
-                    <Input
-                      ref={patenteRef}
-                      value={formData.patente}
-                      onChange={(e) => {
-                        const val = e.target.value.toUpperCase()
-                        setFormData({ ...formData, patente: val })
-                        if (fieldErrors.patente) setFieldErrors((prev) => ({ ...prev, patente: false }))
-                        buscarPatente(val)
-                      }}
-                      onBlur={() => setTimeout(() => setMostrarSugerencias(false), 150)}
-                      onFocus={() => patenteSugerencias.length > 0 && setMostrarSugerencias(true)}
-                      placeholder="ABCD12"
-                      autoComplete="off"
-                      className={`uppercase bg-background/50 h-9 ${fieldErrors.patente ? "border-destructive ring-1 ring-destructive" : ""}`}
-                    />
+                    <div className="relative">
+                      <Input
+                        ref={patenteRef}
+                        value={formData.patente}
+                        onChange={(e) => {
+                          const val = e.target.value.toUpperCase()
+                          setFormData({ ...formData, patente: val })
+                          if (fieldErrors.patente) setFieldErrors((prev) => ({ ...prev, patente: false }))
+                          buscarPatente(val)
+                        }}
+                        onBlur={async () => {
+                          setTimeout(() => setMostrarSugerencias(false), 150)
+                          const patenteLimpia = formData.patente.replace(/[^a-zA-Z0-9]/g, "").toUpperCase()
+                          if (patenteLimpia.length >= 6 && !formData.marca) {
+                            setLookingUpPatente(true)
+                            try {
+                              const data = await lookupPatente(patenteLimpia)
+                              if (data) {
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  marca: data.marca || prev.marca,
+                                  modelo: data.modelo || prev.modelo,
+                                  color: data.color || prev.color,
+                                  año: data.año ? Number(data.año) : prev.año,
+                                  vin: data.vin || prev.vin,
+                                }))
+                                toast({ title: "Vehículo encontrado", description: `${data.marca ?? ""} ${data.modelo ?? ""}`.trim() })
+                              }
+                            } catch {
+                              // falla silenciosa — el usuario puede ingresar los datos manualmente
+                            } finally {
+                              setLookingUpPatente(false)
+                            }
+                          }
+                        }}
+                        onFocus={() => patenteSugerencias.length > 0 && setMostrarSugerencias(true)}
+                        placeholder="ABCD12"
+                        autoComplete="off"
+                        className={`uppercase bg-background/50 h-9 pr-8 ${fieldErrors.patente ? "border-destructive ring-1 ring-destructive" : ""}`}
+                      />
+                      {lookingUpPatente && (
+                        <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
+                      )}
+                    </div>
                     {fieldErrors.patente && <p className="text-xs text-destructive">Requerido</p>}
                     {mostrarSugerencias && patenteSugerencias.length > 0 && (
                       <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-card border border-border rounded-lg shadow-lg overflow-hidden">
@@ -1468,6 +1502,16 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                       onChange={(e) => setFormData({ ...formData, color: e.target.value })}
                       placeholder="Blanco"
                       className="bg-background/50 h-9"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">VIN / Chasis</Label>
+                    <Input
+                      value={formData.vin}
+                      onChange={(e) => setFormData({ ...formData, vin: e.target.value.toUpperCase() })}
+                      placeholder="Auto-completado"
+                      className="uppercase bg-background/50 h-9"
+                      disabled={lookingUpPatente}
                     />
                   </div>
                 </div>
