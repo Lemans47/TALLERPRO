@@ -312,4 +312,34 @@ export const api = {
     update: updatePiezaPinturaApi,
     delete: deletePiezaPinturaApi,
   },
+  proveedores: {
+    getAll: fetchProveedores,
+    create: createProveedorApi,
+    update: updateProveedorApi,
+    delete: deleteProveedorApi,
+  },
+}
+
+// ── Proveedores ───────────────────────────────────────────────────────────────
+async function fetchProveedores() {
+  const res = await fetch("/api/proveedores")
+  if (!res.ok) throw new Error("Error cargando proveedores")
+  return res.json()
+}
+
+async function createProveedorApi(data: object) {
+  const res = await fetch("/api/proveedores", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) })
+  if (!res.ok) throw new Error("Error creando proveedor")
+  return res.json()
+}
+
+async function updateProveedorApi(data: object) {
+  const res = await fetch("/api/proveedores", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) })
+  if (!res.ok) throw new Error("Error actualizando proveedor")
+  return res.json()
+}
+
+async function deleteProveedorApi(id: string) {
+  const res = await fetch(`/api/proveedores?id=${id}`, { method: "DELETE" })
+  if (!res.ok) throw new Error("Error eliminando proveedor")
 }

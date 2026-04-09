@@ -1033,3 +1033,55 @@ export async function deletePlantilla(id: string) {
   const db = getSQL()
   await db`DELETE FROM gastos_fijos_plantillas WHERE id = ${id}`
 }
+
+// ── Proveedores ───────────────────────────────────────────────────────────────
+
+export interface Proveedor {
+  id: string
+  nombre: string
+  rut?: string
+  telefono?: string
+  email?: string
+  categoria?: string
+  notas?: string
+  created_at?: string
+  updated_at?: string
+}
+
+export async function getProveedores() {
+  const db = getSQL()
+  const data = await db`SELECT * FROM proveedores ORDER BY nombre ASC`
+  return data as Proveedor[]
+}
+
+export async function createProveedor(p: Omit<Proveedor, "id" | "created_at" | "updated_at">) {
+  const db = getSQL()
+  const data = await db`
+    INSERT INTO proveedores (nombre, rut, telefono, email, categoria, notas)
+    VALUES (${p.nombre}, ${p.rut ?? null}, ${p.telefono ?? null}, ${p.email ?? null}, ${p.categoria ?? null}, ${p.notas ?? null})
+    RETURNING *
+  `
+  return data[0] as Proveedor
+}
+
+export async function updateProveedor(id: string, p: Partial<Omit<Proveedor, "id" | "created_at" | "updated_at">>) {
+  const db = getSQL()
+  const data = await db`
+    UPDATE proveedores SET
+      nombre    = COALESCE(${p.nombre ?? null}, nombre),
+      rut       = COALESCE(${p.rut ?? null}, rut),
+      telefono  = COALESCE(${p.telefono ?? null}, telefono),
+      email     = COALESCE(${p.email ?? null}, email),
+      categoria = COALESCE(${p.categoria ?? null}, categoria),
+      notas     = COALESCE(${p.notas ?? null}, notas),
+      updated_at = NOW()
+    WHERE id = ${id}
+    RETURNING *
+  `
+  return data[0] as Proveedor
+}
+
+export async function deleteProveedor(id: string) {
+  const db = getSQL()
+  await db`DELETE FROM proveedores WHERE id = ${id}`
+}
