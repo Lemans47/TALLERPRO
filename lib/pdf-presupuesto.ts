@@ -374,8 +374,8 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     y = bottomAnchor
   }
   const subtotalVal = Number(servicio.monto_total_sin_iva) || 0
-  const totalVal = Number(servicio.monto_total) || 0
-  const ivaVal = totalVal - subtotalVal
+  const ivaVal = Math.round(subtotalVal * 0.19)
+  const totalVal = subtotalVal + ivaVal
   const labelX = ML + DESC_W
   const labelW = 28
   const valW = MONTO_W - labelW
