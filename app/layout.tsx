@@ -10,6 +10,7 @@ export const metadata: Metadata = {
   title: "TallerPro - Gestión de Taller Automotriz",
   description: "Sistema profesional de gestión para talleres de reparación de vehículos",
   generator: "v0.app",
+  manifest: "/manifest.json",
   icons: {
     icon: "/logo-taller.png",
     shortcut: "/logo-taller.png",
