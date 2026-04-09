@@ -18,78 +18,76 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Patente inválida" }, { status: 400 })
     }
 
-    // 1. Buscar en DB primero (caché)
+    // 1. Buscar en DB primero (caché) — retorna si ya tiene marca al menos
     const vehiculoEnDB = await getVehiculoByPatente(patente)
-    if (vehiculoEnDB?.vin) {
+    if (vehiculoEnDB?.marca) {
       return NextResponse.json({
         patente: vehiculoEnDB.patente,
         marca: vehiculoEnDB.marca,
         modelo: vehiculoEnDB.modelo,
-        año: vehiculoEnDB.año,
+        año: vehiculoEnDB.año ? Number(vehiculoEnDB.año) : null,
         color: vehiculoEnDB.color,
         vin: vehiculoEnDB.vin,
         fromCache: true,
       })
     }
 
-    // 2. Llamar a la API externa de Patentes Chile
-    const apiKey = process.env.PATENTES_CHILE_API_KEY
-    const apiUrl = process.env.PATENTES_CHILE_API_URL ?? "https://api.patentechile.com"
-
-    if (!apiKey) {
-      return NextResponse.json({ error: "API Key no configurada" }, { status: 500 })
+    // 2. Llamar a la API de Boostr.cl
+    // Endpoint: GET https://api.boostr.cl/vehicle/{patente}.json
+    const apiKey = process.env.BOOSTR_API_KEY
+    const headers: Record<string, string> = { Accept: "application/json" }
+    if (apiKey) {
+      headers["Authorization"] = `Bearer ${apiKey}`
     }
 
-    const externalRes = await fetch(`${apiUrl}/patente/${patente}`, {
-      headers: {
-        "x-api-key": apiKey,
-        "Content-Type": "application/json",
-      },
-      // Timeout de 10 segundos
+    const externalRes = await fetch(`https://api.boostr.cl/vehicle/${patente}.json`, {
+      headers,
       signal: AbortSignal.timeout(10000),
     })
 
-    if (externalRes.status === 404 || externalRes.status === 422) {
-      return NextResponse.json({ error: "Patente no encontrada" }, { status: 404 })
+    if (externalRes.status === 429) {
+      return NextResponse.json({ error: "Límite de consultas alcanzado, intenta en unos segundos" }, { status: 429 })
     }
 
     if (!externalRes.ok) {
-      return NextResponse.json({ error: "Error consultando API externa" }, { status: 502 })
+      return NextResponse.json({ error: "Error consultando API de patentes" }, { status: 502 })
     }
 
-    const apiData = await externalRes.json()
+    // 3. Boostr devuelve { status: "success"|"error", data: {...} }
+    const body = await externalRes.json()
 
-    // 3. Normalizar respuesta — distintos proveedores usan distintos nombres de campo
-    const marca = apiData.marca ?? apiData.brand ?? null
-    const modelo = apiData.modelo ?? apiData.model ?? null
-    const color = apiData.color ?? null
-    const año = apiData.año ?? apiData.anio ?? apiData.year ?? null
-    const vin = apiData.vin ?? apiData.chasis ?? apiData.nro_vin ?? apiData.numero_vin ?? null
+    if (body.status === "error" || !body.data) {
+      // Codes: V-01 falta patente, V-02 no encontrada, V-04 inválida
+      return NextResponse.json({ error: "Patente no encontrada" }, { status: 404 })
+    }
 
-    // 4. Guardar en vehiculos con upsert para futuros lookups
-    const db = getSQL()
-    await db`
-      INSERT INTO vehiculos (patente, marca, modelo, color, año, vin)
-      VALUES (${patente}, ${marca}, ${modelo}, ${color}, ${año ? Number(año) : null}, ${vin})
-      ON CONFLICT (patente) DO UPDATE SET
-        marca = COALESCE(EXCLUDED.marca, vehiculos.marca),
-        modelo = COALESCE(EXCLUDED.modelo, vehiculos.modelo),
-        color = COALESCE(EXCLUDED.color, vehiculos.color),
-        año = COALESCE(EXCLUDED.año, vehiculos.año),
-        vin = COALESCE(EXCLUDED.vin, vehiculos.vin),
-        updated_at = NOW()
-    `
-    await db.end()
+    const d = body.data
+    // Boostr free: make, model, year, type, engine
+    // Boostr paid: además chasis/vin, color, gas_type, kilometers, etc.
+    const marca = d.make ?? null
+    const modelo = d.model ?? null
+    const año = d.year ? Number(d.year) : null
+    const color = d.color ?? null
+    const vin = d.vin ?? d.chasis ?? null
 
-    return NextResponse.json({
-      patente,
-      marca,
-      modelo,
-      año: año ? Number(año) : null,
-      color,
-      vin,
-      fromCache: false,
-    })
+    // 4. Guardar en vehiculos con upsert para futuros lookups (caché local)
+    if (marca) {
+      const db = getSQL()
+      await db`
+        INSERT INTO vehiculos (patente, marca, modelo, color, año, vin)
+        VALUES (${patente}, ${marca}, ${modelo}, ${color}, ${año}, ${vin})
+        ON CONFLICT (patente) DO UPDATE SET
+          marca = COALESCE(EXCLUDED.marca, vehiculos.marca),
+          modelo = COALESCE(EXCLUDED.modelo, vehiculos.modelo),
+          color = COALESCE(EXCLUDED.color, vehiculos.color),
+          año = COALESCE(EXCLUDED.año, vehiculos.año),
+          vin = COALESCE(EXCLUDED.vin, vehiculos.vin),
+          updated_at = NOW()
+      `
+      await db.end()
+    }
+
+    return NextResponse.json({ patente, marca, modelo, año, color, vin, fromCache: false })
   } catch (error: any) {
     console.error("[lookup-patente] error:", error)
     if (error?.name === "TimeoutError") {
