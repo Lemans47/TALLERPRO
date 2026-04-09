@@ -89,6 +89,7 @@ export function ExpenseForm({ defaultCategory, gastoAEditar, onSaved, onCancel }
         descripcion: "",
         monto: "",
         fecha: localToday(),
+        pagado: true,
       })
       onSaved()
     } catch (error) {
@@ -104,6 +105,7 @@ export function ExpenseForm({ defaultCategory, gastoAEditar, onSaved, onCancel }
       descripcion: "",
       monto: "",
       fecha: localToday(),
+      pagado: true,
     })
     onCancel()
   }

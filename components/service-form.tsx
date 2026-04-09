@@ -39,6 +39,8 @@ import {
   ImageIcon,
   AlignJustify,
   List,
+  BookTemplate,
+  BookMarked,
 } from "lucide-react"
 import { api, type Servicio, type Presupuesto, type PrecioPintura, type FotoServicio } from "@/lib/api-client"
 import { useToast } from "@/components/ui/use-toast" // Import useToast hook
@@ -212,6 +214,11 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   const clienteRef = useRef<HTMLInputElement>(null)
   const [patenteSugerencias, setPatenteSugerencias] = useState<any[]>([])
   const [mostrarSugerencias, setMostrarSugerencias] = useState(false)
+  const [plantillas, setPlantillas] = useState<{ id: string; nombre: string; cobros: any; costos: any }[]>([])
+  const [plantillasOpen, setPlantillasOpen] = useState(false)
+  const [guardarPlantillaOpen, setGuardarPlantillaOpen] = useState(false)
+  const [nombreNuevaPlantilla, setNombreNuevaPlantilla] = useState("")
+  const [savingPlantilla, setSavingPlantilla] = useState(false)
 
   const [formData, setFormData] = useState({
     fecha_ingreso: (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}-${String(n.getDate()).padStart(2,"0")}` })(),
@@ -254,6 +261,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
     loadPreciosYPiezasPintura()
     loadManoObraConfig()
     loadMaterialesConfig()
+    api.plantillasServicio.getAll().then(setPlantillas).catch(() => {})
   }, [])
 
   const loadPreciosYPiezasPintura = async () => {
@@ -661,6 +669,68 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       [categoria]: prev[categoria].filter((item) => item.id !== id),
     }))
   }, [])
+
+  const cargarPlantilla = (plantilla: { cobros: any; costos: any }) => {
+    const emptyCategoria = (): ItemsPorCategoria => ({
+      desmontar: [], desabolladura: [], reparar: [], pintura: [], mecanica: [], repuestos: [], otros: [],
+    })
+    const parsedCobros: ItemsPorCategoria = emptyCategoria()
+    const parsedCostos: ItemsPorCategoria = emptyCategoria()
+    const cats: (keyof ItemsPorCategoria)[] = ["desmontar", "desabolladura", "reparar", "pintura", "mecanica", "repuestos", "otros"]
+    const items = Array.isArray(plantilla.cobros) ? plantilla.cobros : []
+    items.forEach((c: any) => {
+      const cat: keyof ItemsPorCategoria = cats.includes(c.categoria) ? c.categoria as keyof ItemsPorCategoria : "otros"
+      parsedCobros[cat].push({ id: crypto.randomUUID(), descripcion: c.descripcion, monto: Number(c.monto) || 0 })
+    })
+    const costoItems = Array.isArray(plantilla.costos) ? plantilla.costos : []
+    costoItems.forEach((c: any) => {
+      if (c.isAuto) return
+      const cat: keyof ItemsPorCategoria = cats.includes(c.categoria) ? c.categoria as keyof ItemsPorCategoria : "otros"
+      parsedCostos[cat].push({ id: crypto.randomUUID(), descripcion: c.descripcion, monto: Number(c.monto) || 0 })
+    })
+    setCobros(parsedCobros)
+    setCostos(parsedCostos)
+    setPlantillasOpen(false)
+    toast({ title: "Plantilla cargada" })
+  }
+
+  const handleGuardarPlantilla = async () => {
+    if (!nombreNuevaPlantilla.trim()) return
+    setSavingPlantilla(true)
+    try {
+      const cobrosArray: any[] = []
+      const costosArray: any[] = []
+      Object.entries(cobros).forEach(([cat, items]) => {
+        items.forEach((i) => {
+          if (i.descripcion || i.monto) cobrosArray.push({ categoria: cat, descripcion: i.descripcion, monto: i.monto })
+        })
+      })
+      Object.entries(costos).forEach(([cat, items]) => {
+        items.forEach((i) => {
+          if (i.descripcion || i.monto) costosArray.push({ categoria: cat, descripcion: i.descripcion, monto: i.monto })
+        })
+      })
+      const nueva = await api.plantillasServicio.create({ nombre: nombreNuevaPlantilla.trim(), cobros: cobrosArray, costos: costosArray })
+      setPlantillas((prev) => [...prev, nueva])
+      setGuardarPlantillaOpen(false)
+      setNombreNuevaPlantilla("")
+      toast({ title: "Plantilla guardada" })
+    } catch {
+      toast({ title: "Error guardando plantilla", variant: "destructive" })
+    } finally {
+      setSavingPlantilla(false)
+    }
+  }
+
+  const handleEliminarPlantilla = async (id: string) => {
+    try {
+      await api.plantillasServicio.delete(id)
+      setPlantillas((prev) => prev.filter((p) => p.id !== id))
+      toast({ title: "Plantilla eliminada" })
+    } catch {
+      toast({ title: "Error eliminando plantilla", variant: "destructive" })
+    }
+  }
 
   const togglePiezaPintura = (precio: PrecioPintura, checked: boolean) => {
     setPiezasSeleccionadas((prev) =>
@@ -1598,6 +1668,57 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
 
               {/* Tab: Detalles de Trabajo (Cobros + Costos unificados) */}
               <TabsContent value="cobros" className="space-y-4">
+                {/* Barra de plantillas */}
+                <div className="flex items-center gap-2">
+                  <Popover open={plantillasOpen} onOpenChange={setPlantillasOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-1.5 text-xs bg-transparent h-8">
+                        <BookMarked className="w-3.5 h-3.5" />
+                        Cargar plantilla
+                        {plantillas.length > 0 && (
+                          <span className="ml-1 bg-primary/20 text-primary text-[10px] px-1.5 py-0.5 rounded-full">{plantillas.length}</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-64 p-2 bg-card border-border" align="start">
+                      {plantillas.length === 0 ? (
+                        <p className="text-xs text-muted-foreground text-center py-3">Sin plantillas guardadas</p>
+                      ) : (
+                        <div className="space-y-1">
+                          {plantillas.map((p) => (
+                            <div key={p.id} className="flex items-center justify-between gap-1 hover:bg-secondary/50 rounded px-2 py-1.5 group">
+                              <button
+                                type="button"
+                                className="flex-1 text-left text-sm truncate"
+                                onClick={() => cargarPlantilla(p)}
+                              >
+                                {p.nombre}
+                              </button>
+                              <button
+                                type="button"
+                                className="opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive/80 transition-opacity"
+                                onClick={() => handleEliminarPlantilla(p.id)}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </PopoverContent>
+                  </Popover>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 text-xs bg-transparent h-8"
+                    onClick={() => { setNombreNuevaPlantilla(""); setGuardarPlantillaOpen(true) }}
+                  >
+                    <BookTemplate className="w-3.5 h-3.5" />
+                    Guardar como plantilla
+                  </Button>
+                </div>
+
                 <Tabs value={activeCobroTab} onValueChange={setActiveCobroTab}>
                   <TabsList className="grid w-full grid-cols-4 sm:grid-cols-7 bg-secondary/20 h-auto">
                     <TabsTrigger value="desmontar" className="text-xs py-2">Desmontar</TabsTrigger>
@@ -2061,6 +2182,42 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
           </div>
         </div>
       </div>
+
+      {/* Dialog: Guardar como plantilla */}
+      <Dialog open={guardarPlantillaOpen} onOpenChange={setGuardarPlantillaOpen}>
+        <DialogContent className="bg-card border-border sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <BookTemplate className="w-4 h-4" />
+              Guardar como plantilla
+            </DialogTitle>
+            <DialogDescription>
+              Los cobros y costos actuales se guardarán como plantilla reutilizable.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Nombre de la plantilla *</Label>
+              <Input
+                value={nombreNuevaPlantilla}
+                onChange={(e) => setNombreNuevaPlantilla(e.target.value)}
+                placeholder="Ej: Choque frontal estándar"
+                className="bg-secondary/50 border-border"
+                onKeyDown={(e) => e.key === "Enter" && handleGuardarPlantilla()}
+              />
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1 bg-transparent" onClick={() => setGuardarPlantillaOpen(false)}>
+                Cancelar
+              </Button>
+              <Button className="flex-1" onClick={handleGuardarPlantilla} disabled={savingPlantilla || !nombreNuevaPlantilla.trim()}>
+                {savingPlantilla ? "Guardando..." : "Guardar"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
     </TooltipProvider>
   )
 }

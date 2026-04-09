@@ -155,7 +155,8 @@ export function ExpensesTable({ gastos, onEditGasto, onDeleted, loading }: Expen
                   </div>
                 </div>
               </div>
-            ))}
+            )
+          })}
           </div>
         )}
       </CardContent>

@@ -318,6 +318,11 @@ export const api = {
     update: updateProveedorApi,
     delete: deleteProveedorApi,
   },
+  plantillasServicio: {
+    getAll: fetchPlantillasServicio,
+    create: createPlantillaServicioApi,
+    delete: deletePlantillaServicioApi,
+  },
 }
 
 // ── Proveedores ───────────────────────────────────────────────────────────────
@@ -342,4 +347,23 @@ async function updateProveedorApi(data: object) {
 async function deleteProveedorApi(id: string) {
   const res = await fetch(`/api/proveedores?id=${id}`, { method: "DELETE" })
   if (!res.ok) throw new Error("Error eliminando proveedor")
+}
+
+
+// ── Plantillas de Servicio ────────────────────────────────────────────────────
+async function fetchPlantillasServicio() {
+  const res = await fetch("/api/plantillas-servicio")
+  if (!res.ok) throw new Error("Error cargando plantillas")
+  return res.json()
+}
+
+async function createPlantillaServicioApi(data: { nombre: string; cobros: any; costos: any }) {
+  const res = await fetch("/api/plantillas-servicio", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) })
+  if (!res.ok) throw new Error("Error creando plantilla")
+  return res.json()
+}
+
+async function deletePlantillaServicioApi(id: string) {
+  const res = await fetch(`/api/plantillas-servicio?id=${id}`, { method: "DELETE" })
+  if (!res.ok) throw new Error("Error eliminando plantilla")
 }

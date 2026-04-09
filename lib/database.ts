@@ -96,7 +96,7 @@ export interface Gasto {
   categoria: string
   descripcion: string
   monto: number
-  pagado: boolean
+  pagado?: boolean
   created_at: string
   updated_at: string
 }
@@ -1035,6 +1035,51 @@ export async function updatePlantilla(id: string, p: { descripcion?: string; mon
 export async function deletePlantilla(id: string) {
   const db = getSQL()
   await db`DELETE FROM gastos_fijos_plantillas WHERE id = ${id}`
+}
+
+// ── Plantillas de Servicio ────────────────────────────────────────────────────
+
+export interface PlantillaServicio {
+  id: string
+  nombre: string
+  cobros: any
+  costos: any
+  created_at?: string
+}
+
+async function ensurePlantillasServicioTable(db: any) {
+  await db`
+    CREATE TABLE IF NOT EXISTS plantillas_servicio (
+      id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+      nombre TEXT NOT NULL,
+      cobros JSONB DEFAULT '[]',
+      costos JSONB DEFAULT '[]',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `
+}
+
+export async function getPlantillasServicio() {
+  const db = getSQL()
+  await ensurePlantillasServicioTable(db)
+  const data = await db`SELECT * FROM plantillas_servicio ORDER BY nombre ASC`
+  return data as PlantillaServicio[]
+}
+
+export async function createPlantillaServicio(p: { nombre: string; cobros: any; costos: any }) {
+  const db = getSQL()
+  await ensurePlantillasServicioTable(db)
+  const data = await db`
+    INSERT INTO plantillas_servicio (nombre, cobros, costos)
+    VALUES (${p.nombre}, ${safeJson(p.cobros)}::jsonb, ${safeJson(p.costos)}::jsonb)
+    RETURNING *
+  `
+  return data[0] as PlantillaServicio
+}
+
+export async function deletePlantillaServicio(id: string) {
+  const db = getSQL()
+  await db`DELETE FROM plantillas_servicio WHERE id = ${id}`
 }
 
 // ── Proveedores ───────────────────────────────────────────────────────────────
