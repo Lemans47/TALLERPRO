@@ -341,37 +341,37 @@ export async function deletePresupuesto(id: string) {
 
 export async function convertPresupuestoToServicio(presupuestoId: string) {
   const db = getSQL()
-  // Get presupuesto
-  const presupuestoData = await db`
-    SELECT * FROM presupuestos WHERE id = ${presupuestoId}
-  `
-  const presupuesto = presupuestoData[0] as Presupuesto
+  return await db.begin(async (sql) => {
+    // Get presupuesto within transaction to lock the row
+    const presupuestoData = await sql`SELECT * FROM presupuestos WHERE id = ${presupuestoId} FOR UPDATE`
+    const presupuesto = presupuestoData[0] as Presupuesto
+    if (!presupuesto) throw new Error("Presupuesto no encontrado")
 
-  if (!presupuesto) throw new Error("Presupuesto no encontrado")
+    // Create servicio from presupuesto (atomically)
+    const newServicio = await sql`
+      INSERT INTO servicios (
+        fecha_ingreso, patente, marca, modelo, color, kilometraje, año, cliente, telefono, observaciones,
+        mano_obra_pintura, cobros, costos, piezas_pintura, estado, iva,
+        anticipo, saldo_pendiente, monto_total, monto_total_sin_iva, observaciones_checkboxes,
+        fotos_ingreso, fotos_entrega
+      ) VALUES (
+        ${presupuesto.fecha_ingreso}, ${presupuesto.patente}, ${presupuesto.marca}, ${presupuesto.modelo},
+        ${presupuesto.color || null}, ${presupuesto.kilometraje || null}, ${presupuesto.año || null},
+        ${presupuesto.cliente}, ${presupuesto.telefono || ""}, ${presupuesto.observaciones || ""},
+        ${presupuesto.mano_obra_pintura || 0},
+        ${safeJson(presupuesto.cobros)}, ${safeJson(presupuesto.costos)},
+        ${safeJson(presupuesto.piezas_pintura)}, 'En Cola', ${presupuesto.iva || "sin"},
+        0, ${presupuesto.monto_total || 0}, ${presupuesto.monto_total || 0}, ${presupuesto.monto_total_sin_iva || 0},
+        ${safeJson(presupuesto.observaciones_checkboxes || [])},
+        '[]'::jsonb, '[]'::jsonb
+      ) RETURNING *
+    `
 
-  // Create servicio from presupuesto
-  const newServicio = await db`
-    INSERT INTO servicios (
-      fecha_ingreso, patente, marca, modelo, kilometraje, año, cliente, telefono, observaciones,
-      mano_obra_pintura, cobros, costos, piezas_pintura, estado, iva,
-      anticipo, saldo_pendiente, monto_total, monto_total_sin_iva, observaciones_checkboxes,
-      fotos_ingreso, fotos_entrega
-    ) VALUES (
-      CURRENT_DATE, ${presupuesto.patente}, ${presupuesto.marca}, ${presupuesto.modelo},
-      ${presupuesto.kilometraje || null}, ${presupuesto.año || null},
-      ${presupuesto.cliente}, ${presupuesto.telefono}, ${presupuesto.observaciones},
-      ${presupuesto.mano_obra_pintura}, ${safeJson(presupuesto.cobros)}, ${safeJson(presupuesto.costos)},
-      ${safeJson(presupuesto.piezas_pintura)}, 'En Cola', ${presupuesto.iva},
-      0, ${presupuesto.monto_total}, ${presupuesto.monto_total}, ${presupuesto.monto_total_sin_iva},
-      ${safeJson(presupuesto.observaciones_checkboxes)},
-      '[]'::jsonb, '[]'::jsonb
-    ) RETURNING *
-  `
+    // Delete presupuesto atomically with the insert
+    await sql`DELETE FROM presupuestos WHERE id = ${presupuestoId}`
 
-  // Delete presupuesto
-  await db`DELETE FROM presupuestos WHERE id = ${presupuestoId}`
-
-  return newServicio[0] as Servicio
+    return newServicio[0] as Servicio
+  })
 }
 
 // Gastos
@@ -580,6 +580,26 @@ export async function deleteGastosSueldoByPattern(nombre: string, mes: number, a
   const db = getSQL()
   const pattern = `Abono sueldo ${nombre} ${String(mes).padStart(2, "0")}/${año}`
   await db`DELETE FROM gastos WHERE categoria = 'Sueldos' AND descripcion = ${pattern}`
+}
+
+// Borra el abono y su gasto asociado de forma atómica
+export async function deleteAbonoWithGastos(id: string) {
+  const db = getSQL()
+  await db.begin(async (sql) => {
+    const [abono] = await sql`
+      SELECT a.*, e.nombre AS empleado_nombre
+      FROM abonos_empleados a
+      JOIN empleados e ON e.id = a.empleado_id
+      WHERE a.id = ${id}
+    `
+    // Borrar el abono primero
+    await sql`DELETE FROM abonos_empleados WHERE id = ${id}`
+    // Borrar el gasto asociado si existía
+    if (abono) {
+      const pattern = `Abono sueldo ${abono.empleado_nombre} ${String(abono.mes).padStart(2, "0")}/${abono.año}`
+      await sql`DELETE FROM gastos WHERE categoria = 'Sueldos' AND descripcion = ${pattern}`
+    }
+  })
 }
 
 // Dashboard KPIs

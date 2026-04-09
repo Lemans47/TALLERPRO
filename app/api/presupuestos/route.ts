@@ -5,8 +5,7 @@ import {
   createPresupuesto,
   updatePresupuesto,
   deletePresupuesto,
-  getPresupuestoById,
-  createServicio,
+  convertPresupuestoToServicio,
 } from "@/lib/database"
 
 export async function GET(request: Request) {
@@ -22,41 +21,9 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: "ID required" }, { status: 400 })
       }
 
-      // Obtener el presupuesto
-      const presupuesto = await getPresupuestoById(id)
-      if (!presupuesto) {
-        return NextResponse.json({ error: "Presupuesto not found" }, { status: 404 })
-      }
-
-      // Crear un servicio basado en el presupuesto
-      const servicioData = {
-        fecha_ingreso: presupuesto.fecha_ingreso,
-        patente: presupuesto.patente,
-        marca: presupuesto.marca,
-        modelo: presupuesto.modelo,
-        color: presupuesto.color || "",
-        kilometraje: presupuesto.kilometraje || null,
-        año: presupuesto.año || null,
-        cliente: presupuesto.cliente,
-        telefono: presupuesto.telefono || "",
-        observaciones: presupuesto.observaciones || "",
-        estado: "En Cola",
-        iva: presupuesto.iva || "sin",
-        anticipo: 0,
-        saldo_pendiente: presupuesto.monto_total || 0,
-        monto_total: presupuesto.monto_total || 0,
-        monto_total_sin_iva: presupuesto.monto_total_sin_iva || 0,
-        mano_obra_pintura: presupuesto.mano_obra_pintura || 0,
-        cobros: presupuesto.cobros || [],
-        costos: presupuesto.costos || [],
-        piezas_pintura: presupuesto.piezas_pintura || [],
-        observaciones_checkboxes: presupuesto.observaciones_checkboxes || [],
-        fotos_ingreso: [],
-        fotos_entrega: [],
-      }
-
-      const servicio = await createServicio(servicioData)
-      await deletePresupuesto(id)
+      // Convertir presupuesto a servicio de forma atómica (transacción)
+      // convertPresupuestoToServicio lanza error si el presupuesto no existe
+      const servicio = await convertPresupuestoToServicio(id)
 
       return NextResponse.json({
         success: true,

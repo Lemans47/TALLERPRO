@@ -785,6 +785,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
           categoria: "pintura",
           descripcion: `Mano de Obra Pintura (${cantidadPiezasSave} pieza${cantidadPiezasSave !== 1 ? "s" : ""})`,
           monto: cantidadPiezasSave * manoObraConfig,
+          isAuto: true,
         })
       }
       if (materialesConfig > 0 && cantidadPiezasSave > 0) {
@@ -792,6 +793,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
           categoria: "pintura",
           descripcion: `Materiales Pintura (${cantidadPiezasSave} pieza${cantidadPiezasSave !== 1 ? "s" : ""})`,
           monto: cantidadPiezasSave * materialesConfig,
+          isAuto: true,
         })
       }
 
@@ -895,6 +897,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
           categoria: "pintura",
           descripcion: `Mano de Obra Pintura (${cantidadPiezasSaveP} pieza${cantidadPiezasSaveP !== 1 ? "s" : ""})`,
           monto: cantidadPiezasSaveP * manoObraConfig,
+          isAuto: true,
         })
       }
       if (materialesConfig > 0 && cantidadPiezasSaveP > 0) {
@@ -902,6 +905,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
           categoria: "pintura",
           descripcion: `Materiales Pintura (${cantidadPiezasSaveP} pieza${cantidadPiezasSaveP !== 1 ? "s" : ""})`,
           monto: cantidadPiezasSaveP * materialesConfig,
+          isAuto: true,
         })
       }
 

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getAbonosByMonth, createAbono, deleteAbono, getAbonoById, deleteGastosSueldoByPattern } from "@/lib/database"
+import { getAbonosByMonth, createAbono, deleteAbonoWithGastos } from "@/lib/database"
 
 export async function GET(request: Request) {
   try {
@@ -35,11 +35,7 @@ export async function DELETE(request: Request) {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
     if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 })
-    const abono = await getAbonoById(id)
-    if (abono) {
-      await deleteGastosSueldoByPattern(abono.empleado_nombre ?? "", abono.mes, abono.año)
-    }
-    await deleteAbono(id)
+    await deleteAbonoWithGastos(id)
     return NextResponse.json({ success: true })
   } catch (e) {
     return NextResponse.json({ error: "Error deleting abono" }, { status: 500 })

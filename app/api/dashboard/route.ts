@@ -30,13 +30,13 @@ function computeKpis(
   // Ingresos netos (sin IVA)
   const ingresoNeto = serviciosConMonto.reduce((sum, sv) => sum + Number(sv.monto_total_sin_iva || 0), 0)
 
-  // Costos directos desde JSONB costos[], excluyendo "materiales pintura" (evita doble conteo)
+  // Costos directos desde JSONB costos[], excluyendo items auto-calculados de pintura (evita doble conteo)
   const costosDirectos = serviciosConMonto.reduce((sum, sv) => {
-    const costos = parseJsonbArray<{ descripcion?: string; monto?: number }>(sv.costos)
+    const costos = parseJsonbArray<{ descripcion?: string; monto?: number; isAuto?: boolean }>(sv.costos)
     return (
       sum +
       costos
-        .filter((c) => !String(c.descripcion || "").toLowerCase().includes("materiales pintura"))
+        .filter((c) => !c.isAuto)
         .reduce((s, c) => s + Number(c.monto || 0), 0)
     )
   }, 0)
