@@ -39,6 +39,7 @@ export function ExpenseForm({ defaultCategory, gastoAEditar, onSaved, onCancel }
     descripcion: "",
     monto: "",
     fecha: localToday(),
+    pagado: true,
   })
 
   useEffect(() => {
@@ -47,12 +48,14 @@ export function ExpenseForm({ defaultCategory, gastoAEditar, onSaved, onCancel }
         descripcion: gastoAEditar.descripcion,
         monto: String(gastoAEditar.monto),
         fecha: toDateStr(gastoAEditar.fecha),
+        pagado: gastoAEditar.pagado !== false,
       })
     } else {
       setFormData({
         descripcion: "",
         monto: "",
         fecha: localToday(),
+        pagado: true,
       })
     }
   }, [gastoAEditar])
@@ -71,6 +74,7 @@ export function ExpenseForm({ defaultCategory, gastoAEditar, onSaved, onCancel }
         descripcion: formData.descripcion,
         monto: Number(formData.monto),
         fecha: formData.fecha,
+        pagado: formData.pagado,
       }
 
       if (gastoAEditar) {
@@ -145,6 +149,26 @@ export function ExpenseForm({ defaultCategory, gastoAEditar, onSaved, onCancel }
                 value={formData.fecha}
                 onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
               />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Estado de pago</Label>
+            <div className="flex rounded-lg border border-border overflow-hidden text-sm">
+              <button
+                type="button"
+                className={`flex-1 py-2 font-medium transition-colors ${formData.pagado ? "bg-green-500/20 text-green-400" : "hover:bg-secondary text-muted-foreground"}`}
+                onClick={() => setFormData({ ...formData, pagado: true })}
+              >
+                ✓ Pagado
+              </button>
+              <button
+                type="button"
+                className={`flex-1 py-2 font-medium transition-colors ${!formData.pagado ? "bg-orange-500/20 text-orange-400" : "hover:bg-secondary text-muted-foreground"}`}
+                onClick={() => setFormData({ ...formData, pagado: false })}
+              >
+                ⏳ Pendiente
+              </button>
             </div>
           </div>
 

@@ -96,6 +96,7 @@ export interface Gasto {
   categoria: string
   descripcion: string
   monto: number
+  pagado: boolean
   created_at: string
   updated_at: string
 }
@@ -411,9 +412,10 @@ export async function getGastosByCategoria(categoria: string) {
 
 export async function createGasto(gasto: Omit<Gasto, "id" | "created_at" | "updated_at">) {
   const db = getSQL()
+  const pagado = gasto.pagado !== false // default true
   const data = await db`
-    INSERT INTO gastos (fecha, categoria, descripcion, monto)
-    VALUES (${gasto.fecha}, ${gasto.categoria}, ${gasto.descripcion}, ${gasto.monto})
+    INSERT INTO gastos (fecha, categoria, descripcion, monto, pagado)
+    VALUES (${gasto.fecha}, ${gasto.categoria}, ${gasto.descripcion}, ${gasto.monto}, ${pagado})
     RETURNING *
   `
   return data[0] as Gasto
@@ -427,6 +429,7 @@ export async function updateGasto(id: string, gasto: Partial<Gasto>) {
       categoria = COALESCE(${gasto.categoria ?? null}, categoria),
       descripcion = COALESCE(${gasto.descripcion ?? null}, descripcion),
       monto = COALESCE(${gasto.monto ?? null}, monto),
+      pagado = COALESCE(${gasto.pagado ?? null}, pagado),
       updated_at = NOW()
     WHERE id = ${id}
     RETURNING *
