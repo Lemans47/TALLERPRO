@@ -1,6 +1,6 @@
 import type { Servicio, Presupuesto, Gasto, PrecioPintura, PiezaPintura, FotoServicio, Cliente, Vehiculo, Empleado } from "./database"
 
-// Patentes Chile
+// Patentes Chile — Boostr.cl
 export interface VehiculoLookup {
   patente: string
   marca?: string
@@ -11,11 +11,55 @@ export interface VehiculoLookup {
   fromCache?: boolean
 }
 
+const BOOSTR_API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjbGllbnQiOiJyb2RyaWdvIHNhcm1pZW50byIsInBsYW4iOiJmcmVlIiwiYWRkb25zIjoiIiwiZXhjbHVkZXMiOiIiLCJyYXRlIjoiNXgxMCIsImN1c3RvbSI6eyJkb2N1bWVudF9udW1iZXJfZGFpbHlfbGltaXQiOjAsInBsYXRlc19kYWlseV9saW1pdCI6NX0sImlhdCI6MTc3NTc5MDk0MSwiZXhwIjoxNzc4MzgyOTQxfQ.Pyo4gLcwsp7bB2LxTUtmloAxC_QjGUkBn6jPM-J77AY"
+
 export async function lookupPatente(patente: string): Promise<VehiculoLookup | null> {
-  const res = await fetch(`/api/lookup-patente?patente=${encodeURIComponent(patente)}`)
-  if (res.status === 404) return null
-  if (!res.ok) throw new Error("Error consultando patente")
-  return res.json()
+  const cleanPatente = patente.replace(/[^a-zA-Z0-9]/g, "").toUpperCase()
+
+  // 1. Buscar en caché local (DB) primero
+  try {
+    const cacheRes = await fetch(`/api/lookup-patente?patente=${encodeURIComponent(cleanPatente)}`)
+    if (cacheRes.ok) {
+      const cached = await cacheRes.json()
+      if (cached?.marca) return cached
+    }
+  } catch { /* continuar a la API externa */ }
+
+  // 2. Llamar a Boostr.cl directo desde el navegador (bypasea Cloudflare)
+  try {
+    const boostrRes = await fetch(`https://api.boostr.cl/vehicle/${cleanPatente}.json`, {
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${BOOSTR_API_KEY}`,
+      },
+    })
+
+    if (!boostrRes.ok) return null
+    const body = await boostrRes.json()
+    if (body.status === "error" || !body.data) return null
+
+    const d = body.data
+    const result: VehiculoLookup = {
+      patente: cleanPatente,
+      marca: d.make ?? undefined,
+      modelo: d.model ?? undefined,
+      año: d.year ? Number(d.year) : undefined,
+      color: d.color ?? undefined,
+      vin: d.vin ?? d.chasis ?? undefined,
+      fromCache: false,
+    }
+
+    // 3. Guardar en caché local (DB) para no gastar consultas
+    fetch("/api/lookup-patente", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(result),
+    }).catch(() => {}) // fire-and-forget
+
+    return result
+  } catch {
+    return null
+  }
 }
 
 // Dashboard
