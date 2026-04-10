@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { KPICard } from "@/components/kpi-card"
 import { RevenueChart } from "@/components/revenue-chart"
 import { PendingPaymentsAlert } from "@/components/pending-payments-alert"
+import { PendingExpensesAlert } from "@/components/pending-expenses-alert"
 import { VehiclePipeline } from "@/components/vehicle-pipeline"
 import { AverageTicketChart } from "@/components/average-ticket-chart"
 import { MonthSelector } from "@/components/month-selector"
@@ -68,6 +69,7 @@ export default function DashboardPage() {
   })
   const [servicios, setServicios] = useState<Servicio[]>([])
   const [serviciosActivos, setServiciosActivos] = useState<Servicio[]>([])
+  const [gastos, setGastos] = useState<Gasto[]>([])
   const [loading, setLoading] = useState(true)
   const [showBreakeven, setShowBreakeven] = useState(false)
   const { selectedMonth } = useMonth()
@@ -84,6 +86,7 @@ export default function DashboardPage() {
       const { servicios: serviciosData, gastos: gastosData, empleados: empleadosData, serviciosActivos: activosData, kpis: apiKpis } = response
       setServicios(serviciosData)
       setServiciosActivos(activosData)
+      setGastos(gastosData)
       calculateKPIs(serviciosData, gastosData, empleadosData, activosData, apiKpis)
     } catch (error) {
       console.error("Error loading dashboard data:", error)
@@ -381,6 +384,7 @@ export default function DashboardPage() {
         </div>
         <div className="flex flex-col gap-4">
           <PendingPaymentsAlert servicios={serviciosActivos} maxItems={3} />
+          <PendingExpensesAlert gastos={gastos} maxItems={3} />
           <div className="rounded-xl border border-border bg-card p-4 space-y-2">
             <p className="text-sm font-semibold text-muted-foreground">Acciones Rápidas</p>
             <Link href="/servicios">
