@@ -22,7 +22,7 @@ export function PresupuestosTable({ presupuestos, onEditPresupuesto, onConverted
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false)
   const [presupuestoParaPdf, setPresupuestoParaPdf] = useState<Presupuesto | null>(null)
   const [pdfPreview, setPdfPreview] = useState<{ url: string; fileName: string } | null>(null)
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(true)
 
   const handleDelete = async (presupuesto: Presupuesto) => {
     if (!confirm(`¿Eliminar presupuesto de ${presupuesto.patente}?`)) return
