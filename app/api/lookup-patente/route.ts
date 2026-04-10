@@ -19,17 +19,21 @@ export async function GET(request: Request) {
     }
 
     // 1. Buscar en caché local (DB)
-    const vehiculoEnDB = await getVehiculoByPatente(patente)
-    if (vehiculoEnDB?.marca) {
-      return NextResponse.json({
-        patente: vehiculoEnDB.patente,
-        marca: vehiculoEnDB.marca,
-        modelo: vehiculoEnDB.modelo,
-        año: vehiculoEnDB.año ? Number(vehiculoEnDB.año) : null,
-        color: vehiculoEnDB.color,
-        vin: vehiculoEnDB.vin,
-        fromCache: true,
-      })
+    try {
+      const vehiculoEnDB = await getVehiculoByPatente(patente)
+      if (vehiculoEnDB?.marca) {
+        return NextResponse.json({
+          patente: vehiculoEnDB.patente,
+          marca: vehiculoEnDB.marca,
+          modelo: vehiculoEnDB.modelo,
+          año: vehiculoEnDB.año ? Number(vehiculoEnDB.año) : null,
+          color: vehiculoEnDB.color,
+          vin: vehiculoEnDB.vin,
+          fromCache: true,
+        })
+      }
+    } catch (dbError) {
+      console.error("[lookup-patente] error leyendo DB:", dbError)
     }
 
     // 2. Llamar a GetAPI.cl
@@ -66,21 +70,25 @@ export async function GET(request: Request) {
     const color = d.color ?? null
     const vin = d.vinNumber ?? null
 
-    // 4. Guardar en caché (DB)
+    // 4. Guardar en caché (DB) — no bloquea la respuesta si falla
     if (marca) {
-      const db = getSQL()
-      await db`
-        INSERT INTO vehiculos (patente, marca, modelo, color, año, vin)
-        VALUES (${patente}, ${marca}, ${modelo}, ${color}, ${año}, ${vin})
-        ON CONFLICT (patente) DO UPDATE SET
-          marca = COALESCE(EXCLUDED.marca, vehiculos.marca),
-          modelo = COALESCE(EXCLUDED.modelo, vehiculos.modelo),
-          color = COALESCE(EXCLUDED.color, vehiculos.color),
-          año = COALESCE(EXCLUDED.año, vehiculos.año),
-          vin = COALESCE(EXCLUDED.vin, vehiculos.vin),
-          updated_at = NOW()
-      `
-      await db.end()
+      try {
+        const db = getSQL()
+        await db`
+          INSERT INTO vehiculos (patente, marca, modelo, color, año, vin)
+          VALUES (${patente}, ${marca}, ${modelo}, ${color}, ${año}, ${vin})
+          ON CONFLICT (patente) DO UPDATE SET
+            marca = COALESCE(EXCLUDED.marca, vehiculos.marca),
+            modelo = COALESCE(EXCLUDED.modelo, vehiculos.modelo),
+            color = COALESCE(EXCLUDED.color, vehiculos.color),
+            año = COALESCE(EXCLUDED.año, vehiculos.año),
+            vin = COALESCE(EXCLUDED.vin, vehiculos.vin),
+            updated_at = NOW()
+        `
+        await db.end()
+      } catch (dbError) {
+        console.error("[lookup-patente] error guardando en DB:", dbError)
+      }
     }
 
     return NextResponse.json({ patente, marca, modelo, año, color, vin, fromCache: false })
