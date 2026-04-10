@@ -11,8 +11,6 @@ export interface VehiculoLookup {
   fromCache?: boolean
 }
 
-const BOOSTR_API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjbGllbnQiOiJyb2RyaWdvIHNhcm1pZW50byIsInBsYW4iOiJmcmVlIiwiYWRkb25zIjoiIiwiZXhjbHVkZXMiOiIiLCJyYXRlIjoiNXgxMCIsImN1c3RvbSI6eyJkb2N1bWVudF9udW1iZXJfZGFpbHlfbGltaXQiOjAsInBsYXRlc19kYWlseV9saW1pdCI6NX0sImlhdCI6MTc3NTc5MDk0MSwiZXhwIjoxNzc4MzgyOTQxfQ.Pyo4gLcwsp7bB2LxTUtmloAxC_QjGUkBn6jPM-J77AY"
-
 export async function lookupPatente(patente: string): Promise<VehiculoLookup | null> {
   const cleanPatente = patente.replace(/[^a-zA-Z0-9]/g, "").toUpperCase()
 
@@ -25,14 +23,9 @@ export async function lookupPatente(patente: string): Promise<VehiculoLookup | n
     }
   } catch { /* continuar a la API externa */ }
 
-  // 2. Llamar a Boostr.cl directo desde el navegador (bypasea Cloudflare)
+  // 2. Llamar a Boostr.cl directo desde el navegador (sin header Auth para evitar CORS)
   try {
-    const boostrRes = await fetch(`https://api.boostr.cl/vehicle/${cleanPatente}.json`, {
-      headers: {
-        Accept: "application/json",
-        Authorization: `Bearer ${BOOSTR_API_KEY}`,
-      },
-    })
+    const boostrRes = await fetch(`https://api.boostr.cl/vehicle/${cleanPatente}.json`)
 
     if (!boostrRes.ok) return null
     const body = await boostrRes.json()
