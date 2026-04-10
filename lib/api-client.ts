@@ -13,46 +13,9 @@ export interface VehiculoLookup {
 
 export async function lookupPatente(patente: string): Promise<VehiculoLookup | null> {
   const cleanPatente = patente.replace(/[^a-zA-Z0-9]/g, "").toUpperCase()
-
-  // 1. Buscar en caché local (DB) primero
-  try {
-    const cacheRes = await fetch(`/api/lookup-patente?patente=${encodeURIComponent(cleanPatente)}`)
-    if (cacheRes.ok) {
-      const cached = await cacheRes.json()
-      if (cached?.marca) return cached
-    }
-  } catch { /* continuar a la API externa */ }
-
-  // 2. Llamar a Boostr.cl directo desde el navegador (sin header Auth para evitar CORS)
-  try {
-    const boostrRes = await fetch(`https://api.boostr.cl/vehicle/${cleanPatente}.json`)
-
-    if (!boostrRes.ok) return null
-    const body = await boostrRes.json()
-    if (body.status === "error" || !body.data) return null
-
-    const d = body.data
-    const result: VehiculoLookup = {
-      patente: cleanPatente,
-      marca: d.make ?? undefined,
-      modelo: d.model ?? undefined,
-      año: d.year ? Number(d.year) : undefined,
-      color: d.color ?? undefined,
-      vin: d.vin ?? d.chasis ?? undefined,
-      fromCache: false,
-    }
-
-    // 3. Guardar en caché local (DB) para no gastar consultas
-    fetch("/api/lookup-patente", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(result),
-    }).catch(() => {}) // fire-and-forget
-
-    return result
-  } catch {
-    return null
-  }
+  const res = await fetch(`/api/lookup-patente?patente=${encodeURIComponent(cleanPatente)}`)
+  if (!res.ok) return null
+  return res.json()
 }
 
 // Dashboard
