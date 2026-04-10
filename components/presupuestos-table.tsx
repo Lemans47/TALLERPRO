@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
-import { FileText, Trash2, CheckCircle, Edit, Car, User, Calendar, AlignJustify, List } from "lucide-react"
+import { FileText, Trash2, CheckCircle, Edit, Car, User, Calendar, AlignJustify, List, ChevronDown, ChevronRight } from "lucide-react"
 import { api, type Presupuesto } from "@/lib/api-client"
 import { generarPDFPresupuesto } from "@/lib/pdf-presupuesto"
 import { PDFPreviewModal } from "@/components/pdf-preview-modal"
@@ -22,6 +22,7 @@ export function PresupuestosTable({ presupuestos, onEditPresupuesto, onConverted
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false)
   const [presupuestoParaPdf, setPresupuestoParaPdf] = useState<Presupuesto | null>(null)
   const [pdfPreview, setPdfPreview] = useState<{ url: string; fileName: string } | null>(null)
+  const [collapsed, setCollapsed] = useState(false)
 
   const handleDelete = async (presupuesto: Presupuesto) => {
     if (!confirm(`¿Eliminar presupuesto de ${presupuesto.patente}?`)) return
@@ -111,16 +112,21 @@ export function PresupuestosTable({ presupuestos, onEditPresupuesto, onConverted
 
       <div className="rounded-xl border border-dashed border-warning/30 bg-card overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-border bg-warning/5">
+        <button
+          type="button"
+          onClick={() => setCollapsed(!collapsed)}
+          className="flex items-center justify-between w-full p-4 border-b border-border bg-warning/5 hover:bg-warning/10 transition-colors cursor-pointer"
+        >
           <div className="flex items-center gap-2">
             <FileText className="w-5 h-5 text-warning" />
             <h3 className="font-semibold">Presupuestos Pendientes</h3>
             <Badge className="bg-warning/10 text-warning border-warning/30">{presupuestos.length}</Badge>
           </div>
-        </div>
+          {collapsed ? <ChevronRight className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
+        </button>
 
         {/* Content */}
-        <div className="divide-y divide-border">
+        {!collapsed && <div className="divide-y divide-border">
           {presupuestos.map((presupuesto) => (
             <div key={presupuesto.id} className="p-4 hover:bg-secondary/30 transition-colors">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -191,7 +197,7 @@ export function PresupuestosTable({ presupuestos, onEditPresupuesto, onConverted
               </div>
             </div>
           ))}
-        </div>
+        </div>}
       </div>
     </>
   )

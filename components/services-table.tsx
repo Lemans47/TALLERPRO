@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { api, type Servicio } from "@/lib/api-client"
-import { FileText, Trash2, Edit, Calendar, User, Car, Wrench, ClipboardList, List, AlignJustify, TrendingUp, Receipt } from "lucide-react"
+import { FileText, Trash2, Edit, Calendar, User, Car, Wrench, ClipboardList, List, AlignJustify, TrendingUp, Receipt, ChevronDown, ChevronRight } from "lucide-react"
 
 const parseArr = (v: any): any[] => {
   let val = v
@@ -78,6 +78,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
   const { toast } = useToast()
   const [filtroEstado, setFiltroEstado] = useState("todos")
   const [sortBy, setSortBy] = useState("fecha_desc")
+  const [collapsed, setCollapsed] = useState(false)
   const [montoPago, setMontoPago] = useState("")
   const [modoCorregir, setModoCorregir] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -303,14 +304,19 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
       <div className="rounded-xl border border-border bg-card overflow-hidden">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border-b border-border bg-secondary/30">
-        <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setCollapsed(!collapsed)}
+          className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer"
+        >
+          {collapsed ? <ChevronRight className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
           <Wrench className="w-5 h-5 text-primary" />
           <h3 className="font-semibold">Servicios por Realizar</h3>
           <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/30">
             {serviciosFiltrados.length}
           </Badge>
-        </div>
-        <div className="flex gap-2 w-full sm:w-auto">
+        </button>
+        {!collapsed && <div className="flex gap-2 w-full sm:w-auto">
           <Select value={sortBy} onValueChange={setSortBy}>
             <SelectTrigger className="w-full sm:w-[170px] bg-secondary/50 border-border">
               <SelectValue />
@@ -335,10 +341,11 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
               ))}
             </SelectContent>
           </Select>
-        </div>
+        </div>}
       </div>
 
       {/* Content */}
+      {!collapsed && <>
       {serviciosFiltrados.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           <Wrench className="w-12 h-12 mx-auto mb-3 opacity-30" />
@@ -494,6 +501,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
           ))}
         </div>
       )}
+      </>}
       </div>
     </>
   )
