@@ -185,7 +185,7 @@ export async function getEntregadosByMonth(year: number, month: number) {
 
   const data = await db`
     SELECT * FROM servicios
-    WHERE estado IN ('Entregado', 'Cerrado/Pagado')
+    WHERE estado IN ('Entregado', 'Cerrado/Pagado', 'Por Cobrar')
     AND updated_at >= ${startDate}
     AND updated_at < ${`${year}-${String(month + 1 > 12 ? 1 : month + 1).padStart(2, "0")}-01`}
     ORDER BY updated_at DESC
