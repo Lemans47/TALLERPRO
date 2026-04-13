@@ -923,6 +923,12 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
           servicioData as Omit<Servicio, "id" | "created_at" | "updated_at">,
         )
         console.log("[v0] Servicio created:", newServicio)
+
+        if (servicioAEditar?.isPresupuesto && servicioAEditar.id) {
+          console.log("[v0] Deleting presupuesto after conversion:", servicioAEditar.id)
+          await api.presupuestos.delete(servicioAEditar.id)
+        }
+
         toast({ title: "Servicio guardado" })
       }
       console.log("[v0] Calling onSaved")
