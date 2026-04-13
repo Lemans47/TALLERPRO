@@ -83,11 +83,11 @@ export default function DashboardPage() {
     try {
       const [year, month] = selectedMonth.split("-").map(Number)
       const response = await fetchDashboardData(year, month)
-      const { servicios: serviciosData, gastos: gastosData, empleados: empleadosData, serviciosActivos: activosData, kpis: apiKpis } = response
+      const { servicios: serviciosData, gastos: gastosData, empleados: empleadosData, serviciosActivos: activosData, kpis: apiKpis, entregadosMes } = response
       setServicios(serviciosData)
       setServiciosActivos(activosData)
       setGastos(gastosData)
-      calculateKPIs(serviciosData, gastosData, empleadosData, activosData, apiKpis)
+      calculateKPIs(serviciosData, gastosData, empleadosData, activosData, apiKpis, entregadosMes)
     } catch (error) {
       console.error("Error loading dashboard data:", error)
     } finally {
@@ -95,7 +95,7 @@ export default function DashboardPage() {
     }
   }
 
-  const calculateKPIs = (servicios: Servicio[], gastos: Gasto[], empleados: Empleado[], serviciosActivos: Servicio[], apiKpis?: any) => {
+  const calculateKPIs = (servicios: Servicio[], gastos: Gasto[], empleados: Empleado[], serviciosActivos: Servicio[], apiKpis?: any, entregadosMes?: number) => {
     const parseArr = (v: any): any[] => {
       if (Array.isArray(v)) return v
       if (typeof v === "string" && v) {
@@ -146,7 +146,8 @@ export default function DashboardPage() {
       .slice(0, 3)
       .map((x) => `${x.n} ${x.e.toLowerCase()}`)
     const vehiculosDesglose = desgloseParts.length > 0 ? desgloseParts.join(" · ") : "Sin vehículos activos"
-    const entregadosEsteMes = servicios.filter((s) => s.estado === "Entregado").length
+    // Entregados: viene del backend (busca por updated_at, no fecha_ingreso)
+    const entregadosEsteMes = entregadosMes ?? servicios.filter((s) => s.estado === "Entregado").length
 
     // ---- KPI 2: Flujo de caja ----
     // Anticipos solo de servicios NO cerrados (los cerrados ya están en ingresosCobrado)

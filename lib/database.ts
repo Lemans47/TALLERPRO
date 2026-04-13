@@ -177,6 +177,22 @@ export async function getActiveServicios() {
   return data as Servicio[]
 }
 
+export async function getEntregadosByMonth(year: number, month: number) {
+  const db = getSQL()
+  const startDate = `${year}-${String(month).padStart(2, "0")}-01`
+  const lastDay = new Date(year, month, 0).getDate()
+  const endDate = `${year}-${String(month).padStart(2, "0")}-${lastDay}`
+
+  const data = await db`
+    SELECT * FROM servicios
+    WHERE estado IN ('Entregado', 'Cerrado/Pagado')
+    AND updated_at >= ${startDate}
+    AND updated_at < ${`${year}-${String(month + 1 > 12 ? 1 : month + 1).padStart(2, "0")}-01`}
+    ORDER BY updated_at DESC
+  `
+  return data as Servicio[]
+}
+
 export async function getServiciosByMonth(year: number, month: number) {
   const db = getSQL()
   const startDate = `${year}-${String(month).padStart(2, "0")}-01`

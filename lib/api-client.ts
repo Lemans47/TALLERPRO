@@ -23,7 +23,7 @@ export async function fetchDashboardData(
   year: number,
   month: number,
   options?: { useAbonos?: boolean },
-): Promise<{ servicios: Servicio[]; gastos: Gasto[]; empleados: Empleado[]; serviciosActivos: Servicio[]; kpis: any }> {
+): Promise<{ servicios: Servicio[]; gastos: Gasto[]; empleados: Empleado[]; serviciosActivos: Servicio[]; kpis: any; entregadosMes: number }> {
   const params = new URLSearchParams({ year: String(year), month: String(month) })
   if (options?.useAbonos) params.set("useAbonos", "true")
   const res = await fetch(`/api/dashboard?${params}`)
