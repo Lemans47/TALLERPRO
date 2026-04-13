@@ -149,8 +149,11 @@ export default function DashboardPage() {
     const entregadosEsteMes = servicios.filter((s) => s.estado === "Entregado").length
 
     // ---- KPI 2: Flujo de caja ----
-    const anticiposTotal = servicios.reduce((s, sv) => s + Number(sv.anticipo || 0), 0)
-    const flujoEntradas = ingresosCobrado + anticiposTotal
+    // Anticipos solo de servicios NO cerrados (los cerrados ya están en ingresosCobrado)
+    const anticiposNoCerrados = servicios
+      .filter((s) => s.estado !== "Cerrado/Pagado")
+      .reduce((s, sv) => s + Number(sv.anticipo || 0), 0)
+    const flujoEntradas = ingresosCobrado + anticiposNoCerrados
     const flujoSalidas = gastosOperacionales + costosCerrados + sueldosComprometidos
     const flujoCaja = flujoEntradas - flujoSalidas
 
