@@ -40,6 +40,7 @@ interface KPIs {
   serviciosConMonto: number
   gastosOperativos: number
   margenContribucion: number
+  gastosTotalMes: number
 }
 
 export default function DashboardPage() {
@@ -66,6 +67,7 @@ export default function DashboardPage() {
     serviciosConMonto: 0,
     gastosOperativos: 0,
     margenContribucion: 0,
+    gastosTotalMes: 0,
   })
   const [servicios, setServicios] = useState<Servicio[]>([])
   const [serviciosActivos, setServiciosActivos] = useState<Servicio[]>([])
@@ -158,9 +160,10 @@ export default function DashboardPage() {
     const flujoSalidas = gastosOperacionales + costosCerrados + sueldosComprometidos
     const flujoCaja = flujoEntradas - flujoSalidas
 
-    // ---- KPI 3: Margen de ganancia ----
+    // ---- KPI 3: Margen de ganancia (consistente con gráfico: ingresos vs todos los gastos) ----
+    const gastosTotalMes = costosFacturados + gastosOperacionales + sueldosComprometidos
     const margenGanancia = ingresosFacturado > 0
-      ? ((ingresosFacturado - costosFacturados) / ingresosFacturado) * 100
+      ? ((ingresosFacturado - gastosTotalMes) / ingresosFacturado) * 100
       : 0
 
     // ---- KPI 4: Por cobrar con edad ----
@@ -225,6 +228,7 @@ export default function DashboardPage() {
       serviciosConMonto: countConMonto,
       gastosOperativos: gastosOperativosApi,
       margenContribucion: margenContribucionApi,
+      gastosTotalMes,
     })
   }
 
@@ -305,6 +309,9 @@ export default function DashboardPage() {
               <p className="text-xs text-muted-foreground mt-0.5">margen</p>
             </div>
           </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            Gastos {formatCurrency(kpis.gastosTotalMes)} · Margen {formatCurrency(kpis.ingresosFacturado - kpis.gastosTotalMes)}
+          </p>
         </div>
         <KPICard
           title="Flujo de Caja"
