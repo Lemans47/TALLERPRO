@@ -13,6 +13,7 @@ import { MonthSelector } from "@/components/month-selector"
 import {
   Car, ArrowUpDown, TrendingUp, CheckCircle2,
   Activity, Clock, Wrench, Plus, RefreshCw, ChevronDown, ChevronUp,
+  Paintbrush,
 } from "lucide-react"
 import { useMonth } from "@/lib/month-context"
 import { fetchDashboardData } from "@/lib/api-client"
@@ -41,6 +42,12 @@ interface KPIs {
   gastosOperativos: number
   margenContribucion: number
   gastosTotalMes: number
+  // Pintura
+  piezasPintadas: number
+  ingresosPintura: number
+  gastosPintura: number
+  costoPorPieza: number
+  margenPintura: number
 }
 
 export default function DashboardPage() {
@@ -68,6 +75,11 @@ export default function DashboardPage() {
     gastosOperativos: 0,
     margenContribucion: 0,
     gastosTotalMes: 0,
+    piezasPintadas: 0,
+    ingresosPintura: 0,
+    gastosPintura: 0,
+    costoPorPieza: 0,
+    margenPintura: 0,
   })
   const [servicios, setServicios] = useState<Servicio[]>([])
   const [serviciosActivos, setServiciosActivos] = useState<Servicio[]>([])
@@ -186,6 +198,19 @@ export default function DashboardPage() {
     if (edadReciente > 0) edadParts.push(`$${(edadReciente / 1000).toFixed(0)}k reciente`)
     const porCobrarDesglose = edadParts.join(" · ") || "Sin deuda pendiente"
 
+    // ---- KPIs Pintura ----
+    const piezasPintadas = servicios.reduce((sum, s) => {
+      return sum + parseArr(s.piezas_pintura).reduce((ps: number, p: any) => ps + Number(p.cantidad || p.cantidad_piezas || 1), 0)
+    }, 0)
+    const ingresosPintura = servicios.reduce((sum, s) => {
+      return sum + parseArr(s.piezas_pintura).reduce((ps: number, p: any) => ps + Number(p.precio || 0), 0)
+    }, 0)
+    const gastosPintura = gastos
+      .filter((g) => g.categoria === "Gastos de Pintura")
+      .reduce((sum, g) => sum + Number(g.monto || 0), 0)
+    const costoPorPieza = piezasPintadas > 0 ? gastosPintura / piezasPintadas : 0
+    const margenPintura = ingresosPintura > 0 ? ((ingresosPintura - gastosPintura) / ingresosPintura) * 100 : 0
+
     // ---- KPIs secundarios ----
     const activosParaPromedio = serviciosActivos
     const tiempoPromedio = activosParaPromedio.length > 0
@@ -229,6 +254,11 @@ export default function DashboardPage() {
       gastosOperativos: gastosOperativosApi,
       margenContribucion: margenContribucionApi,
       gastosTotalMes,
+      piezasPintadas,
+      ingresosPintura,
+      gastosPintura,
+      costoPorPieza,
+      margenPintura,
     })
   }
 
@@ -387,6 +417,44 @@ export default function DashboardPage() {
           </div>
         )
       })()}
+
+      {/* KPIs Pintura */}
+      {!isOperador && kpis.piezasPintadas > 0 && (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="p-2 rounded-lg bg-purple-500/10">
+              <Paintbrush className="w-4 h-4 text-purple-500" />
+            </div>
+            <h3 className="text-sm font-semibold text-muted-foreground">Pintura del Mes</h3>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+            <div>
+              <p className="text-xs text-muted-foreground">Piezas Pintadas</p>
+              <p className="text-2xl font-bold mt-1">{kpis.piezasPintadas}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Ingresos Pintura</p>
+              <p className="text-2xl font-bold mt-1 text-green-500">{formatCurrency(kpis.ingresosPintura)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Gastos Materiales</p>
+              <p className="text-2xl font-bold mt-1 text-red-400">{formatCurrency(kpis.gastosPintura)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Costo por Pieza</p>
+              <p className="text-2xl font-bold mt-1">{formatCurrency(kpis.costoPorPieza)}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">ref. materiales</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Margen Pintura</p>
+              <p className={`text-2xl font-bold mt-1 ${kpis.margenPintura >= 40 ? "text-green-500" : kpis.margenPintura >= 20 ? "text-amber-500" : "text-red-400"}`}>
+                {kpis.margenPintura.toFixed(1)}%
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">ganancia {formatCurrency(kpis.ingresosPintura - kpis.gastosPintura)}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ZONA 2: Operación y Alertas */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
