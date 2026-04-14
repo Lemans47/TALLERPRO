@@ -46,6 +46,8 @@ interface KPIs {
   piezasPintadas: number
   ingresosPintura: number
   gastosPintura: number
+  gastosPinturaMateriales: number
+  manoObraPintura: number
   costoPorPieza: number
   margenPintura: number
 }
@@ -78,6 +80,8 @@ export default function DashboardPage() {
     piezasPintadas: 0,
     ingresosPintura: 0,
     gastosPintura: 0,
+    gastosPinturaMateriales: 0,
+    manoObraPintura: 0,
     costoPorPieza: 0,
     margenPintura: 0,
   })
@@ -205,9 +209,16 @@ export default function DashboardPage() {
     const ingresosPintura = servicios.reduce((sum, s) => {
       return sum + parseArr(s.piezas_pintura).reduce((ps: number, p: any) => ps + Number(p.precio || 0), 0)
     }, 0)
-    const gastosPintura = gastos
+    const gastosPinturaMateriales = gastos
       .filter((g) => g.categoria === "Gastos de Pintura")
       .reduce((sum, g) => sum + Number(g.monto || 0), 0)
+    // Mano de obra pintura: costos auto-calculados con descripción "Mano de Obra Pintura"
+    const manoObraPintura = servicios.reduce((sum, s) => {
+      return sum + parseArr(s.costos)
+        .filter((c: any) => c.isAuto && String(c.descripcion || "").toLowerCase().includes("mano de obra pintura"))
+        .reduce((cs: number, c: any) => cs + Number(c.monto || 0), 0)
+    }, 0)
+    const gastosPintura = gastosPinturaMateriales + manoObraPintura
     const costoPorPieza = piezasPintadas > 0 ? gastosPintura / piezasPintadas : 0
     const margenPintura = ingresosPintura > 0 ? ((ingresosPintura - gastosPintura) / ingresosPintura) * 100 : 0
 
@@ -257,6 +268,8 @@ export default function DashboardPage() {
       piezasPintadas,
       ingresosPintura,
       gastosPintura,
+      gastosPinturaMateriales,
+      manoObraPintura,
       costoPorPieza,
       margenPintura,
     })
@@ -437,8 +450,11 @@ export default function DashboardPage() {
               <p className="text-2xl font-bold mt-1 text-green-500">{formatCurrency(kpis.ingresosPintura)}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Gastos Materiales</p>
+              <p className="text-xs text-muted-foreground">Costos Pintura</p>
               <p className="text-2xl font-bold mt-1 text-red-400">{formatCurrency(kpis.gastosPintura)}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Mat. {formatCurrency(kpis.gastosPinturaMateriales)} · M.O. {formatCurrency(kpis.manoObraPintura)}
+              </p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Costo por Pieza</p>
