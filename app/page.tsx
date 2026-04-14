@@ -92,6 +92,27 @@ export default function DashboardPage() {
   const [showBreakeven, setShowBreakeven] = useState(false)
   const { selectedMonth } = useMonth()
 
+  // Migración única: actualizar servicios existentes sin tarifa de mano de obra
+  useEffect(() => {
+    const migrated = localStorage.getItem("mano_obra_migrated")
+    if (!migrated) {
+      const tarifa = Number(localStorage.getItem("mano_obra_pintura_default") || 0)
+      if (tarifa > 0) {
+        fetch("/api/migrate-mano-obra", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tarifa }),
+        })
+          .then((r) => r.json())
+          .then((data) => {
+            console.log("Migración mano de obra:", data)
+            localStorage.setItem("mano_obra_migrated", "true")
+          })
+          .catch(console.error)
+      }
+    }
+  }, [])
+
   useEffect(() => {
     loadData()
   }, [selectedMonth])
@@ -212,9 +233,14 @@ export default function DashboardPage() {
     const gastosPinturaMateriales = gastos
       .filter((g) => g.categoria === "Gastos de Pintura")
       .reduce((sum, g) => sum + Number(g.monto || 0), 0)
-    // Mano de obra pintura: piezas × tarifa configurada en localStorage
-    const tarifaManoObra = Number(localStorage.getItem("mano_obra_pintura_default") || 0)
-    const manoObraPintura = piezasPintadas * tarifaManoObra
+    // Mano de obra pintura: usa tarifa guardada en cada servicio, fallback a localStorage
+    const tarifaFallback = Number(localStorage.getItem("mano_obra_pintura_default") || 0)
+    const manoObraPintura = servicios.reduce((sum, s) => {
+      const piezas = parseArr(s.piezas_pintura)
+      const cantPiezas = piezas.reduce((ps: number, p: any) => ps + Number(p.cantidad || p.cantidad_piezas || 1), 0)
+      const tarifa = Number(s.mano_obra_pintura || 0) || tarifaFallback
+      return sum + (cantPiezas * tarifa)
+    }, 0)
     const gastosPintura = gastosPinturaMateriales + manoObraPintura
     const costoPorPieza = piezasPintadas > 0 ? gastosPintura / piezasPintadas : 0
     const margenPintura = ingresosPintura > 0 ? ((ingresosPintura - gastosPintura) / ingresosPintura) * 100 : 0

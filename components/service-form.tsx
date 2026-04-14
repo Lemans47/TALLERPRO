@@ -896,7 +896,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         cliente: formData.cliente,
         telefono: formData.telefono,
         observaciones: formData.observaciones,
-        mano_obra_pintura: 0,
+        mano_obra_pintura: manoObraConfig,
         cobros: cobrosArray,
         costos: costosArray,
         piezas_pintura: piezasPinturaArray,
@@ -1009,7 +1009,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         cliente: formData.cliente,
         telefono: formData.telefono,
         observaciones: formData.observaciones,
-        mano_obra_pintura: 0, // Ya no se usa aquí, está en costos
+        mano_obra_pintura: manoObraConfig,
         cobros: cobrosArray,
         costos: costosArray,
         piezas_pintura: piezasPinturaArray,
