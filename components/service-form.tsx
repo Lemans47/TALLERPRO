@@ -1421,7 +1421,8 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                                   año: data.año ? Number(data.año) : prev.año,
                                   vin: data.vin || prev.vin,
                                 }))
-                                toast({ title: "Vehículo encontrado", description: `${data.marca ?? ""} ${data.modelo ?? ""}`.trim() })
+                                const desc = [`${data.marca ?? ""} ${data.modelo ?? ""}`.trim(), data.mes_revision_tecnica ? `Rev. técnica: ${data.mes_revision_tecnica}` : ""].filter(Boolean).join(" · ")
+                                toast({ title: "Vehículo encontrado", description: desc })
                               }
                             } catch {
                               // falla silenciosa — el usuario puede ingresar los datos manualmente

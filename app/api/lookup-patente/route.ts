@@ -8,6 +8,15 @@ function getSQL() {
   return postgres(connectionString, { ssl: "require", max: 2, prepare: false })
 }
 
+let migrated = false
+async function ensureColumn(db: ReturnType<typeof postgres>) {
+  if (migrated) return
+  try {
+    await db`ALTER TABLE vehiculos ADD COLUMN IF NOT EXISTS mes_revision_tecnica TEXT`
+    migrated = true
+  } catch { migrated = true }
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -29,6 +38,7 @@ export async function GET(request: Request) {
           año: vehiculoEnDB.año ? Number(vehiculoEnDB.año) : null,
           color: vehiculoEnDB.color,
           vin: vehiculoEnDB.vin,
+          mes_revision_tecnica: vehiculoEnDB.mes_revision_tecnica ?? null,
           fromCache: true,
         })
       }
@@ -69,20 +79,23 @@ export async function GET(request: Request) {
     const año = d.year ? Number(d.year) : null
     const color = d.color ?? null
     const vin = d.vinNumber ?? null
+    const mes_revision_tecnica = d.monthRT ?? null
 
     // 4. Guardar en caché (DB) — no bloquea la respuesta si falla
     if (marca) {
       try {
         const db = getSQL()
+        await ensureColumn(db)
         await db`
-          INSERT INTO vehiculos (patente, marca, modelo, color, año, vin)
-          VALUES (${patente}, ${marca}, ${modelo}, ${color}, ${año}, ${vin})
+          INSERT INTO vehiculos (patente, marca, modelo, color, año, vin, mes_revision_tecnica)
+          VALUES (${patente}, ${marca}, ${modelo}, ${color}, ${año}, ${vin}, ${mes_revision_tecnica})
           ON CONFLICT (patente) DO UPDATE SET
             marca = COALESCE(EXCLUDED.marca, vehiculos.marca),
             modelo = COALESCE(EXCLUDED.modelo, vehiculos.modelo),
             color = COALESCE(EXCLUDED.color, vehiculos.color),
             año = COALESCE(EXCLUDED.año, vehiculos.año),
             vin = COALESCE(EXCLUDED.vin, vehiculos.vin),
+            mes_revision_tecnica = COALESCE(EXCLUDED.mes_revision_tecnica, vehiculos.mes_revision_tecnica),
             updated_at = NOW()
         `
         await db.end()
@@ -91,7 +104,7 @@ export async function GET(request: Request) {
       }
     }
 
-    return NextResponse.json({ patente, marca, modelo, año, color, vin, fromCache: false })
+    return NextResponse.json({ patente, marca, modelo, año, color, vin, mes_revision_tecnica, fromCache: false })
   } catch (error: any) {
     console.error("[lookup-patente] error:", error)
     if (error?.name === "TimeoutError") {

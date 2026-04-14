@@ -817,6 +817,7 @@ export interface Vehiculo {
   color?: string
   año?: number
   vin?: string
+  mes_revision_tecnica?: string
   cliente_id?: string
   created_at: string
   updated_at: string
