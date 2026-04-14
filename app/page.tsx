@@ -212,12 +212,9 @@ export default function DashboardPage() {
     const gastosPinturaMateriales = gastos
       .filter((g) => g.categoria === "Gastos de Pintura")
       .reduce((sum, g) => sum + Number(g.monto || 0), 0)
-    // Mano de obra pintura: costos auto-calculados con descripción "Mano de Obra Pintura"
-    const manoObraPintura = servicios.reduce((sum, s) => {
-      return sum + parseArr(s.costos)
-        .filter((c: any) => c.isAuto && String(c.descripcion || "").toLowerCase().includes("mano de obra pintura"))
-        .reduce((cs: number, c: any) => cs + Number(c.monto || 0), 0)
-    }, 0)
+    // Mano de obra pintura: piezas × tarifa configurada en localStorage
+    const tarifaManoObra = Number(localStorage.getItem("mano_obra_pintura_default") || 0)
+    const manoObraPintura = piezasPintadas * tarifaManoObra
     const gastosPintura = gastosPinturaMateriales + manoObraPintura
     const costoPorPieza = piezasPintadas > 0 ? gastosPintura / piezasPintadas : 0
     const margenPintura = ingresosPintura > 0 ? ((ingresosPintura - gastosPintura) / ingresosPintura) * 100 : 0
