@@ -14,7 +14,7 @@ interface PendingExpensesAlertProps {
 export function PendingExpensesAlert({ gastos, maxItems = 5 }: PendingExpensesAlertProps) {
   const pendientes = gastos
     .filter((g) => g.pagado === false)
-    .sort((a, b) => Number(b.monto) - Number(a.monto))
+    .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())
 
   const totalPendiente = pendientes.reduce((sum, g) => sum + Number(g.monto), 0)
 
