@@ -880,10 +880,10 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
           precio: p.precio * (p.cantidad_piezas || 1),
         }))
 
-      const anticipoExistente = (servicioAEditar && !servicioAEditar.isPresupuesto)
+      const anticipoFinal = formData.anticipo || ((servicioAEditar && !servicioAEditar.isPresupuesto)
         ? Number(servicioAEditar.anticipo) || 0
-        : 0
-      const saldoPendiente = Math.max(0, montoConIva - anticipoExistente)
+        : 0)
+      const saldoPendiente = Math.max(0, montoConIva - anticipoFinal)
 
       const servicioData = {
         fecha_ingreso: formData.fecha_ingreso,
@@ -902,7 +902,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         piezas_pintura: piezasPinturaArray,
         estado: formData.estado,
         iva: formData.iva,
-        anticipo: anticipoExistente,
+        anticipo: anticipoFinal,
         saldo_pendiente: saldoPendiente,
         monto_total_sin_iva: cobroTotal,
         monto_total: montoConIva,
@@ -1577,7 +1577,13 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Estado</Label>
-                    <Select value={formData.estado} onValueChange={(v) => setFormData({ ...formData, estado: v })}>
+                    <Select value={formData.estado} onValueChange={(v) => {
+                      if (v === "Cerrado/Pagado" && formData.estado !== "Cerrado/Pagado") {
+                        setFormData({ ...formData, estado: v, anticipo: montoConIva })
+                      } else {
+                        setFormData({ ...formData, estado: v })
+                      }
+                    }}>
                       <SelectTrigger className="bg-background/50 h-9">
                         <SelectValue />
                       </SelectTrigger>
