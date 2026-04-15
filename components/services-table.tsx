@@ -89,7 +89,16 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
 
   const handleEstadoChange = async (id: string, nuevoEstado: string) => {
     try {
-      await api.servicios.update(id, { estado: nuevoEstado })
+      const updateData: Record<string, unknown> = { estado: nuevoEstado }
+      if (nuevoEstado === "Cerrado/Pagado") {
+        const servicio = servicios.find((s) => s.id === id)
+        if (servicio) {
+          const montoTotal = Number(servicio.monto_total) || 0
+          updateData.anticipo = montoTotal
+          updateData.saldo_pendiente = 0
+        }
+      }
+      await api.servicios.update(id, updateData)
       onDeleted()
       toast({ title: "Estado actualizado" })
     } catch (error) {
