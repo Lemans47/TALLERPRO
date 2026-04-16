@@ -372,7 +372,7 @@ export async function convertPresupuestoToServicio(presupuestoId: string) {
         anticipo, saldo_pendiente, monto_total, monto_total_sin_iva, observaciones_checkboxes,
         fotos_ingreso, fotos_entrega
       ) VALUES (
-        ${presupuesto.fecha_ingreso}, ${presupuesto.patente}, ${presupuesto.marca}, ${presupuesto.modelo},
+        NOW(), ${presupuesto.patente}, ${presupuesto.marca}, ${presupuesto.modelo},
         ${presupuesto.color || null}, ${presupuesto.kilometraje || null}, ${presupuesto.año || null},
         ${presupuesto.cliente}, ${presupuesto.telefono || ""}, ${presupuesto.observaciones || ""},
         ${presupuesto.mano_obra_pintura || 0},
