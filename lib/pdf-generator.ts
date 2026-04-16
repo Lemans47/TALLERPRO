@@ -98,7 +98,7 @@ export async function generateServicioPDF(data: Servicio | Presupuesto) {
   doc.setFontSize(9)
 
   // Agrupar cobros por categoría
-  const cobrosPorCategoria: { [key: string]: { descripcion: string; monto: number }[] } = {}
+  const cobrosPorCategoria: { [key: string]: { categoria?: string; descripcion: string; monto: number }[] } = {}
 
   const CAT_LABELS: Record<string, string> = {
     desmontar: "Desmontar y Montar",

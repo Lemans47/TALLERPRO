@@ -1,15 +1,8 @@
 import { NextResponse } from "next/server"
-import { getVehiculoByPatente } from "@/lib/database"
-import postgres from "postgres"
-
-function getSQL() {
-  const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL
-  if (!connectionString) throw new Error("Database connection string not found")
-  return postgres(connectionString, { ssl: "require", max: 2, prepare: false })
-}
+import { getVehiculoByPatente, getSQL } from "@/lib/database"
 
 let migrated = false
-async function ensureColumn(db: ReturnType<typeof postgres>) {
+async function ensureColumn(db: any) {
   if (migrated) return
   try {
     await db`ALTER TABLE vehiculos ADD COLUMN IF NOT EXISTS mes_revision_tecnica TEXT`
@@ -98,7 +91,6 @@ export async function GET(request: Request) {
             mes_revision_tecnica = COALESCE(EXCLUDED.mes_revision_tecnica, vehiculos.mes_revision_tecnica),
             updated_at = NOW()
         `
-        await db.end()
       } catch (dbError) {
         console.error("[lookup-patente] error guardando en DB:", dbError)
       }

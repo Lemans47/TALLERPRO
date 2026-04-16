@@ -13,24 +13,6 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const year = searchParams.get("year")
     const month = searchParams.get("month")
-    const action = searchParams.get("action")
-
-    if (action === "convert") {
-      const id = searchParams.get("id")
-      if (!id) {
-        return NextResponse.json({ error: "ID required" }, { status: 400 })
-      }
-
-      // Convertir presupuesto a servicio de forma atómica (transacción)
-      // convertPresupuestoToServicio lanza error si el presupuesto no existe
-      const servicio = await convertPresupuestoToServicio(id)
-
-      return NextResponse.json({
-        success: true,
-        servicio,
-        message: "Presupuesto convertido a servicio exitosamente",
-      })
-    }
 
     let presupuestos
     if (year && month) {
@@ -43,6 +25,26 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error("Presupuestos GET error:", error)
     return NextResponse.json({ error: "Error loading presupuestos" }, { status: 500 })
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const { id } = await request.json()
+    if (!id) {
+      return NextResponse.json({ error: "ID required" }, { status: 400 })
+    }
+
+    const servicio = await convertPresupuestoToServicio(id)
+
+    return NextResponse.json({
+      success: true,
+      servicio,
+      message: "Presupuesto convertido a servicio exitosamente",
+    })
+  } catch (error) {
+    console.error("Presupuestos PATCH (convert) error:", error)
+    return NextResponse.json({ error: "Error converting presupuesto" }, { status: 500 })
   }
 }
 

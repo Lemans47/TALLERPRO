@@ -8,6 +8,7 @@ export interface VehiculoLookup {
   año?: number
   color?: string
   vin?: string
+  mes_revision_tecnica?: string
   fromCache?: boolean
 }
 
@@ -105,7 +106,11 @@ export async function deletePresupuestoApi(id: string): Promise<void> {
 }
 
 export async function convertToServicioApi(id: string): Promise<any> {
-  const res = await fetch(`/api/presupuestos?action=convert&id=${id}`)
+  const res = await fetch("/api/presupuestos", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id }),
+  })
   if (!res.ok) throw new Error("Error converting presupuesto")
   return res.json()
 }

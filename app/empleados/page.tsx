@@ -262,7 +262,7 @@ export default function EmpleadosPage() {
                     ) : abEmp.map(a => (
                       <div key={a.id} className="flex items-center gap-3 text-sm py-1 border-b border-border/40 last:border-0">
                         <span className="text-muted-foreground w-20 shrink-0">
-                          {new Date(a.fecha instanceof Date ? a.fecha : String(a.fecha).split("T")[0] + "T12:00").toLocaleDateString("es-CL", { day:"2-digit", month:"2-digit" })}
+                          {new Date(String(a.fecha).split("T")[0] + "T12:00").toLocaleDateString("es-CL", { day:"2-digit", month:"2-digit" })}
                         </span>
                         <span className="flex-1">{a.notas || "—"}</span>
                         <span className="font-semibold text-success">${Number(a.monto).toLocaleString("es-CL")}</span>

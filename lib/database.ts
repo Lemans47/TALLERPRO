@@ -15,7 +15,7 @@ declare global {
   var _pgSql: ReturnType<typeof postgres> | undefined
 }
 
-function getSQL() {
+export function getSQL() {
   if (global._pgSql) return global._pgSql as any
 
   const connectionString =
@@ -49,8 +49,8 @@ export interface Servicio {
   telefono: string
   observaciones: string | null
   mano_obra_pintura: number
-  cobros: { categoria: string; descripcion: string; monto: number }[]
-  costos: { descripcion: string; monto: number }[]
+  cobros: { categoria: string; descripcion: string; monto: number; isAuto?: boolean }[]
+  costos: { categoria?: string; descripcion: string; monto: number; isAuto?: boolean }[]
   piezas_pintura: { nombre: string; cantidad: number; precio: number }[]
   estado: string
   iva: string
@@ -79,8 +79,8 @@ export interface Presupuesto {
   telefono: string
   observaciones: string | null
   mano_obra_pintura: number
-  cobros: { categoria: string; descripcion: string; monto: number }[]
-  costos: { descripcion: string; monto: number }[]
+  cobros: { categoria: string; descripcion: string; monto: number; isAuto?: boolean }[]
+  costos: { categoria?: string; descripcion: string; monto: number; isAuto?: boolean }[]
   piezas_pintura: { nombre: string; cantidad: number; precio: number }[]
   iva: string
   monto_total: number
@@ -180,14 +180,15 @@ export async function getActiveServicios() {
 export async function getEntregadosByMonth(year: number, month: number) {
   const db = getSQL()
   const startDate = `${year}-${String(month).padStart(2, "0")}-01`
-  const lastDay = new Date(year, month, 0).getDate()
-  const endDate = `${year}-${String(month).padStart(2, "0")}-${lastDay}`
+  const nextYear = month === 12 ? year + 1 : year
+  const nextMonth = month === 12 ? 1 : month + 1
+  const endDate = `${nextYear}-${String(nextMonth).padStart(2, "0")}-01`
 
   const data = await db`
     SELECT * FROM servicios
     WHERE estado IN ('Entregado', 'Cerrado/Pagado', 'Por Cobrar')
     AND updated_at >= ${startDate}
-    AND updated_at < ${`${year}-${String(month + 1 > 12 ? 1 : month + 1).padStart(2, "0")}-01`}
+    AND updated_at < ${endDate}
     ORDER BY updated_at DESC
   `
   return data as Servicio[]
@@ -358,7 +359,7 @@ export async function deletePresupuesto(id: string) {
 
 export async function convertPresupuestoToServicio(presupuestoId: string) {
   const db = getSQL()
-  return await db.begin(async (sql) => {
+  return await db.begin(async (sql: any) => {
     // Get presupuesto within transaction to lock the row
     const presupuestoData = await sql`SELECT * FROM presupuestos WHERE id = ${presupuestoId} FOR UPDATE`
     const presupuesto = presupuestoData[0] as Presupuesto
@@ -604,7 +605,7 @@ export async function deleteGastosSueldoByPattern(nombre: string, mes: number, a
 // Borra el abono y su gasto asociado de forma atómica
 export async function deleteAbonoWithGastos(id: string) {
   const db = getSQL()
-  await db.begin(async (sql) => {
+  await db.begin(async (sql: any) => {
     const [abono] = await sql`
       SELECT a.*, e.nombre AS empleado_nombre
       FROM abonos_empleados a
@@ -986,7 +987,7 @@ export async function batchUpdatePreciosPintura(updates: { id: string; precio: n
   if (updates.length === 0) return []
   const results = await Promise.all(
     updates.map((u) =>
-      db`UPDATE precios_pintura SET precio = ${u.precio}, updated_at = NOW() WHERE id = ${u.id} RETURNING *`
+      db`UPDATE precios_pintura SET precio_por_pieza = ${u.precio}, updated_at = NOW() WHERE id = ${u.id} RETURNING *`
     )
   )
   return results.flat() as PrecioPintura[]

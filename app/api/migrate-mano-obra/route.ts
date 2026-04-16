@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { sql } from "@/lib/database"
+import { getSQL } from "@/lib/database"
 
 export async function POST(request: Request) {
   try {
@@ -7,6 +7,8 @@ export async function POST(request: Request) {
     if (!tarifa || tarifa <= 0) {
       return NextResponse.json({ error: "Tarifa inválida" }, { status: 400 })
     }
+
+    const sql = getSQL()
 
     // Actualizar servicios que tienen piezas de pintura pero mano_obra_pintura = 0
     const result = await sql`

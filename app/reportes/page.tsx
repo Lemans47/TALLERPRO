@@ -398,14 +398,14 @@ export default function ReportsPage() {
                     outerRadius={100}
                     paddingAngle={2}
                     dataKey="value"
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    label={({ name, percent }: any) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
                     labelLine={false}
                   >
                     {gastosChartData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: number) => [`$${value.toLocaleString("es-CL")}`, ""]} />
+                  <Tooltip formatter={(value) => [`$${Number(value).toLocaleString("es-CL")}`, ""]} />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
@@ -675,7 +675,7 @@ export default function ReportsPage() {
                       <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                       <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                       <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
-                      <Tooltip formatter={(v: number) => [`$${v.toLocaleString("es-CL")}`, "Ingresos"]} contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px" }} />
+                      <Tooltip formatter={(v) => [`$${Number(v).toLocaleString("es-CL")}`, "Ingresos"]} contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px" }} />
                       <Bar dataKey="value" fill="var(--chart-1)" radius={[4, 4, 0, 0]} name="Ingresos" />
                     </BarChart>
                   </ResponsiveContainer>

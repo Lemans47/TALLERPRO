@@ -197,10 +197,11 @@ export function RevenueChart() {
               tickLine={false}
             />
             <Tooltip
-              formatter={(value: number, name: string) => {
-                if (name === "margen") return [`${value}%`, "Margen"]
-                if (name === "ingresos") return [`$${value.toLocaleString("es-CL")}`, "Ingresos"]
-                return [`$${value.toLocaleString("es-CL")}`, "Gastos"]
+              formatter={(value, name) => {
+                const v = Number(value)
+                if (name === "margen") return [`${v}%`, "Margen"]
+                if (name === "ingresos") return [`$${v.toLocaleString("es-CL")}`, "Ingresos"]
+                return [`$${v.toLocaleString("es-CL")}`, "Gastos"]
               }}
               contentStyle={{
                 backgroundColor: "#1e2a3c",

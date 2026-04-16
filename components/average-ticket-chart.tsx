@@ -98,7 +98,7 @@ export function AverageTicketChart() {
               tickLine={false}
             />
             <Tooltip
-              formatter={(value: number) => [`$${value.toLocaleString("es-CL")}`, "Ticket promedio"]}
+              formatter={(value) => [`$${Number(value).toLocaleString("es-CL")}`, "Ticket promedio"]}
               contentStyle={{
                 backgroundColor: "#1e2a3c",
                 border: "1px solid #334155",

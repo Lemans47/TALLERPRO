@@ -24,14 +24,10 @@ import {
   Car,
   User,
   Wrench,
-  DollarSign,
   Paintbrush,
   Plus,
   Trash2,
-  Package,
-  Settings2,
   Settings,
-  Hammer,
   Check,
   ChevronsUpDown,
   Camera,
@@ -43,12 +39,10 @@ import {
   BookMarked,
   Loader2,
 } from "lucide-react"
-import { api, lookupPatente, type Servicio, type Presupuesto, type PrecioPintura, type FotoServicio } from "@/lib/api-client"
-import { useToast } from "@/components/ui/use-toast" // Import useToast hook
-import { Badge } from "@/components/ui/badge"
+import { api, lookupPatente, type Servicio, type Presupuesto, type FotoServicio } from "@/lib/api-client"
+import { useToast } from "@/hooks/use-toast"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { generateServicioPDF } from "@/lib/pdf-generator"
 import { generarPDFPresupuesto } from "@/lib/pdf-presupuesto"
 import { PDFPreviewModal } from "@/components/pdf-preview-modal"
 import { roundMoney } from "@/lib/utils"
@@ -69,26 +63,6 @@ const ESTADOS = [
   "Entregado",
   "Por Cobrar",
   "Cerrado/Pagado",
-]
-
-const CATEGORIAS_COBROS = [
-  { id: "desmontar", label: "Desmontar y Montar", icon: Wrench },
-  { id: "desabolladura", label: "Desabolladura", icon: Hammer },
-  { id: "reparar", label: "Reparar", icon: Wrench },
-  { id: "pintura", label: "Piezas Pintura", icon: Paintbrush },
-  { id: "mecanica", label: "Mecánica", icon: Settings2 },
-  { id: "repuestos", label: "Repuestos", icon: Package },
-  { id: "otros", label: "Otros", icon: DollarSign },
-]
-
-const CATEGORIAS_COSTOS = [
-  { id: "desmontar", label: "Desmontar y Montar", icon: Wrench },
-  { id: "desabolladura", label: "Desabolladura", icon: Hammer },
-  { id: "reparar", label: "Reparar", icon: Wrench },
-  { id: "pintura", label: "Mano Obra Pintura", icon: Paintbrush },
-  { id: "mecanica", label: "Mecánica", icon: Settings2 },
-  { id: "repuestos", label: "Repuestos", icon: Package },
-  { id: "otros", label: "Otros", icon: DollarSign },
 ]
 
 interface ItemDetalle {
@@ -114,70 +88,6 @@ interface PiezaPintura {
   cantidad_piezas?: number
 }
 
-const ItemsList = ({
-  items,
-  categoria,
-  onAdd,
-  onUpdate,
-  onRemove,
-}: {
-  items: ItemDetalle[]
-  categoria: keyof ItemsPorCategoria
-  onAdd: () => void
-  onUpdate: (id: string, field: "descripcion" | "monto", value: string | number) => void
-  onRemove: (id: string) => void
-}) => (
-  <div className="space-y-2">
-    {items.length === 0 ? (
-      <div className="text-center py-4 text-muted-foreground text-xs border border-dashed border-border rounded-lg bg-secondary/20">
-        Sin items. Clic en + para agregar.
-      </div>
-    ) : (
-      <div className="space-y-2">
-        {items.map((item, index) => (
-          <div key={item.id} className="flex gap-2 items-center p-2 bg-secondary/30 rounded-lg border border-border">
-            <span className="text-xs text-muted-foreground w-4">{index + 1}.</span>
-            <Input
-              value={item.descripcion}
-              onChange={(e) => onUpdate(item.id, "descripcion", e.target.value)}
-              placeholder="Descripción..."
-              className="flex-1 bg-background/50 text-sm h-8"
-            />
-            <div className="flex items-center gap-1">
-              <span className="text-xs text-muted-foreground">$</span>
-              <Input
-                type="number"
-                value={item.monto || ""}
-                onChange={(e) => onUpdate(item.id, "monto", Number(e.target.value) || 0)}
-                placeholder="0"
-                className="w-24 bg-background/50 text-sm h-8 text-right"
-              />
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => onRemove(item.id)}
-              className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </Button>
-          </div>
-        ))}
-      </div>
-    )}
-    <Button
-      type="button"
-      variant="outline"
-      size="sm"
-      onClick={onAdd}
-      className="w-full h-8 text-xs border-dashed bg-transparent"
-    >
-      <Plus className="w-3 h-3 mr-1" />
-      Agregar Item
-    </Button>
-  </div>
-)
-
 const isAutoItem = (desc: string | null | undefined) => {
   if (!desc) return false
   const d = desc.toLowerCase()
@@ -190,7 +100,6 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   const [pdfFormatDialog, setPdfFormatDialog] = useState(false)
   const [savedPresupuesto, setSavedPresupuesto] = useState<any>(null)
   const [pdfPreview, setPdfPreview] = useState<{ url: string; fileName: string } | null>(null)
-  const [preciosPintura, setPreciosPintura] = useState<PrecioPintura[]>([])
   const [piezasSeleccionadas, setPiezasSeleccionadas] = useState<PiezaPintura[]>([])
 
   const [showPreciosModal, setShowPreciosModal] = useState(false)
@@ -198,7 +107,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   const [showMaterialesModal, setShowMaterialesModal] = useState(false)
   const [manoObraConfig, setManoObraConfig] = useState(0)
   const [materialesConfig, setMaterialesConfig] = useState(0)
-  const [precioGlobalPintura, setPrecioGlobalPintura] = useState(0)
+  const [, setPrecioGlobalPintura] = useState(0)
   const [preciosTemp, setPreciosTemp] = useState<{ precio: number }[]>([{ precio: 0 }])
 
   const [searchOpen, setSearchOpen] = useState(false)
@@ -206,7 +115,6 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   const [showEditPiezasModal, setShowEditPiezasModal] = useState(false)
   const [activeTab, setActiveTab] = useState("cobros")
   const [activeCobroTab, setActiveCobroTab] = useState("desmontar")
-  const [activeCostoTab, setActiveCostoTab] = useState("pintura") // Added state for cost tab
   const [fotosIngreso, setFotosIngreso] = useState<FotoServicio[]>([])
   const [fotosEntrega, setFotosEntrega] = useState<FotoServicio[]>([])
   const [uploadingFoto, setUploadingFoto] = useState(false)
@@ -357,17 +265,13 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
     }
   }
 
-  const addPiezaFromSearch = useCallback((precio: PrecioPintura) => {
-    setPiezasSeleccionadas((prev) => prev.map((p) => (p.nombre === precio.nombre ? { ...p, seleccionada: true } : p)))
-    setSearchOpen(false)
-    setSearchValue("")
-  }, [])
+
 
   useEffect(() => {
     if (servicioAEditar) {
       setFormData({
         fecha_ingreso: (() => {
-          const v = servicioAEditar.fecha_ingreso
+          const v: any = servicioAEditar.fecha_ingreso
           if (v instanceof Date) {
             const y = v.getFullYear(), m = String(v.getMonth()+1).padStart(2,"0"), d = String(v.getDate()).padStart(2,"0")
             return `${y}-${m}-${d}`
@@ -634,24 +538,6 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
     }))
   }, [])
 
-  // Funciones para manejar costos
-  const addItemCosto = useCallback((categoria: keyof ItemsPorCategoria) => {
-    setCostos((prev) => ({
-      ...prev,
-      [categoria]: [...prev[categoria], { id: crypto.randomUUID(), descripcion: "", monto: 0 }],
-    }))
-  }, [])
-
-  const updateItemCosto = useCallback(
-    (categoria: keyof ItemsPorCategoria, id: string, field: "descripcion" | "monto", value: string | number) => {
-      setCostos((prev) => ({
-        ...prev,
-        [categoria]: prev[categoria].map((item) => (item.id === id ? { ...item, [field]: value } : item)),
-      }))
-    },
-    [],
-  )
-
   const upsertItemCostoByIndex = useCallback(
     (categoria: keyof ItemsPorCategoria, index: number, field: "descripcion" | "monto", value: string | number) => {
       setCostos((prev) => {
@@ -668,12 +554,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
     [],
   )
 
-  const removeItemCosto = useCallback((categoria: keyof ItemsPorCategoria, id: string) => {
-    setCostos((prev) => ({
-      ...prev,
-      [categoria]: prev[categoria].filter((item) => item.id !== id),
-    }))
-  }, [])
+
 
   const cargarPlantilla = (plantilla: { cobros: any; costos: any }) => {
     const emptyCategoria = (): ItemsPorCategoria => ({
@@ -706,12 +587,12 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       const cobrosArray: any[] = []
       const costosArray: any[] = []
       Object.entries(cobros).forEach(([cat, items]) => {
-        items.forEach((i) => {
+        items.forEach((i: ItemDetalle) => {
           if (i.descripcion || i.monto) cobrosArray.push({ categoria: cat, descripcion: i.descripcion, monto: i.monto })
         })
       })
       Object.entries(costos).forEach(([cat, items]) => {
-        items.forEach((i) => {
+        items.forEach((i: ItemDetalle) => {
           if (i.descripcion || i.monto) costosArray.push({ categoria: cat, descripcion: i.descripcion, monto: i.monto })
         })
       })
@@ -737,11 +618,6 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
     }
   }
 
-  const togglePiezaPintura = (precio: PrecioPintura, checked: boolean) => {
-    setPiezasSeleccionadas((prev) =>
-      prev.map((p) => (p.nombre === precio.nombre ? { ...p, seleccionada: checked } : p)),
-    )
-  }
 
 
   // Calcular totales
@@ -842,7 +718,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
 
       // Convertir costos por categoría a array con descripción
       // Para pintura: excluir items auto-gestionados (se recalculan abajo)
-      const costosArray: { categoria: string; descripcion: string; monto: number }[] = []
+      const costosArray: { categoria: string; descripcion: string; monto: number; isAuto?: boolean }[] = []
       Object.entries(costos).forEach(([categoria, items]) => {
         safeArr(items).forEach((item) => {
           if (item.monto > 0 || item.descripcion) {
@@ -961,7 +837,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
 
       // Convertir costos por categoría a array con descripción
       // Para pintura: excluir items auto-gestionados (se recalculan abajo)
-      const costosArray: { categoria: string; descripcion: string; monto: number }[] = []
+      const costosArray: { categoria: string; descripcion: string; monto: number; isAuto?: boolean }[] = []
       Object.entries(costos).forEach(([categoria, items]) => {
         safeArr(items).forEach((item) => {
           if (item.monto > 0 || item.descripcion) {

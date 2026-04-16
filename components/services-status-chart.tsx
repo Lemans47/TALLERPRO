@@ -77,7 +77,7 @@ export function ServicesStatusChart({ servicios }: ServicesStatusChartProps) {
             ))}
           </Pie>
           <Tooltip
-            formatter={(value: number, name: string) => [value, name]}
+            formatter={(value, name) => [Number(value), String(name)]}
             contentStyle={{
               backgroundColor: "var(--card)",
               border: "1px solid var(--border)",
