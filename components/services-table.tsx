@@ -438,9 +438,9 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                 </div>
 
                 {/* Actions */}
-                <div className="flex flex-row sm:flex-col gap-2 sm:w-[160px]">
+                <div className="flex flex-row sm:flex-col gap-2 sm:w-auto sm:items-end shrink-0">
                   <Select value={servicio.estado} onValueChange={(v) => handleEstadoChange(servicio.id, v)}>
-                    <SelectTrigger className="h-9 text-xs bg-secondary/50 border-border w-full">
+                    <SelectTrigger className="h-9 text-xs bg-secondary/50 border-border w-[160px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-card border-border">
@@ -452,7 +452,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                     </SelectContent>
                   </Select>
 
-                  <div className="flex gap-1">
+                  <div className="flex flex-wrap gap-1">
                     <Button
                       variant="outline"
                       size="icon"
