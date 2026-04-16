@@ -442,9 +442,9 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                 </div>
 
                 {/* Actions */}
-                <div className="flex flex-row sm:flex-col gap-2 sm:w-auto sm:items-end shrink-0">
+                <div className="flex flex-row sm:flex-col gap-2 sm:w-[160px] shrink-0">
                   <Select value={servicio.estado} onValueChange={(v) => handleEstadoChange(servicio.id, v)}>
-                    <SelectTrigger className="h-9 text-xs bg-secondary/50 border-border w-[160px]">
+                    <SelectTrigger className="h-9 text-xs bg-secondary/50 border-border w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-card border-border">
@@ -456,7 +456,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                     </SelectContent>
                   </Select>
 
-                  <div className="flex flex-wrap gap-1">
+                  <div className="flex gap-1">
                     <Button
                       variant="outline"
                       size="icon"
@@ -484,20 +484,6 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                     >
                       <FileText className="w-3.5 h-3.5" />
                     </Button>
-                    {servicio.estado === "Cerrado/Pagado" && (
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-9 w-9 bg-green-500/5 border-green-500/30 text-green-400 hover:bg-green-500/10"
-                        onClick={async () => {
-                          const { blobUrl, fileName } = await generarReciboPDF(servicio)
-                          setPdfPreview({ url: blobUrl, fileName })
-                        }}
-                        title="Recibo de pago"
-                      >
-                        <Receipt className="w-3.5 h-3.5" />
-                      </Button>
-                    )}
                     <Button
                       variant="outline"
                       size="icon"
@@ -508,6 +494,20 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                   </div>
+                  {servicio.estado === "Cerrado/Pagado" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 w-full bg-green-500/5 border-green-500/30 text-green-400 hover:bg-green-500/10 gap-1.5"
+                      onClick={async () => {
+                        const { blobUrl, fileName } = await generarReciboPDF(servicio)
+                        setPdfPreview({ url: blobUrl, fileName })
+                      }}
+                    >
+                      <Receipt className="w-3.5 h-3.5" />
+                      Recibo
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
