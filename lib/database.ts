@@ -50,7 +50,7 @@ export interface Servicio {
   observaciones: string | null
   mano_obra_pintura: number
   cobros: { categoria: string; descripcion: string; monto: number; isAuto?: boolean }[]
-  costos: { categoria?: string; descripcion: string; monto: number; isAuto?: boolean }[]
+  costos: { categoria?: string; descripcion: string; monto: number; isAuto?: boolean; costoReal?: number | null }[]
   piezas_pintura: { nombre: string; cantidad: number; precio: number }[]
   estado: string
   iva: string
@@ -80,7 +80,7 @@ export interface Presupuesto {
   observaciones: string | null
   mano_obra_pintura: number
   cobros: { categoria: string; descripcion: string; monto: number; isAuto?: boolean }[]
-  costos: { categoria?: string; descripcion: string; monto: number; isAuto?: boolean }[]
+  costos: { categoria?: string; descripcion: string; monto: number; isAuto?: boolean; costoReal?: number | null }[]
   piezas_pintura: { nombre: string; cantidad: number; precio: number }[]
   iva: string
   monto_total: number

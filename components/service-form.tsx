@@ -106,6 +106,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   const [showManoObraModal, setShowManoObraModal] = useState(false)
   const [showMaterialesModal, setShowMaterialesModal] = useState(false)
   const [manoObraConfig, setManoObraConfig] = useState(0)
+  const [costoRealPintor, setCostoRealPintor] = useState<number | null>(null)
   const [materialesConfig, setMaterialesConfig] = useState(0)
   const [, setPrecioGlobalPintura] = useState(0)
   const [preciosTemp, setPreciosTemp] = useState<{ precio: number }[]>([{ precio: 0 }])
@@ -344,6 +345,13 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       // Cargar costos por categoría
       const costosData = parseToFlatArray(servicioAEditar.costos)
       console.log("[v0] costosData from servicio:", costosData)
+      // Extraer costo real del pintor antes de filtrar auto-items
+      const autoManoObra = costosData.find(
+        (c: any) => isAutoItem(c.descripcion) && c.descripcion?.toLowerCase().includes("mano de obra")
+      )
+      if (autoManoObra?.costoReal != null) {
+        setCostoRealPintor(Number(autoManoObra.costoReal))
+      }
       const newCostos: ItemsPorCategoria = {
         desmontar: [],
         desabolladura: [],
@@ -636,7 +644,8 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
     : 0
 
   // Costos de mano de obra y materiales calculados automáticamente por pieza
-  const autoCostoManoObra = cantidadPiezasAuto * (Number(manoObraConfig) || 0)
+  const autoCostoManoObraCalculado = cantidadPiezasAuto * (Number(manoObraConfig) || 0)
+  const autoCostoManoObra = costoRealPintor !== null ? costoRealPintor : autoCostoManoObraCalculado
   const autoCostoMateriales = cantidadPiezasAuto * (Number(materialesConfig) || 0)
 
   const safeArr = (v: any): ItemDetalle[] => Array.isArray(v) ? v : []
@@ -718,7 +727,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
 
       // Convertir costos por categoría a array con descripción
       // Para pintura: excluir items auto-gestionados (se recalculan abajo)
-      const costosArray: { categoria: string; descripcion: string; monto: number; isAuto?: boolean }[] = []
+      const costosArray: { categoria: string; descripcion: string; monto: number; isAuto?: boolean; costoReal?: number | null }[] = []
       Object.entries(costos).forEach(([categoria, items]) => {
         safeArr(items).forEach((item) => {
           if (item.monto > 0 || item.descripcion) {
@@ -732,11 +741,13 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         .filter((p) => p.seleccionada)
         .reduce((sum, p) => sum + (Number(p.cantidad_piezas) || 1), 0)
       if (manoObraConfig > 0 && cantidadPiezasSave > 0) {
+        const montoCalculado = cantidadPiezasSave * manoObraConfig
         costosArray.push({
           categoria: "pintura",
           descripcion: `Mano de Obra Pintura (${cantidadPiezasSave} pieza${cantidadPiezasSave !== 1 ? "s" : ""})`,
-          monto: cantidadPiezasSave * manoObraConfig,
+          monto: costoRealPintor !== null ? costoRealPintor : montoCalculado,
           isAuto: true,
+          costoReal: costoRealPintor,
         })
       }
       if (materialesConfig > 0 && cantidadPiezasSave > 0) {
@@ -837,7 +848,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
 
       // Convertir costos por categoría a array con descripción
       // Para pintura: excluir items auto-gestionados (se recalculan abajo)
-      const costosArray: { categoria: string; descripcion: string; monto: number; isAuto?: boolean }[] = []
+      const costosArray: { categoria: string; descripcion: string; monto: number; isAuto?: boolean; costoReal?: number | null }[] = []
       Object.entries(costos).forEach(([categoria, items]) => {
         safeArr(items).forEach((item) => {
           if (item.monto > 0 || item.descripcion) {
@@ -850,11 +861,13 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         .filter((p) => p.seleccionada)
         .reduce((sum, p) => sum + (Number(p.cantidad_piezas) || 1), 0)
       if (manoObraConfig > 0 && cantidadPiezasSaveP > 0) {
+        const montoCalculadoP = cantidadPiezasSaveP * manoObraConfig
         costosArray.push({
           categoria: "pintura",
           descripcion: `Mano de Obra Pintura (${cantidadPiezasSaveP} pieza${cantidadPiezasSaveP !== 1 ? "s" : ""})`,
-          monto: cantidadPiezasSaveP * manoObraConfig,
+          monto: costoRealPintor !== null ? costoRealPintor : montoCalculadoP,
           isAuto: true,
+          costoReal: costoRealPintor,
         })
       }
       if (materialesConfig > 0 && cantidadPiezasSaveP > 0) {
@@ -1889,13 +1902,54 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                       return (
                         <div className="space-y-2">
                           {/* Detalle de costos auto-calculados */}
-                          {(autoCostoManoObra > 0 || autoCostoMateriales > 0) && (
-                            <div className="text-xs text-muted-foreground px-3 space-y-0.5">
-                              {autoCostoManoObra > 0 && (
-                                <div className="flex justify-between">
-                                  <span>Mano de Obra ({cantidadPiezasAuto} piezas × ${manoObraConfig.toLocaleString("es-CL")})</span>
-                                  <span className="text-warning">${autoCostoManoObra.toLocaleString("es-CL")}</span>
-                                </div>
+                          {(autoCostoManoObraCalculado > 0 || autoCostoMateriales > 0) && (
+                            <div className="text-xs text-muted-foreground px-3 space-y-1">
+                              {autoCostoManoObraCalculado > 0 && (
+                                <>
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="whitespace-nowrap">
+                                      Mano de Obra ({cantidadPiezasAuto} pz × ${manoObraConfig.toLocaleString("es-CL")} = ${autoCostoManoObraCalculado.toLocaleString("es-CL")})
+                                    </span>
+                                    <div className="flex items-center gap-1">
+                                      <span>$</span>
+                                      <Input
+                                        type="number"
+                                        value={costoRealPintor !== null ? costoRealPintor : autoCostoManoObraCalculado}
+                                        onChange={(e) => {
+                                          const val = e.target.value
+                                          if (val === "") {
+                                            setCostoRealPintor(null)
+                                          } else {
+                                            const num = Number(val) || 0
+                                            setCostoRealPintor(num === autoCostoManoObraCalculado ? null : num)
+                                          }
+                                        }}
+                                        className="w-28 h-6 text-xs text-right"
+                                      />
+                                      {costoRealPintor !== null && (
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-5 w-5 text-muted-foreground hover:text-foreground"
+                                          onClick={() => setCostoRealPintor(null)}
+                                          title="Volver al cálculo automático"
+                                        >
+                                          <X className="w-3 h-3" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </div>
+                                  {costoRealPintor !== null && costoRealPintor !== autoCostoManoObraCalculado && (
+                                    <div className="flex justify-between italic">
+                                      <span>Diferencia vs. calculado</span>
+                                      <span className={costoRealPintor - autoCostoManoObraCalculado > 0 ? "text-destructive" : "text-success"}>
+                                        {costoRealPintor - autoCostoManoObraCalculado > 0 ? "+" : ""}
+                                        ${(costoRealPintor - autoCostoManoObraCalculado).toLocaleString("es-CL")}
+                                      </span>
+                                    </div>
+                                  )}
+                                </>
                               )}
                               {autoCostoMateriales > 0 && (
                                 <div className="flex justify-between">
