@@ -233,9 +233,16 @@ export default function DashboardPage() {
     const gastosPinturaMateriales = gastos
       .filter((g) => g.categoria === "Gastos de Pintura")
       .reduce((sum, g) => sum + Number(g.monto || 0), 0)
-    // Mano de obra pintura: usa tarifa guardada en cada servicio, fallback a localStorage
+    // Mano de obra pintura: prioriza costo real del item auto en costos (puede estar editado
+    // manualmente por servicio), fallback a tarifa × piezas si el servicio no tiene el item.
     const tarifaFallback = Number(localStorage.getItem("mano_obra_pintura_default") || 0)
     const manoObraPintura = servicios.reduce((sum, s) => {
+      const manoObraItem = parseArr(s.costos).find(
+        (c: any) => c.isAuto && String(c.descripcion || "").toLowerCase().includes("mano de obra pintura")
+      )
+      if (manoObraItem) {
+        return sum + Number(manoObraItem.monto || 0)
+      }
       const piezas = parseArr(s.piezas_pintura)
       const cantPiezas = piezas.reduce((ps: number, p: any) => ps + Number(p.cantidad || p.cantidad_piezas || 1), 0)
       const tarifa = Number(s.mano_obra_pintura || 0) || tarifaFallback
