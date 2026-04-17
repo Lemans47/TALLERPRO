@@ -1,5 +1,6 @@
 import jsPDF from "jspdf"
 import type { Servicio, Presupuesto } from "./database"
+import { formatFechaDMA } from "./utils"
 
 export async function generateServicioPDF(data: Servicio | Presupuesto) {
   const doc = new jsPDF()
@@ -41,7 +42,7 @@ export async function generateServicioPDF(data: Servicio | Presupuesto) {
   // Fecha
   doc.setFontSize(10)
   doc.setFont("helvetica", "normal")
-  doc.text(`FECHA: ${(data.fecha_ingreso || "").substring(0, 10).split("-").reverse().join("-")}`, 150, 55)
+  doc.text(`FECHA: ${formatFechaDMA(data.fecha_ingreso)}`, 150, 55)
 
   // Información del Cliente
   doc.setFontSize(10)

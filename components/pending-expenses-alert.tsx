@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Receipt, CheckCircle2, ChevronRight } from "lucide-react"
 import Link from "next/link"
 import type { Gasto } from "@/lib/database"
+import { formatFechaDMA } from "@/lib/utils"
 
 interface PendingExpensesAlertProps {
   gastos: Gasto[]
@@ -66,7 +67,7 @@ export function PendingExpensesAlert({ gastos, maxItems = 5 }: PendingExpensesAl
               <div className="min-w-0 flex-1">
                 <p className="font-semibold text-foreground">{gasto.descripcion}</p>
                 <p className="text-sm text-muted-foreground mt-0.5">
-                  {gasto.categoria} • {new Date(gasto.fecha).toLocaleDateString("es-CL")}
+                  {gasto.categoria} • {formatFechaDMA(gasto.fecha)}
                 </p>
               </div>
               <div className="text-right shrink-0">

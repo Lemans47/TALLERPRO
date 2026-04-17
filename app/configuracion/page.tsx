@@ -32,6 +32,7 @@ import {
 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { api, type PrecioPintura, type PiezaPintura } from "@/lib/api-client"
+import { formatFechaDMA } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
 
 type UsuarioRow = { id: string; email: string; role: string | null; created_at: string; last_sign_in_at: string | null }
@@ -313,7 +314,7 @@ export default function ConfiguracionPage() {
               </div>
               <div className="flex justify-between py-2">
                 <span className="text-sm text-muted-foreground">Última actualización</span>
-                <span className="text-sm font-medium">{new Date().toLocaleDateString("es-CL")}</span>
+                <span className="text-sm font-medium">{formatFechaDMA(new Date())}</span>
               </div>
             </CardContent>
           </Card>
@@ -543,7 +544,7 @@ export default function ConfiguracionPage() {
                         <div className="min-w-0">
                           <p className="text-sm font-medium truncate">{u.email}</p>
                           <p className="text-xs text-muted-foreground">
-                            Último acceso: {u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleDateString("es-CL") : "nunca"}
+                            Último acceso: {u.last_sign_in_at ? formatFechaDMA(new Date(u.last_sign_in_at)) : "nunca"}
                           </p>
                         </div>
                         <Select

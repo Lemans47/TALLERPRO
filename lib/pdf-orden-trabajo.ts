@@ -1,5 +1,6 @@
 import jsPDF from "jspdf"
 import type { Servicio } from "@/lib/database"
+import { formatFechaDMA } from "@/lib/utils"
 
 export async function generarOrdenTrabajo(servicio: Servicio) {
   const doc = new jsPDF({ unit: "mm", format: [210, 297], orientation: "portrait" })
@@ -85,9 +86,7 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
       const otNum = (servicio as any).numero_ot
         ? String((servicio as any).numero_ot).padStart(4, "0")
         : servicio.id.substring(0, 8).toUpperCase()
-      const raw = servicio.fecha_ingreso?.substring(0, 10) || ""
-      const [yr, m, d] = raw.split("-")
-      const fechaStr = yr && m && d ? `${d}-${m}-${yr}` : raw
+      const fechaStr = formatFechaDMA(servicio.fecha_ingreso)
 
       const dX = MR - 55; const dY = 53
       doc.setLineWidth(0.3); doc.setDrawColor(0, 0, 0)

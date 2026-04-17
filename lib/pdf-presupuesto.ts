@@ -1,5 +1,6 @@
 import jsPDF from "jspdf"
 import type { Servicio } from "@/lib/database"
+import { formatFechaDMA } from "@/lib/utils"
 
 const ML = 10
 const MR = 200
@@ -17,11 +18,7 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   const up = (s: string) => (s || "").toUpperCase()
   const fmt = (n: number) => (n > 0 ? `$${n.toLocaleString("es-CL")}` : "-")
 
-  const fechaStr = (() => {
-    const raw = servicio.fecha_ingreso?.substring(0, 10) || ""
-    const [yr, m, d] = raw.split("-")
-    return (!yr || !m || !d) ? raw : `${d}-${m}-${yr}`
-  })()
+  const fechaStr = formatFechaDMA(servicio.fecha_ingreso)
 
   // ─── DRAW LOGO ────────────────────────────────────────────────────
   function drawLogo(logoBase64: string) {

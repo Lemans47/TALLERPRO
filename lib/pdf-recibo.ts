@@ -1,5 +1,6 @@
 import jsPDF from "jspdf"
 import type { Servicio } from "./database"
+import { formatFechaDMA } from "./utils"
 
 const LOGO_URL = "https://res.cloudinary.com/dzjtujwor/image/upload/v1775100136/LOGO_AUTOMOTORA_RS_narpoz.png"
 
@@ -56,7 +57,7 @@ export async function generarReciboPDF(servicio: Servicio): Promise<{ blobUrl: s
   doc.line(15, 49, 195, 49)
 
   // ── Metadatos ────────────────────────────────────────
-  const fechaHoy = new Date().toLocaleDateString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric" })
+  const fechaHoy = formatFechaDMA(new Date())
   const otNum = servicio.numero_ot ? `OT-${String(servicio.numero_ot).padStart(4, "0")}` : ""
 
   doc.setFontSize(9)

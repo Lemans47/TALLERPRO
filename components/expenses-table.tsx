@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { Pencil, Trash2, Search, AlertCircle, CheckCircle2, Clock } from "lucide-react"
 import { api, type Gasto } from "@/lib/api-client"
+import { formatFechaDMA } from "@/lib/utils"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 
@@ -118,7 +119,7 @@ export function ExpensesTable({ gastos, onEditGasto, onDeleted, loading }: Expen
                       )}
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      {(gasto.fecha || "").substring(0, 10).split("-").reverse().join("-")}
+                      {formatFechaDMA(gasto.fecha)}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">

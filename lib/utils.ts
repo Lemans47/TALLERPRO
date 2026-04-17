@@ -52,3 +52,20 @@ export function calculateIVA(base: number, applyIVA: boolean, rate = 0.19): IvaB
 export function calculateAbsorptionRate(laborRevenue: number, fixedExpenses: number): number {
   return safeDivide(laborRevenue, fixedExpenses) * 100
 }
+
+// ─── Date Utilities ───────────────────────────────────────────────────────────
+
+/** Formatea una fecha a d/m/a (DD/MM/YYYY). Acepta Date, string ISO o "YYYY-MM-DD". */
+export function formatFechaDMA(value: Date | string | null | undefined): string {
+  if (!value) return ""
+  if (typeof value === "string") {
+    const raw = value.substring(0, 10)
+    const [yr, m, d] = raw.split("-")
+    if (yr && m && d) return `${d}/${m}/${yr}`
+    return raw
+  }
+  const d = String(value.getDate()).padStart(2, "0")
+  const m = String(value.getMonth() + 1).padStart(2, "0")
+  const y = value.getFullYear()
+  return `${d}/${m}/${y}`
+}

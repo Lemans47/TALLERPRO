@@ -15,6 +15,7 @@ import { Download, FileSpreadsheet, TrendingUp, TrendingDown, DollarSign, Wrench
 import { ProfitabilityAnalysis } from "@/components/profitability-analysis"
 import { useMonth } from "@/lib/month-context"
 import { api, type Servicio, type Gasto } from "@/lib/api-client"
+import { formatFechaDMA } from "@/lib/utils"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
@@ -223,7 +224,7 @@ export default function ReportsPage() {
       startY: afterGastos + 6,
       head: [["Fecha", "Patente", "Cliente", "Marca/Modelo", "Estado", "Monto"]],
       body: servicios.map((s) => [
-        new Date(s.fecha_ingreso).toLocaleDateString("es-CL"),
+        formatFechaDMA(s.fecha_ingreso),
         s.patente,
         s.cliente,
         `${s.marca} ${s.modelo}`,
@@ -239,7 +240,7 @@ export default function ReportsPage() {
 
   const exportarExcelServicios = () => {
     const data = servicios.map((s) => ({
-      Fecha: new Date(s.fecha_ingreso).toLocaleDateString("es-CL"),
+      Fecha: formatFechaDMA(s.fecha_ingreso),
       Patente: s.patente,
       Cliente: s.cliente,
       Marca: s.marca,
@@ -258,7 +259,7 @@ export default function ReportsPage() {
 
   const exportarExcelGastos = () => {
     const data = gastos.map((g) => ({
-      Fecha: new Date(g.fecha).toLocaleDateString("es-CL"),
+      Fecha: formatFechaDMA(g.fecha),
       Categoría: g.categoria,
       Descripción: g.descripcion,
       Monto: Number(g.monto),

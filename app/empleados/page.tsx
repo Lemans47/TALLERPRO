@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/lib/auth-context"
 import { useMonth } from "@/lib/month-context"
 import { api, type Empleado, type AbonoEmpleado } from "@/lib/api-client"
+import { formatFechaDMA } from "@/lib/utils"
 import { Users, Plus, Pencil, Trash2, RefreshCw, ChevronDown, ChevronUp, CheckCircle } from "lucide-react"
 
 const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"]
@@ -261,8 +262,8 @@ export default function EmpleadosPage() {
                       <p className="text-sm text-muted-foreground py-2">Sin abonos este mes.</p>
                     ) : abEmp.map(a => (
                       <div key={a.id} className="flex items-center gap-3 text-sm py-1 border-b border-border/40 last:border-0">
-                        <span className="text-muted-foreground w-20 shrink-0">
-                          {new Date(String(a.fecha).split("T")[0] + "T12:00").toLocaleDateString("es-CL", { day:"2-digit", month:"2-digit" })}
+                        <span className="text-muted-foreground w-24 shrink-0">
+                          {formatFechaDMA(a.fecha)}
                         </span>
                         <span className="flex-1">{a.notas || "—"}</span>
                         <span className="font-semibold text-success">${Number(a.monto).toLocaleString("es-CL")}</span>

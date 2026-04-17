@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useToast } from "@/hooks/use-toast"
 import { FileText, Trash2, CheckCircle, Edit, Car, User, Calendar, AlignJustify, List, ChevronDown, ChevronRight } from "lucide-react"
 import { api, type Presupuesto } from "@/lib/api-client"
+import { formatFechaDMA } from "@/lib/utils"
 import { generarPDFPresupuesto } from "@/lib/pdf-presupuesto"
 import { PDFPreviewModal } from "@/components/pdf-preview-modal"
 
@@ -146,7 +147,7 @@ export function PresupuestosTable({ presupuestos, onEditPresupuesto, onConverted
                     </span>
                     <span className="flex items-center gap-1.5">
                       <Calendar className="w-3.5 h-3.5" />
-                      {presupuesto.fecha_ingreso?.substring(0, 10).split("-").reverse().join("-")}
+                      {formatFechaDMA(presupuesto.fecha_ingreso)}
                     </span>
                   </div>
                 </div>

@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { api, type Servicio } from "@/lib/api-client"
+import { formatFechaDMA } from "@/lib/utils"
 import { FileText, Trash2, Edit, Calendar, User, Car, Wrench, ClipboardList, List, AlignJustify, TrendingUp, Receipt, ChevronDown, ChevronRight } from "lucide-react"
 
 const parseArr = (v: any): any[] => {
@@ -388,7 +389,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                     </span>
                     <span className="flex items-center gap-1.5 text-muted-foreground">
                       <Calendar className="w-3.5 h-3.5" />
-                      {servicio.fecha_ingreso?.substring(0, 10).split("-").reverse().join("-")}
+                      {formatFechaDMA(servicio.fecha_ingreso)}
                     </span>
                   </div>
 

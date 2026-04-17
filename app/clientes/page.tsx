@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog"
 import { Users, Search, Pencil, Trash2, Plus, Car, Phone, Mail, RefreshCw, X, GitMerge, History, ChevronDown, ChevronUp } from "lucide-react"
 import { api, type Cliente, type Vehiculo } from "@/lib/api-client"
+import { formatFechaDMA } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
 
 type ServicioHistorial = {
@@ -320,7 +321,7 @@ export default function ClientesPage() {
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">{historialData.length} servicio(s) encontrado(s)</p>
               {historialData.map((s) => {
-                const fecha = s.fecha_ingreso?.substring(0, 10).split("-").reverse().join("-")
+                const fecha = formatFechaDMA(s.fecha_ingreso)
                 const expanded = expandedServicio === s.id
                 const estadoColor: Record<string, string> = {
                   "Pagado": "bg-green-500/20 text-green-400",
