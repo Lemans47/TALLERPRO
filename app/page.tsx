@@ -482,7 +482,9 @@ export default function DashboardPage() {
             <div>
               <p className="text-xs text-muted-foreground">Costo por Pieza</p>
               <p className="text-2xl font-bold mt-1">{formatCurrency(kpis.costoPorPieza)}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">ref. materiales</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Mat. {formatCurrency(kpis.piezasPintadas > 0 ? kpis.gastosPinturaMateriales / kpis.piezasPintadas : 0)} · M.O. {formatCurrency(kpis.piezasPintadas > 0 ? kpis.manoObraPintura / kpis.piezasPintadas : 0)}
+              </p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Margen Pintura</p>
