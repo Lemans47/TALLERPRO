@@ -10,9 +10,10 @@ import { PresupuestosTable } from "@/components/presupuestos-table"
 import { SearchBar } from "@/components/search-bar"
 import { useMonth } from "@/lib/month-context"
 import { api, type Servicio, type Presupuesto } from "@/lib/api-client"
-import { RefreshCw, Wrench, FileText, ClipboardList, Plus, ChevronUp, ChevronDown } from "lucide-react"
+import { RefreshCw, Wrench, FileText, ClipboardList, Plus, ChevronUp, ChevronDown, Calendar } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { useToast } from "@/hooks/use-toast"
 
 export default function ServicesPage() {
   const [servicioAEditar, setServicioAEditar] = useState<(Servicio & { isPresupuesto?: boolean }) | null>(null)
@@ -24,6 +25,34 @@ export default function ServicesPage() {
   const { selectedMonth } = useMonth()
   const [serviciosOpen, setServiciosOpen] = useState(true)
   const [presupuestosOpen, setPresupuestosOpen] = useState(true)
+  const [backfilling, setBackfilling] = useState(false)
+  const { toast } = useToast()
+
+  const handleBackfillRevTecnica = async () => {
+    if (backfilling) return
+    const ok = window.confirm(
+      "Esto consulta la API de patentes para todos los vehículos sin mes de revisión técnica. Puede demorar varios minutos. ¿Continuar?"
+    )
+    if (!ok) return
+    setBackfilling(true)
+    try {
+      const res = await fetch("/api/backfill-revision-tecnica", { method: "POST" })
+      const data = await res.json()
+      if (!res.ok) {
+        toast({ title: "Error", description: data?.error ?? "No se pudo completar", variant: "destructive" })
+      } else {
+        toast({
+          title: "Backfill completo",
+          description: `Total: ${data.total} · Actualizados: ${data.updated} · Sin datos: ${data.skipped} · Fallos: ${data.failed}`,
+        })
+        loadData()
+      }
+    } catch (e: any) {
+      toast({ title: "Error", description: e?.message ?? "Error de red", variant: "destructive" })
+    } finally {
+      setBackfilling(false)
+    }
+  }
 
   const ESTADOS_ACTIVOS = ["En Cola", "En Proceso", "En Reparación", "Esperando Repuestos", "Control de Calidad", "Listo para Entrega", "Entregado", "Por Cobrar"]
 
@@ -136,6 +165,17 @@ export default function ServicesPage() {
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
             Actualizar
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleBackfillRevTecnica}
+            disabled={backfilling}
+            className="border-border hover:bg-secondary bg-transparent"
+            title="Consulta la API para completar el mes de revisión técnica en todos los vehículos existentes"
+          >
+            <Calendar className={`w-4 h-4 mr-2 ${backfilling ? "animate-pulse" : ""}`} />
+            {backfilling ? "Actualizando..." : "Rev. Técnica"}
           </Button>
         </div>
       </div>
