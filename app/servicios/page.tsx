@@ -30,6 +30,13 @@ export default function ServicesPage() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
+      // Asignar N° OT a servicios sin uno (idempotente)
+      try {
+        await fetch("/api/migrate-numero-ot", { method: "POST" })
+      } catch (e) {
+        console.error("migrate-numero-ot:", e)
+      }
+
       const [year, month] = selectedMonth.split("-").map(Number)
       const [delMes, todos, presupuestosDelMes, todosPresupuestos] = await Promise.all([
         api.servicios.getByMonth(year, month),

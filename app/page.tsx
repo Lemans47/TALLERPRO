@@ -113,18 +113,6 @@ export default function DashboardPage() {
     }
   }, [])
 
-  // Migración única: asignar N° OT a servicios existentes sin uno
-  useEffect(() => {
-    if (localStorage.getItem("numero_ot_migrated")) return
-    fetch("/api/migrate-numero-ot", { method: "POST" })
-      .then((r) => r.json())
-      .then((data) => {
-        console.log("Migración N° OT:", data)
-        localStorage.setItem("numero_ot_migrated", "true")
-      })
-      .catch(console.error)
-  }, [])
-
   useEffect(() => {
     loadData()
   }, [selectedMonth])
@@ -132,6 +120,17 @@ export default function DashboardPage() {
   const loadData = async () => {
     setLoading(true)
     try {
+      // Asignar N° OT a servicios sin uno antes de cargar (idempotente)
+      try {
+        const res = await fetch("/api/migrate-numero-ot", { method: "POST" })
+        if (res.ok) {
+          const data = await res.json()
+          if (data?.backfilled > 0) console.log("N° OT asignados:", data.backfilled)
+        }
+      } catch (e) {
+        console.error("migrate-numero-ot:", e)
+      }
+
       const [year, month] = selectedMonth.split("-").map(Number)
       const response = await fetchDashboardData(year, month)
       const { servicios: serviciosData, gastos: gastosData, empleados: empleadosData, serviciosActivos: activosData, kpis: apiKpis, entregadosMes } = response
