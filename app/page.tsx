@@ -113,6 +113,18 @@ export default function DashboardPage() {
     }
   }, [])
 
+  // Migración única: asignar N° OT a servicios existentes sin uno
+  useEffect(() => {
+    if (localStorage.getItem("numero_ot_migrated")) return
+    fetch("/api/migrate-numero-ot", { method: "POST" })
+      .then((r) => r.json())
+      .then((data) => {
+        console.log("Migración N° OT:", data)
+        localStorage.setItem("numero_ot_migrated", "true")
+      })
+      .catch(console.error)
+  }, [])
+
   useEffect(() => {
     loadData()
   }, [selectedMonth])

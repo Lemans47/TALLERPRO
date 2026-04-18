@@ -216,14 +216,27 @@ export async function getServiciosByMonth(year: number, month: number) {
   return data as Servicio[]
 }
 
+async function ensureNumeroOtInfra(db: any) {
+  await db`ALTER TABLE servicios ADD COLUMN IF NOT EXISTS numero_ot INTEGER`
+  await db`CREATE SEQUENCE IF NOT EXISTS servicios_numero_ot_seq`
+  const maxRow = await db`SELECT COALESCE(MAX(numero_ot), 0)::int AS max FROM servicios`
+  const currentMax = Number(maxRow[0]?.max || 0)
+  const seqRow = await db`SELECT last_value::int AS last FROM servicios_numero_ot_seq`
+  const seqLast = Number(seqRow[0]?.last || 0)
+  if (currentMax > seqLast) {
+    await db`SELECT setval('servicios_numero_ot_seq', ${currentMax})`
+  }
+}
+
 export async function createServicio(servicio: Omit<Servicio, "id" | "created_at" | "updated_at">) {
   const db = getSQL()
+  await ensureNumeroOtInfra(db)
   const data = await db`
     INSERT INTO servicios (
       fecha_ingreso, patente, marca, modelo, color, kilometraje, año, cliente, telefono, observaciones,
       mano_obra_pintura, cobros, costos, piezas_pintura, estado, iva,
       anticipo, saldo_pendiente, monto_total, monto_total_sin_iva, observaciones_checkboxes,
-      fotos_ingreso, fotos_entrega
+      fotos_ingreso, fotos_entrega, numero_ot
     ) VALUES (
       ${servicio.fecha_ingreso}, ${servicio.patente}, ${servicio.marca}, ${servicio.modelo},
       ${servicio.color || null}, ${servicio.kilometraje || null}, ${servicio.año || null},
@@ -232,7 +245,8 @@ export async function createServicio(servicio: Omit<Servicio, "id" | "created_at
       ${safeJson(servicio.piezas_pintura)}, ${servicio.estado}, ${servicio.iva},
       ${servicio.anticipo}, ${servicio.saldo_pendiente}, ${servicio.monto_total},
       ${servicio.monto_total_sin_iva}, ${safeJson(servicio.observaciones_checkboxes)},
-      ${safeJson(servicio.fotos_ingreso || [])}, ${safeJson(servicio.fotos_entrega || [])}
+      ${safeJson(servicio.fotos_ingreso || [])}, ${safeJson(servicio.fotos_entrega || [])},
+      nextval('servicios_numero_ot_seq')::int
     ) RETURNING *
   `
   return data[0] as Servicio
@@ -366,6 +380,7 @@ export async function deletePresupuesto(id: string) {
 
 export async function convertPresupuestoToServicio(presupuestoId: string) {
   const db = getSQL()
+  await ensureNumeroOtInfra(db)
   return await db.begin(async (sql: any) => {
     // Get presupuesto within transaction to lock the row
     const presupuestoData = await sql`SELECT * FROM presupuestos WHERE id = ${presupuestoId} FOR UPDATE`
@@ -378,7 +393,7 @@ export async function convertPresupuestoToServicio(presupuestoId: string) {
         fecha_ingreso, patente, marca, modelo, color, kilometraje, año, cliente, telefono, observaciones,
         mano_obra_pintura, cobros, costos, piezas_pintura, estado, iva,
         anticipo, saldo_pendiente, monto_total, monto_total_sin_iva, observaciones_checkboxes,
-        fotos_ingreso, fotos_entrega
+        fotos_ingreso, fotos_entrega, numero_ot
       ) VALUES (
         NOW(), ${presupuesto.patente}, ${presupuesto.marca}, ${presupuesto.modelo},
         ${presupuesto.color || null}, ${presupuesto.kilometraje || null}, ${presupuesto.año || null},
@@ -388,7 +403,7 @@ export async function convertPresupuestoToServicio(presupuestoId: string) {
         ${safeJson(presupuesto.piezas_pintura)}, 'En Cola', ${presupuesto.iva || "sin"},
         0, ${presupuesto.monto_total || 0}, ${presupuesto.monto_total || 0}, ${presupuesto.monto_total_sin_iva || 0},
         ${safeJson(presupuesto.observaciones_checkboxes || [])},
-        '[]'::jsonb, '[]'::jsonb
+        '[]'::jsonb, '[]'::jsonb, nextval('servicios_numero_ot_seq')::int
       ) RETURNING *
     `
 
