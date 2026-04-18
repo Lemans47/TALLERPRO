@@ -165,7 +165,8 @@ export async function getServicios() {
     SELECT s.*, v.mes_revision_tecnica
     FROM servicios s
     LEFT JOIN vehiculos v
-      ON UPPER(TRIM(v.patente)) = UPPER(TRIM(s.patente))
+      ON UPPER(REGEXP_REPLACE(v.patente, '[^A-Za-z0-9]', '', 'g'))
+       = UPPER(REGEXP_REPLACE(s.patente, '[^A-Za-z0-9]', '', 'g'))
     ORDER BY s.fecha_ingreso DESC
   `
   return data as Servicio[]
@@ -208,7 +209,8 @@ export async function getServiciosByMonth(year: number, month: number) {
     SELECT s.*, v.mes_revision_tecnica
     FROM servicios s
     LEFT JOIN vehiculos v
-      ON UPPER(TRIM(v.patente)) = UPPER(TRIM(s.patente))
+      ON UPPER(REGEXP_REPLACE(v.patente, '[^A-Za-z0-9]', '', 'g'))
+       = UPPER(REGEXP_REPLACE(s.patente, '[^A-Za-z0-9]', '', 'g'))
     WHERE s.fecha_ingreso >= ${startDate}
     AND s.fecha_ingreso <= ${endDate}
     ORDER BY s.fecha_ingreso DESC

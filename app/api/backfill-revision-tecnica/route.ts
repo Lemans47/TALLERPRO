@@ -18,14 +18,16 @@ export async function POST() {
   } catch {}
 
   // Patentes únicas de servicios cuyo vehículo no tiene mes_revision_tecnica
+  // (normalizando en ambos lados — servicios puede tener espacios, vehiculos no)
   const rows: any[] = await db`
-    SELECT DISTINCT UPPER(TRIM(s.patente)) AS patente
+    SELECT DISTINCT UPPER(REGEXP_REPLACE(s.patente, '[^A-Za-z0-9]', '', 'g')) AS patente
     FROM servicios s
     LEFT JOIN vehiculos v
-      ON UPPER(TRIM(v.patente)) = UPPER(TRIM(s.patente))
+      ON UPPER(REGEXP_REPLACE(v.patente, '[^A-Za-z0-9]', '', 'g'))
+       = UPPER(REGEXP_REPLACE(s.patente, '[^A-Za-z0-9]', '', 'g'))
     WHERE v.mes_revision_tecnica IS NULL
       AND s.patente IS NOT NULL
-      AND LENGTH(TRIM(s.patente)) >= 4
+      AND LENGTH(REGEXP_REPLACE(s.patente, '[^A-Za-z0-9]', '', 'g')) >= 4
   `
 
   const patentes = rows.map((r) => String(r.patente).replace(/[^a-zA-Z0-9]/g, "").toUpperCase()).filter(Boolean)
