@@ -34,6 +34,15 @@ function calcGanancia(servicio: Servicio) {
   return { ganancia, margen }
 }
 
+const MESES = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+               "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+
+function mesNombre(mes?: string) {
+  if (!mes) return ""
+  const n = Number(mes)
+  return MESES[n] ?? mes
+}
+
 function getGananciaStyles(margen: number) {
   if (margen >= 45) return {
     box: "bg-success/10 border border-success/30",
@@ -508,6 +517,15 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                       <Receipt className="w-3.5 h-3.5" />
                       Recibo
                     </Button>
+                  )}
+                  {servicio.mes_revision_tecnica && (
+                    <div className="mt-auto px-3 py-2 rounded-lg bg-secondary/50 border border-border/40 flex items-center gap-2 w-full">
+                      <Calendar className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      <div className="flex flex-col leading-tight">
+                        <span className="text-[10px] text-muted-foreground">Rev. Técnica</span>
+                        <span className="text-sm font-semibold">{mesNombre(servicio.mes_revision_tecnica)}</span>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>

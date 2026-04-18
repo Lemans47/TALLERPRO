@@ -62,6 +62,7 @@ export interface Servicio {
   fotos_ingreso: FotoServicio[]
   fotos_entrega: FotoServicio[]
   numero_ot?: number
+  mes_revision_tecnica?: string
   created_at: string
   updated_at: string
 }
@@ -161,8 +162,11 @@ export async function getHistorialByCliente(nombre: string) {
 export async function getServicios() {
   const db = getSQL()
   const data = await db`
-    SELECT * FROM servicios 
-    ORDER BY fecha_ingreso DESC
+    SELECT s.*, v.mes_revision_tecnica
+    FROM servicios s
+    LEFT JOIN vehiculos v
+      ON UPPER(TRIM(v.patente)) = UPPER(TRIM(s.patente))
+    ORDER BY s.fecha_ingreso DESC
   `
   return data as Servicio[]
 }
@@ -201,10 +205,13 @@ export async function getServiciosByMonth(year: number, month: number) {
   const endDate = `${year}-${String(month).padStart(2, "0")}-${lastDay}`
 
   const data = await db`
-    SELECT * FROM servicios 
-    WHERE fecha_ingreso >= ${startDate} 
-    AND fecha_ingreso <= ${endDate}
-    ORDER BY fecha_ingreso DESC
+    SELECT s.*, v.mes_revision_tecnica
+    FROM servicios s
+    LEFT JOIN vehiculos v
+      ON UPPER(TRIM(v.patente)) = UPPER(TRIM(s.patente))
+    WHERE s.fecha_ingreso >= ${startDate}
+    AND s.fecha_ingreso <= ${endDate}
+    ORDER BY s.fecha_ingreso DESC
   `
   return data as Servicio[]
 }
