@@ -20,10 +20,11 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Patente inválida" }, { status: 400 })
     }
 
-    // 1. Buscar en caché local (DB)
+    // 1. Buscar en caché local (DB) — solo retornar si ya trae mes_revision_tecnica
+    //    (si el vehículo fue cacheado antes del feature, seguimos a la API para completar el dato)
     try {
       const vehiculoEnDB = await getVehiculoByPatente(patente)
-      if (vehiculoEnDB?.marca) {
+      if (vehiculoEnDB?.marca && vehiculoEnDB.mes_revision_tecnica) {
         return NextResponse.json({
           patente: vehiculoEnDB.patente,
           marca: vehiculoEnDB.marca,
@@ -31,7 +32,7 @@ export async function GET(request: Request) {
           año: vehiculoEnDB.año ? Number(vehiculoEnDB.año) : null,
           color: vehiculoEnDB.color,
           vin: vehiculoEnDB.vin,
-          mes_revision_tecnica: vehiculoEnDB.mes_revision_tecnica ?? null,
+          mes_revision_tecnica: vehiculoEnDB.mes_revision_tecnica,
           fromCache: true,
         })
       }

@@ -518,15 +518,15 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                       Recibo
                     </Button>
                   )}
-                  {servicio.mes_revision_tecnica && (
-                    <div className="mt-auto px-3 py-2 rounded-lg bg-secondary/50 border border-border/40 flex items-center gap-2 w-full">
-                      <Calendar className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                      <div className="flex flex-col leading-tight">
-                        <span className="text-[10px] text-muted-foreground">Rev. Técnica</span>
-                        <span className="text-sm font-semibold">{mesNombre(servicio.mes_revision_tecnica)}</span>
-                      </div>
+                  <div className="mt-auto px-3 py-2 rounded-lg bg-secondary/50 border border-border/40 flex items-center gap-2 w-full">
+                    <Calendar className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                    <div className="flex flex-col leading-tight">
+                      <span className="text-[10px] text-muted-foreground">Rev. Técnica</span>
+                      <span className="text-sm font-semibold">
+                        {servicio.mes_revision_tecnica ? mesNombre(servicio.mes_revision_tecnica) : "—"}
+                      </span>
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
             </div>
