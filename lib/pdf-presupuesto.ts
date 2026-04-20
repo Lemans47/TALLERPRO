@@ -271,26 +271,77 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   const startY_next = 60 + 7  // drawPageHeader returns 60 for page>1, + 7 for "DESCRIPCION (cont.)"
 
   // ── Phase A/B: compute page breaks (indices into displayRows where a new page begins)
-  // Conservative: every page reserves footer space, so content always ends <= bottomAnchor.
-  // Prefer breaking at category boundaries to avoid splitting a category across pages.
-  const pageBreaks: number[] = [0]
+  // Goal: balance content across pages, preferring category boundaries to avoid splitting.
+  // Strategy: compute target cumulative heights (totalH / N) and cut at the category
+  // boundary closest to each target. Fall back to greedy if that doesn't fit.
+  const cumH: number[] = [0]
+  for (const row of displayRows) cumH.push(cumH[cumH.length - 1] + measureRow(row))
+  const totalH = cumH[cumH.length - 1]
+
+  const firstPageCap = bottomAnchor - startY_p1
+  const otherPageCap = bottomAnchor - startY_next
+
+  // Determine N pages needed (conservative: all pages reserve footer space)
+  let N = 1
   {
-    let pageStart = 0
-    let yCur = startY_p1
-    for (let i = 0; i < displayRows.length; i++) {
-      const rh = measureRow(displayRows[i])
-      while (yCur + rh > bottomAnchor && i > pageStart) {
-        let cut = -1
-        for (let j = i - 1; j > pageStart; j--) {
-          if (displayRows[j].type === "category") { cut = j; break }
-        }
-        if (cut === -1) cut = i  // no category boundary: cut right before current row
-        pageBreaks.push(cut)
-        pageStart = cut
-        yCur = startY_next
-        for (let j = cut; j < i; j++) yCur += measureRow(displayRows[j])
+    let cap = firstPageCap
+    while (totalH > cap) { N++; cap += otherPageCap }
+  }
+
+  let pageBreaks: number[] = [0]
+
+  if (N >= 2) {
+    // Try balanced splitting: cut at category boundaries closest to equal-distribution targets
+    const targets: number[] = []
+    for (let p = 1; p < N; p++) targets.push((p / N) * totalH)
+
+    const balanced: number[] = [0]
+    let ok = true
+    let last = 0
+    for (const target of targets) {
+      let best = -1, bestDist = Infinity
+      for (let i = last + 1; i < displayRows.length; i++) {
+        if (displayRows[i].type !== "category") continue
+        const dist = Math.abs(cumH[i] - target)
+        if (dist < bestDist) { bestDist = dist; best = i }
       }
-      yCur += rh
+      if (best === -1 || best === last) { ok = false; break }
+      balanced.push(best)
+      last = best
+    }
+
+    // Validate each page fits
+    if (ok) {
+      for (let pi = 0; pi < balanced.length && ok; pi++) {
+        const s = balanced[pi]
+        const e = pi + 1 < balanced.length ? balanced[pi + 1] : displayRows.length
+        const pageH = cumH[e] - cumH[s]
+        const cap = pi === 0 ? firstPageCap : otherPageCap
+        if (pageH > cap) ok = false
+      }
+    }
+
+    if (ok) {
+      pageBreaks = balanced
+    } else {
+      // Fallback: greedy category-preferring breaks (mid-category as last resort)
+      let pageStart = 0
+      let yCur = startY_p1
+      for (let i = 0; i < displayRows.length; i++) {
+        const rh = measureRow(displayRows[i])
+        while (yCur + rh > bottomAnchor && i > pageStart) {
+          let cut = -1
+          for (let j = i - 1; j > pageStart; j--) {
+            if (displayRows[j].type === "category") { cut = j; break }
+          }
+          if (cut === -1) cut = i
+          pageBreaks.push(cut)
+          pageStart = cut
+          yCur = startY_next
+          for (let j = cut; j < i; j++) yCur += measureRow(displayRows[j])
+        }
+        yCur += rh
+      }
     }
   }
 
