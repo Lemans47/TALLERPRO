@@ -256,11 +256,57 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     rh: number
     pg: number
   }
-  const placed: PlacedRow[] = []
-  let cy = y; let cp = pageNum
 
-  function placeRow(type: PlacedRow["type"], rh: number, label?: string, desc?: string, monto?: number) {
-    if (cy + rh > PAGE_H - 15) {
+  // Footer anchor — used to reserve space on the last page
+  const trh1 = 16  // tall signature row
+  const trh = 6    // totals rows
+  const FIRMA_H = trh1 + trh * 2 + 2 + 10
+  const bottomAnchor = PAGE_H - 15 - FIRMA_H
+
+  const measureRow = (row: DisplayRow): number =>
+    row.type === "category" ? CAT_H : row.type === "subtotal" ? SUBTOTAL_H : ITEM_H
+
+  // Y where content starts on each page (after page header + table header/cont-header)
+  const startY_p1 = y
+  const startY_next = 60 + 7  // drawPageHeader returns 60 for page>1, + 7 for "DESCRIPCION (cont.)"
+
+  // ── Phase A/B: compute page breaks (indices into displayRows where a new page begins)
+  // Conservative: every page reserves footer space, so content always ends <= bottomAnchor.
+  // Prefer breaking at category boundaries to avoid splitting a category across pages.
+  const pageBreaks: number[] = [0]
+  {
+    let pageStart = 0
+    let yCur = startY_p1
+    for (let i = 0; i < displayRows.length; i++) {
+      const rh = measureRow(displayRows[i])
+      while (yCur + rh > bottomAnchor && i > pageStart) {
+        let cut = -1
+        for (let j = i - 1; j > pageStart; j--) {
+          if (displayRows[j].type === "category") { cut = j; break }
+        }
+        if (cut === -1) cut = i  // no category boundary: cut right before current row
+        pageBreaks.push(cut)
+        pageStart = cut
+        yCur = startY_next
+        for (let j = cut; j < i; j++) yCur += measureRow(displayRows[j])
+      }
+      yCur += rh
+    }
+  }
+
+  // ── Phase C: emit placed[] page-by-page, filling blanks at the end of each page
+  const placed: PlacedRow[] = []
+  let cy = startY_p1
+  let cp = pageNum
+  const lastPageIdx = pageBreaks.length - 1
+
+  for (let pi = 0; pi < pageBreaks.length; pi++) {
+    const isFirstPage = pi === 0
+    const isLastPage = pi === lastPageIdx
+    const rowStart = pageBreaks[pi]
+    const rowEnd = pi + 1 < pageBreaks.length ? pageBreaks[pi + 1] : displayRows.length
+
+    if (!isFirstPage) {
       doc.addPage(); cp++; cy = drawPageHeader(cp, logoBase64)
       doc.setFillColor(20, 20, 20)
       doc.rect(ML, cy, DESC_W, 7, "F")
@@ -271,28 +317,30 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
       black()
       cy += 7
     }
-    placed.push({ type, label, desc, monto, ry: cy, rh, pg: cp })
-    cy += rh
-  }
 
-  displayRows.forEach((row) => {
-    if (row.type === "category") {
-      placeRow("category", CAT_H, row.label)
-    } else if (row.type === "subtotal") {
-      placeRow("subtotal", SUBTOTAL_H, row.label, undefined, row.monto)
-    } else {
-      placeRow("item", ITEM_H, undefined, row.desc, row.monto)
+    for (let i = rowStart; i < rowEnd; i++) {
+      const row = displayRows[i]
+      const rh = measureRow(row)
+      if (row.type === "category") {
+        placed.push({ type: "category", label: row.label, ry: cy, rh, pg: cp })
+      } else if (row.type === "subtotal") {
+        placed.push({ type: "subtotal", label: row.label, monto: row.monto, ry: cy, rh, pg: cp })
+      } else {
+        placed.push({ type: "item", desc: row.desc, monto: row.monto, ry: cy, rh, pg: cp })
+      }
+      cy += rh
     }
-  })
-  // Fill with blank rows up to bottomAnchor (totals section start)
-  const trh1 = 16  // tall signature row
-  const trh = 6    // totals rows
-  const FIRMA_H = trh1 + trh * 2 + 2 + 10
-  const bottomAnchor = PAGE_H - 15 - FIRMA_H
-  const spaceLeft = bottomAnchor - 2 - cy  // -2 for the y += 2 after the loop
-  if (spaceLeft > 0) {
-    const blanksNeeded = Math.floor(spaceLeft / ITEM_H)
-    for (let i = 0; i < blanksNeeded; i++) placeRow("blank", ITEM_H)
+
+    // Last page leaves room for the footer; intermediate pages fill to the bottom margin
+    const fillTo = isLastPage ? bottomAnchor : (PAGE_H - 15)
+    const spaceLeft = fillTo - cy
+    if (spaceLeft > 0) {
+      const blanksNeeded = Math.floor(spaceLeft / ITEM_H)
+      for (let k = 0; k < blanksNeeded; k++) {
+        placed.push({ type: "blank", ry: cy, rh: ITEM_H, pg: cp })
+        cy += ITEM_H
+      }
+    }
   }
 
   y = cy; pageNum = cp
@@ -363,13 +411,9 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
   })
 
   doc.setPage(savedPg)
-  y += 2
 
   // ─── TOTALS + SIGNATURES — anchored to page bottom ───────────────
-  if (y > bottomAnchor) {
-    doc.addPage(); pageNum++; drawPageHeader(pageNum, logoBase64)
-    y = bottomAnchor
-  }
+  y = bottomAnchor
   const subtotalVal = Number(servicio.monto_total_sin_iva) || 0
   const ivaVal = Math.round(subtotalVal * 0.19)
   const totalVal = subtotalVal + ivaVal
