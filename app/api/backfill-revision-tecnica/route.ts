@@ -186,3 +186,6 @@ export async function POST() {
     detail,
   })
 }
+
+// Alias GET para poder disparar el backfill abriendo la URL en el navegador
+export const GET = POST
