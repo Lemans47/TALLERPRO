@@ -169,6 +169,7 @@ export async function getServicios() {
       FROM vehiculos
       WHERE UPPER(REGEXP_REPLACE(patente, '[^A-Za-z0-9]', '', 'g'))
           = UPPER(REGEXP_REPLACE(s.patente, '[^A-Za-z0-9]', '', 'g'))
+      ORDER BY (mes_revision_tecnica IS NOT NULL) DESC, updated_at DESC NULLS LAST
       LIMIT 1
     ) v ON true
     ORDER BY s.fecha_ingreso DESC
@@ -217,6 +218,7 @@ export async function getServiciosByMonth(year: number, month: number) {
       FROM vehiculos
       WHERE UPPER(REGEXP_REPLACE(patente, '[^A-Za-z0-9]', '', 'g'))
           = UPPER(REGEXP_REPLACE(s.patente, '[^A-Za-z0-9]', '', 'g'))
+      ORDER BY (mes_revision_tecnica IS NOT NULL) DESC, updated_at DESC NULLS LAST
       LIMIT 1
     ) v ON true
     WHERE s.fecha_ingreso >= ${startDate}
@@ -949,8 +951,13 @@ export async function upsertClienteYVehiculo(
     cliente = created[0] as Cliente
   }
 
-  // Buscar o crear vehículo por patente
-  const vehiculoRows = await db`SELECT * FROM vehiculos WHERE patente = ${patente.toUpperCase()} LIMIT 1`
+  // Buscar o crear vehículo por patente (normalizada: sin espacios/guiones, mayúsculas)
+  const patenteLimpia = patente.replace(/[^a-zA-Z0-9]/g, "").toUpperCase()
+  const vehiculoRows = await db`
+    SELECT * FROM vehiculos
+    WHERE UPPER(REGEXP_REPLACE(patente, '[^A-Za-z0-9]', '', 'g')) = ${patenteLimpia}
+    LIMIT 1
+  `
   if (vehiculoRows.length > 0) {
     await db`
       UPDATE vehiculos SET
@@ -961,12 +968,12 @@ export async function upsertClienteYVehiculo(
         vin = COALESCE(${vehiculoData.vin || null}, vin),
         cliente_id = ${cliente.id},
         updated_at = NOW()
-      WHERE patente = ${patente.toUpperCase()}
+      WHERE UPPER(REGEXP_REPLACE(patente, '[^A-Za-z0-9]', '', 'g')) = ${patenteLimpia}
     `
   } else {
     await db`
       INSERT INTO vehiculos (patente, marca, modelo, color, año, vin, cliente_id)
-      VALUES (${patente.toUpperCase()}, ${vehiculoData.marca || null}, ${vehiculoData.modelo || null},
+      VALUES (${patenteLimpia}, ${vehiculoData.marca || null}, ${vehiculoData.modelo || null},
               ${vehiculoData.color || null}, ${vehiculoData.año || null}, ${vehiculoData.vin || null}, ${cliente.id})
     `
   }
