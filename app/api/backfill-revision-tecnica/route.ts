@@ -103,14 +103,25 @@ export async function POST() {
 
   for (const patente of patentes) {
     try {
-      const res = await fetch(`https://chile.getapi.cl/v1/vehicles/plate/${patente}`, {
+      let res = await fetch(`https://chile.getapi.cl/v1/vehicles/plate/${patente}`, {
         headers: { "X-Api-Key": apiKey },
         signal: AbortSignal.timeout(10000),
       })
 
+      // Rate limit: esperar 60s y reintentar una vez
+      let retried = false
       if (res.status === 429) {
-        errors.push({ patente, error: "Límite de consultas alcanzado — abortando" })
-        detail.push({ patente, result: "rate_limit_abort" })
+        await sleep(60000)
+        retried = true
+        res = await fetch(`https://chile.getapi.cl/v1/vehicles/plate/${patente}`, {
+          headers: { "X-Api-Key": apiKey },
+          signal: AbortSignal.timeout(10000),
+        })
+      }
+
+      if (res.status === 429) {
+        errors.push({ patente, error: "Rate limit persistente — abortando" })
+        detail.push({ patente, result: "rate_limit_abort", note: retried ? "retry también 429" : undefined })
         failed++
         break
       }
