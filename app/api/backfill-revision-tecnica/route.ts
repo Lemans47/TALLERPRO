@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { getSQL } from "@/lib/database"
 
 export const maxDuration = 300
+export const dynamic = "force-dynamic"
+export const revalidate = 0
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 const cleanPatente = (p: string) => p.replace(/[^a-zA-Z0-9]/g, "").toUpperCase()
