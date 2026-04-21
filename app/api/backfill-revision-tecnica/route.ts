@@ -99,6 +99,7 @@ export async function POST() {
   let skipped = 0
   let failed = 0
   const errors: { patente: string; error: string }[] = []
+  const detail: { patente: string; result: string; note?: string }[] = []
 
   for (const patente of patentes) {
     try {
@@ -109,17 +110,20 @@ export async function POST() {
 
       if (res.status === 429) {
         errors.push({ patente, error: "Límite de consultas alcanzado — abortando" })
+        detail.push({ patente, result: "rate_limit_abort" })
         failed++
         break
       }
 
       if (!res.ok) {
+        detail.push({ patente, result: "http_error", note: `status ${res.status}` })
         skipped++
         continue
       }
 
       const body = await res.json()
       if (!body?.success || !body?.data) {
+        detail.push({ patente, result: "no_data", note: body?.message ?? "sin body.data" })
         skipped++
         continue
       }
@@ -133,6 +137,7 @@ export async function POST() {
       const mes = d.monthRT ?? null
 
       if (!mes) {
+        detail.push({ patente, result: "api_sin_monthRT" })
         skipped++
         continue
       }
@@ -161,9 +166,11 @@ export async function POST() {
       }
 
       updated++
+      detail.push({ patente, result: "updated", note: mes })
     } catch (e: any) {
       failed++
       errors.push({ patente, error: e?.message ?? "error desconocido" })
+      detail.push({ patente, result: "exception", note: e?.message ?? "error" })
     }
 
     await sleep(1500)
@@ -176,5 +183,6 @@ export async function POST() {
     failed,
     dedupe: { merged: dedupeMerged, deleted: dedupeDeleted },
     errors: errors.slice(0, 10),
+    detail,
   })
 }
