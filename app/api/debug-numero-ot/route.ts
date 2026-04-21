@@ -41,12 +41,30 @@ export async function GET() {
       ORDER BY created_at DESC
     `
 
+    // Ver si hay filas duplicadas en vehiculos para LGSD72 (causa de render duplicado en UI)
+    const vehiculosLGSD72: any[] = await db`
+      SELECT id, patente, marca, modelo, cliente_id, mes_revision_tecnica, created_at, updated_at
+      FROM vehiculos
+      WHERE UPPER(REGEXP_REPLACE(patente, '[^A-Za-z0-9]', '', 'g')) = 'LGSD72'
+      ORDER BY created_at DESC
+    `
+
+    // Ver todos los clientes "SANTA GEMA"
+    const clientesSantaGema: any[] = await db`
+      SELECT id, nombre, telefono, created_at, updated_at
+      FROM clientes
+      WHERE nombre ILIKE '%SANTA GEMA%'
+      ORDER BY created_at DESC
+    `
+
     return NextResponse.json({
       counts,
       seqInfo,
       duplicados,
       ultimos,
       chevrolet,
+      vehiculosLGSD72,
+      clientesSantaGema,
     })
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? "error", stack: e?.stack }, { status: 500 })
