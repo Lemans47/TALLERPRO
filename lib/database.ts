@@ -164,9 +164,13 @@ export async function getServicios() {
   const data = await db`
     SELECT s.*, v.mes_revision_tecnica
     FROM servicios s
-    LEFT JOIN vehiculos v
-      ON UPPER(REGEXP_REPLACE(v.patente, '[^A-Za-z0-9]', '', 'g'))
-       = UPPER(REGEXP_REPLACE(s.patente, '[^A-Za-z0-9]', '', 'g'))
+    LEFT JOIN LATERAL (
+      SELECT mes_revision_tecnica
+      FROM vehiculos
+      WHERE UPPER(REGEXP_REPLACE(patente, '[^A-Za-z0-9]', '', 'g'))
+          = UPPER(REGEXP_REPLACE(s.patente, '[^A-Za-z0-9]', '', 'g'))
+      LIMIT 1
+    ) v ON true
     ORDER BY s.fecha_ingreso DESC
   `
   return data as Servicio[]
@@ -208,9 +212,13 @@ export async function getServiciosByMonth(year: number, month: number) {
   const data = await db`
     SELECT s.*, v.mes_revision_tecnica
     FROM servicios s
-    LEFT JOIN vehiculos v
-      ON UPPER(REGEXP_REPLACE(v.patente, '[^A-Za-z0-9]', '', 'g'))
-       = UPPER(REGEXP_REPLACE(s.patente, '[^A-Za-z0-9]', '', 'g'))
+    LEFT JOIN LATERAL (
+      SELECT mes_revision_tecnica
+      FROM vehiculos
+      WHERE UPPER(REGEXP_REPLACE(patente, '[^A-Za-z0-9]', '', 'g'))
+          = UPPER(REGEXP_REPLACE(s.patente, '[^A-Za-z0-9]', '', 'g'))
+      LIMIT 1
+    ) v ON true
     WHERE s.fecha_ingreso >= ${startDate}
     AND s.fecha_ingreso <= ${endDate}
     ORDER BY s.fecha_ingreso DESC
