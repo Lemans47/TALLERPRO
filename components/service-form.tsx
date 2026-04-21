@@ -97,6 +97,7 @@ const isAutoItem = (desc: string | null | undefined) => {
 export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFormProps) {
   const { toast } = useToast() // Declare useToast hook
   const [loading, setLoading] = useState(false)
+  const submittingRef = useRef(false)
   const [pdfFormatDialog, setPdfFormatDialog] = useState(false)
   const [savedPresupuesto, setSavedPresupuesto] = useState<any>(null)
   const [pdfPreview, setPdfPreview] = useState<{ url: string; fileName: string } | null>(null)
@@ -710,7 +711,9 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
 
   const handleSubmit = async () => {
     console.log("[v0] handleSubmit called")
+    if (submittingRef.current) return
     if (!validateRequiredFields()) return
+    submittingRef.current = true
 
     setLoading(true)
     try {
@@ -826,12 +829,15 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       toast({ title: "Error", description: "No se pudo guardar", variant: "destructive" })
     } finally {
       setLoading(false)
+      submittingRef.current = false
     }
   }
 
   const handlePresupuesto = async () => {
     console.log("[v0] handlePresupuesto called")
+    if (submittingRef.current) return
     if (!validateRequiredFields()) return
+    submittingRef.current = true
 
     setLoading(true)
     try {
@@ -933,6 +939,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       toast({ title: "Error", description: "No se pudo guardar el presupuesto", variant: "destructive" })
     } finally {
       setLoading(false)
+      submittingRef.current = false
     }
   }
 
