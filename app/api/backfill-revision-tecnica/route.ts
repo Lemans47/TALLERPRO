@@ -166,7 +166,7 @@ export async function POST() {
       errors.push({ patente, error: e?.message ?? "error desconocido" })
     }
 
-    await sleep(400)
+    await sleep(1500)
   }
 
   return NextResponse.json({
