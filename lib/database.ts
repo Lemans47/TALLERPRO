@@ -893,6 +893,7 @@ export async function updateCliente(id: string, cliente: Partial<Cliente>) {
 
 export async function deleteCliente(id: string) {
   const db = getSQL()
+  await db`UPDATE vehiculos SET cliente_id = NULL, updated_at = NOW() WHERE cliente_id = ${id}`
   await db`DELETE FROM clientes WHERE id = ${id}`
 }
 
