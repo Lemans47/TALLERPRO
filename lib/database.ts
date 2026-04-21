@@ -233,6 +233,21 @@ async function ensureNumeroOtInfra(db: any) {
 export async function createServicio(servicio: Omit<Servicio, "id" | "created_at" | "updated_at">) {
   const db = getSQL()
   await ensureNumeroOtInfra(db)
+
+  // Idempotencia: si llegó un POST duplicado (misma patente+cliente+monto en los últimos 15s) devolver el existente
+  const recent: any[] = await db`
+    SELECT * FROM servicios
+    WHERE patente = ${servicio.patente}
+      AND cliente = ${servicio.cliente}
+      AND monto_total = ${servicio.monto_total}
+      AND created_at > NOW() - INTERVAL '15 seconds'
+    ORDER BY created_at DESC
+    LIMIT 1
+  `
+  if (recent.length > 0) {
+    return recent[0] as Servicio
+  }
+
   const data = await db`
     INSERT INTO servicios (
       fecha_ingreso, patente, marca, modelo, color, kilometraje, año, cliente, telefono, observaciones,
