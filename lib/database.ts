@@ -234,17 +234,20 @@ export async function createServicio(servicio: Omit<Servicio, "id" | "created_at
   const db = getSQL()
   await ensureNumeroOtInfra(db)
 
-  // Idempotencia: si llegó un POST duplicado (misma patente+cliente+monto en los últimos 15s) devolver el existente
+  // Idempotencia: si llegó un POST duplicado (misma patente+cliente en los últimos 30s) devolver el existente.
+  // Normaliza patente (ignora espacios/guiones/case) y cliente (trim+upper) para cubrir diferencias triviales.
   const recent: any[] = await db`
     SELECT * FROM servicios
-    WHERE patente = ${servicio.patente}
-      AND cliente = ${servicio.cliente}
-      AND monto_total = ${servicio.monto_total}
-      AND created_at > NOW() - INTERVAL '15 seconds'
+    WHERE UPPER(REGEXP_REPLACE(patente, '[^A-Za-z0-9]', '', 'g'))
+        = UPPER(REGEXP_REPLACE(${servicio.patente}, '[^A-Za-z0-9]', '', 'g'))
+      AND UPPER(TRIM(COALESCE(cliente, '')))
+        = UPPER(TRIM(COALESCE(${servicio.cliente}, '')))
+      AND created_at > NOW() - INTERVAL '30 seconds'
     ORDER BY created_at DESC
     LIMIT 1
   `
   if (recent.length > 0) {
+    console.log("[createServicio] duplicate POST detected, returning existing", recent[0].id, "numero_ot", recent[0].numero_ot)
     return recent[0] as Servicio
   }
 
