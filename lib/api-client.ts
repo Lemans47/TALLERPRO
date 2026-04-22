@@ -32,11 +32,33 @@ export async function fetchDashboardData(
   return res.json()
 }
 
-// Chart data
-export async function fetchChartData(): Promise<{ servicios: Servicio[]; gastos: Gasto[]; empleados: Empleado[] }> {
-  const res = await fetch("/api/chart")
-  if (!res.ok) throw new Error("Error fetching chart data")
-  return res.json()
+// Chart data — agregados por mes (últimos 6 meses) calculados en SQL.
+export interface ChartMonthlyRow {
+  mes: string // YYYY-MM
+  facturado: number
+  cobrado: number
+  costos_internos: number
+  gastos_operativos: number
+  sueldos_comprometidos: number
+  count_servicios: number
+}
+
+// Deduplicación: si dos componentes (RevenueChart + AverageTicketChart) se montan a la vez,
+// comparten la misma promesa en vuelo en lugar de hacer dos requests.
+let chartDataInFlight: Promise<{ monthlyData: ChartMonthlyRow[] }> | null = null
+
+export async function fetchChartData(): Promise<{ monthlyData: ChartMonthlyRow[] }> {
+  if (chartDataInFlight) return chartDataInFlight
+  chartDataInFlight = (async () => {
+    try {
+      const res = await fetch("/api/chart")
+      if (!res.ok) throw new Error("Error fetching chart data")
+      return await res.json()
+    } finally {
+      chartDataInFlight = null
+    }
+  })()
+  return chartDataInFlight
 }
 
 // Servicios

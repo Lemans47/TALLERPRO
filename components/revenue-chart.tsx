@@ -1,115 +1,45 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import { TrendingUp } from "lucide-react"
-import { fetchChartData } from "@/lib/api-client"
+import { fetchChartData, type ChartMonthlyRow } from "@/lib/api-client"
 
 type Modo = "facturado" | "cobrado"
+const MONTH_NAMES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+const START = "2026-04"
 
 export function RevenueChart() {
   const [modo, setModo] = useState<Modo>("facturado")
-  const [chartData, setChartData] = useState<Array<{ mes: string; ingresos: number; gastos: number; margen: number }>>([])
+  const [rows, setRows] = useState<ChartMonthlyRow[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    loadChartData(modo)
-  }, [modo])
-
-  const loadChartData = async (modoActual: Modo) => {
-    setLoading(true)
-    try {
-      const { servicios, gastos, empleados } = await fetchChartData()
-
-      // Sueldos comprometidos desde empleados activos (igual que KPI Flujo de Caja)
-      const sueldosTotal = empleados
-        .filter((e: any) => e.activo)
-        .reduce((sum: number, e: any) => sum + Number(e.sueldo_base || 0), 0)
-
-      const monthlyData: Record<string, { ingresos: number; gastos: number }> = {}
-      const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
-
-      const now = new Date()
-      const START = "2026-04"
-      for (let i = 5; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
-        if (key >= START) monthlyData[key] = { ingresos: 0, gastos: 0 }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { monthlyData } = await fetchChartData()
+        if (!cancelled) setRows(monthlyData ?? [])
+      } catch (error) {
+        console.error("Error loading chart data:", error)
+      } finally {
+        if (!cancelled) setLoading(false)
       }
+    })()
+    return () => { cancelled = true }
+  }, [])
 
-      servicios.forEach((s) => {
-        // Parsear fecha como string para evitar desfase de timezone (UTC vs local)
-        const [yearStr, monthStr] = s.fecha_ingreso.split("-")
-        const key = `${yearStr}-${monthStr}`
-        if (!monthlyData[key]) return
-
-        // Ingresos según modo
-        if (modoActual === "facturado") {
-          if (Number(s.monto_total_sin_iva || 0) > 0) {
-            monthlyData[key].ingresos += Number(s.monto_total_sin_iva || 0)
-          }
-        } else {
-          // Cobrado: monto completo si está cerrado/pagado, anticipo para el resto
-          if (s.estado === "Cerrado/Pagado") {
-            monthlyData[key].ingresos += Number(s.monto_total_sin_iva || 0)
-          } else {
-            monthlyData[key].ingresos += Number(s.anticipo || 0)
-          }
-        }
-
-        // Costos internos: siempre se incluyen todos los servicios con monto (los costos se incurren
-        // independientemente de si el cliente pagó o no)
-        if (Number(s.monto_total_sin_iva || 0) > 0) {
-          const rawCostos =
-            typeof s.costos === "string" && s.costos
-              ? (() => { try { const p = JSON.parse(s.costos as string); return Array.isArray(p) ? p : [] } catch { return [] } })()
-              : Array.isArray(s.costos) ? s.costos : []
-
-          const costoServicio = (rawCostos as any[])
-            .filter((c) => !String(c.descripcion || "").toLowerCase().includes("materiales pintura"))
-            .reduce((sum: number, c: any) => sum + (Number(c.monto) || 0), 0)
-
-          monthlyData[key].gastos += costoServicio
-        }
+  const chartData = useMemo(() => {
+    return rows
+      .filter((r) => r.mes >= START)
+      .map((r) => {
+        const ingresos = Math.round(modo === "facturado" ? Number(r.facturado) : Number(r.cobrado))
+        const gastosVal = Math.round(Number(r.costos_internos) + Number(r.gastos_operativos) + Number(r.sueldos_comprometidos))
+        const margen = ingresos > 0 ? Math.round(((ingresos - gastosVal) / ingresos) * 100) : 0
+        const monthNum = Number.parseInt(r.mes.split("-")[1])
+        return { mes: MONTH_NAMES[monthNum - 1], ingresos, gastos: gastosVal, margen }
       })
-
-      // Gastos operacionales — excluir "Sueldos" (se usan sueldo_base de empleados activos)
-      gastos.forEach((g) => {
-        if (g.categoria === "Sueldos") return
-        const [yearStr, monthStr] = g.fecha.split("-")
-        const key = `${yearStr}-${monthStr}`
-        if (monthlyData[key]) {
-          monthlyData[key].gastos += Number(g.monto || 0)
-        }
-      })
-
-      // Agregar sueldos comprometidos a cada mes del gráfico
-      Object.keys(monthlyData).forEach((key) => {
-        monthlyData[key].gastos += sueldosTotal
-      })
-
-      const data = Object.entries(monthlyData)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([key, values]) => {
-          const [, month] = key.split("-")
-          const ingresos = Math.round(values.ingresos)
-          const gastosVal = Math.round(values.gastos)
-          const margen = ingresos > 0 ? Math.round(((ingresos - gastosVal) / ingresos) * 100) : 0
-          return {
-            mes: monthNames[Number.parseInt(month) - 1],
-            ingresos,
-            gastos: gastosVal,
-            margen,
-          }
-        })
-
-      setChartData(data)
-    } catch (error) {
-      console.error("Error loading chart data:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [rows, modo])
 
   return (
     <div className="rounded-xl border border-border bg-card p-5">

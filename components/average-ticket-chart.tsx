@@ -1,62 +1,46 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import { Receipt } from "lucide-react"
-import { fetchChartData } from "@/lib/api-client"
+import { fetchChartData, type ChartMonthlyRow } from "@/lib/api-client"
+
+const MONTH_NAMES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+const START = "2026-04"
 
 export function AverageTicketChart() {
-  const [chartData, setChartData] = useState<Array<{ mes: string; ticket: number }>>([])
-  const [currentTicket, setCurrentTicket] = useState(0)
+  const [rows, setRows] = useState<ChartMonthlyRow[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    loadData()
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { monthlyData } = await fetchChartData()
+        if (!cancelled) setRows(monthlyData ?? [])
+      } catch (error) {
+        console.error("Error loading ticket data:", error)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
   }, [])
 
-  const loadData = async () => {
-    try {
-      const { servicios } = await fetchChartData()
-      const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
-      const now = new Date()
-      const START = "2026-04"
-
-      const monthlyData: Record<string, { total: number; count: number }> = {}
-      for (let i = 5; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
-        if (key >= START) monthlyData[key] = { total: 0, count: 0 }
-      }
-
-      servicios.forEach((s) => {
-        const fecha = new Date(s.fecha_ingreso)
-        const key = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}`
-        if (monthlyData[key]) {
-          monthlyData[key].total += Number(s.monto_total_sin_iva || 0)
-          monthlyData[key].count += 1
-        }
+  const chartData = useMemo(() => {
+    return rows
+      .filter((r) => r.mes >= START)
+      .map((r) => {
+        const monthNum = Number.parseInt(r.mes.split("-")[1])
+        const ticket = r.count_servicios > 0 ? Math.round(Number(r.facturado) / r.count_servicios) : 0
+        return { mes: MONTH_NAMES[monthNum - 1], ticket }
       })
+  }, [rows])
 
-      const data = Object.entries(monthlyData)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([key, v]) => {
-          const [, month] = key.split("-")
-          return {
-            mes: monthNames[Number.parseInt(month) - 1],
-            ticket: v.count > 0 ? Math.round(v.total / v.count) : 0,
-          }
-        })
-
-      setChartData(data)
-      // current ticket = last month with data
-      const lastWithData = [...data].reverse().find((d) => d.ticket > 0)
-      setCurrentTicket(lastWithData?.ticket ?? 0)
-    } catch (error) {
-      console.error("Error loading ticket data:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  const currentTicket = useMemo(() => {
+    const last = [...chartData].reverse().find((d) => d.ticket > 0)
+    return last?.ticket ?? 0
+  }, [chartData])
 
   return (
     <div className="rounded-xl border border-border bg-card p-5">
