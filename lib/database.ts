@@ -161,14 +161,14 @@ export async function getHistorialByCliente(nombre: string) {
 
 export async function getServicios() {
   const db = getSQL()
+  await ensurePatenteNormInfra(db)
   const data = await db`
     SELECT s.*, v.mes_revision_tecnica
     FROM servicios s
     LEFT JOIN LATERAL (
       SELECT mes_revision_tecnica
       FROM vehiculos
-      WHERE UPPER(REGEXP_REPLACE(patente, '[^A-Za-z0-9]', '', 'g'))
-          = UPPER(REGEXP_REPLACE(s.patente, '[^A-Za-z0-9]', '', 'g'))
+      WHERE patente_norm = s.patente_norm
       ORDER BY (mes_revision_tecnica IS NOT NULL) DESC, updated_at DESC NULLS LAST
       LIMIT 1
     ) v ON true
@@ -206,6 +206,7 @@ export async function getEntregadosByMonth(year: number, month: number) {
 
 export async function getServiciosByMonth(year: number, month: number) {
   const db = getSQL()
+  await ensurePatenteNormInfra(db)
   const startDate = `${year}-${String(month).padStart(2, "0")}-01`
   const lastDay = new Date(year, month, 0).getDate()
   const endDate = `${year}-${String(month).padStart(2, "0")}-${lastDay}`
@@ -216,8 +217,7 @@ export async function getServiciosByMonth(year: number, month: number) {
     LEFT JOIN LATERAL (
       SELECT mes_revision_tecnica
       FROM vehiculos
-      WHERE UPPER(REGEXP_REPLACE(patente, '[^A-Za-z0-9]', '', 'g'))
-          = UPPER(REGEXP_REPLACE(s.patente, '[^A-Za-z0-9]', '', 'g'))
+      WHERE patente_norm = s.patente_norm
       ORDER BY (mes_revision_tecnica IS NOT NULL) DESC, updated_at DESC NULLS LAST
       LIMIT 1
     ) v ON true
@@ -238,6 +238,30 @@ async function ensureNumeroOtInfra(db: any) {
   if (currentMax > seqLast) {
     await db`SELECT setval('servicios_numero_ot_seq', ${currentMax})`
   }
+}
+
+// Columnas generadas + índices para eliminar REGEXP_REPLACE en LATERAL JOINs.
+// Antes: full scan de vehiculos por cada fila de servicios (O(N×M)).
+// Ahora: lookup indexado O(log N). Memoizado en memoria para correr una sola vez por proceso.
+let patenteNormInfraReady: Promise<void> | null = null
+async function ensurePatenteNormInfra(db: any): Promise<void> {
+  if (patenteNormInfraReady) return patenteNormInfraReady
+  patenteNormInfraReady = (async () => {
+    try {
+      await db`ALTER TABLE vehiculos ADD COLUMN IF NOT EXISTS patente_norm TEXT
+        GENERATED ALWAYS AS (UPPER(REGEXP_REPLACE(patente, '[^A-Za-z0-9]', '', 'g'))) STORED`
+      await db`ALTER TABLE servicios ADD COLUMN IF NOT EXISTS patente_norm TEXT
+        GENERATED ALWAYS AS (UPPER(REGEXP_REPLACE(patente, '[^A-Za-z0-9]', '', 'g'))) STORED`
+      await db`CREATE INDEX IF NOT EXISTS idx_vehiculos_patente_norm ON vehiculos(patente_norm)`
+      await db`CREATE INDEX IF NOT EXISTS idx_servicios_patente_norm ON servicios(patente_norm)`
+      await db`CREATE INDEX IF NOT EXISTS idx_servicios_fecha_ingreso ON servicios(fecha_ingreso DESC)`
+    } catch (e) {
+      // Si falla, reintentar en el próximo query (no dejar la promesa envenenada).
+      patenteNormInfraReady = null
+      throw e
+    }
+  })()
+  return patenteNormInfraReady
 }
 
 export async function createServicio(servicio: Omit<Servicio, "id" | "created_at" | "updated_at">) {
