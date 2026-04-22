@@ -35,6 +35,7 @@ import {
   ImageIcon,
   AlignJustify,
   List,
+  ListChecks,
   BookTemplate,
   BookMarked,
   Loader2,
@@ -956,28 +957,40 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
 
       {/* PDF format picker dialog */}
       <Dialog open={pdfFormatDialog} onOpenChange={setPdfFormatDialog}>
-        <DialogContent className="bg-card border-border max-w-sm">
+        <DialogContent className="bg-card border-border max-w-md">
           <DialogHeader>
             <DialogTitle>Generar Presupuesto PDF</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">Elige el formato del presupuesto:</p>
-          <div className="grid grid-cols-2 gap-3 pt-1">
+          <div className="grid grid-cols-3 gap-3 pt-1">
             <button
-              className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-colors"
+              className="flex flex-col items-center gap-2 p-3 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-colors"
               onClick={async () => {
-                const { blobUrl, fileName } = await generarPDFPresupuesto(savedPresupuesto, false)
+                const { blobUrl, fileName } = await generarPDFPresupuesto(savedPresupuesto, "detalle")
                 setPdfPreview({ url: blobUrl, fileName })
                 setPdfFormatDialog(false)
               }}
             >
               <AlignJustify className="w-6 h-6 text-primary" />
               <span className="font-semibold text-sm">Con detalle</span>
-              <span className="text-xs text-muted-foreground text-center">Cada item con subtotal por categoría</span>
+              <span className="text-xs text-muted-foreground text-center">Items y subtotal por categoría</span>
             </button>
             <button
-              className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-colors"
+              className="flex flex-col items-center gap-2 p-3 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-colors"
               onClick={async () => {
-                const { blobUrl, fileName } = await generarPDFPresupuesto(savedPresupuesto, true)
+                const { blobUrl, fileName } = await generarPDFPresupuesto(savedPresupuesto, "completo")
+                setPdfPreview({ url: blobUrl, fileName })
+                setPdfFormatDialog(false)
+              }}
+            >
+              <ListChecks className="w-6 h-6 text-primary" />
+              <span className="font-semibold text-sm">Detalle completo</span>
+              <span className="text-xs text-muted-foreground text-center">Valor por item + subtotal por categoría</span>
+            </button>
+            <button
+              className="flex flex-col items-center gap-2 p-3 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-colors"
+              onClick={async () => {
+                const { blobUrl, fileName } = await generarPDFPresupuesto(savedPresupuesto, "totales")
                 setPdfPreview({ url: blobUrl, fileName })
                 setPdfFormatDialog(false)
               }}

@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { api, type Servicio } from "@/lib/api-client"
 import { formatFechaDMA } from "@/lib/utils"
-import { FileText, Trash2, Edit, Calendar, User, Car, Wrench, ClipboardList, List, AlignJustify, TrendingUp, Receipt, ChevronDown, ChevronRight } from "lucide-react"
+import { FileText, Trash2, Edit, Calendar, User, Car, Wrench, ClipboardList, List, AlignJustify, ListChecks, TrendingUp, Receipt, ChevronDown, ChevronRight } from "lucide-react"
 
 const parseArr = (v: any): any[] => {
   let val = v
@@ -229,28 +229,40 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
 
       {/* PDF format picker dialog */}
       <Dialog open={pdfDialogOpen} onOpenChange={setPdfDialogOpen}>
-        <DialogContent className="bg-card border-border max-w-sm">
+        <DialogContent className="bg-card border-border max-w-md">
           <DialogHeader>
             <DialogTitle>Generar Presupuesto PDF</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">Elige el formato del presupuesto:</p>
-          <div className="grid grid-cols-2 gap-3 pt-1">
+          <div className="grid grid-cols-3 gap-3 pt-1">
             <button
-              className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-colors text-left"
+              className="flex flex-col items-center gap-2 p-3 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-colors text-left"
               onClick={async () => {
-                const { blobUrl, fileName } = await generarPDFPresupuesto(servicioParaPdf!, false)
+                const { blobUrl, fileName } = await generarPDFPresupuesto(servicioParaPdf!, "detalle")
                 setPdfPreview({ url: blobUrl, fileName })
                 setPdfDialogOpen(false)
               }}
             >
               <AlignJustify className="w-6 h-6 text-primary" />
               <span className="font-semibold text-sm">Con detalle</span>
-              <span className="text-xs text-muted-foreground text-center">Cada item por separado con su valor</span>
+              <span className="text-xs text-muted-foreground text-center">Items y subtotal por categoría</span>
             </button>
             <button
-              className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-colors text-left"
+              className="flex flex-col items-center gap-2 p-3 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-colors text-left"
               onClick={async () => {
-                const { blobUrl, fileName } = await generarPDFPresupuesto(servicioParaPdf!, true)
+                const { blobUrl, fileName } = await generarPDFPresupuesto(servicioParaPdf!, "completo")
+                setPdfPreview({ url: blobUrl, fileName })
+                setPdfDialogOpen(false)
+              }}
+            >
+              <ListChecks className="w-6 h-6 text-primary" />
+              <span className="font-semibold text-sm">Detalle completo</span>
+              <span className="text-xs text-muted-foreground text-center">Valor por item + subtotal por categoría</span>
+            </button>
+            <button
+              className="flex flex-col items-center gap-2 p-3 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-colors text-left"
+              onClick={async () => {
+                const { blobUrl, fileName } = await generarPDFPresupuesto(servicioParaPdf!, "totales")
                 setPdfPreview({ url: blobUrl, fileName })
                 setPdfDialogOpen(false)
               }}

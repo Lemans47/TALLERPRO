@@ -9,7 +9,18 @@ const MONTO_W = 48
 const DESC_W = CW - MONTO_W
 const PAGE_H = 297
 
-export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = false) {
+export type PresupuestoPdfModo = "detalle" | "totales" | "completo"
+
+export async function generarPDFPresupuesto(
+  servicio: Servicio,
+  modoOrSoloTotales: PresupuestoPdfModo | boolean = "detalle",
+) {
+  const modo: PresupuestoPdfModo =
+    typeof modoOrSoloTotales === "boolean"
+      ? (modoOrSoloTotales ? "totales" : "detalle")
+      : modoOrSoloTotales
+  const soloTotales = modo === "totales"
+  const itemsConPrecio = modo === "completo"
   const doc = new jsPDF({ unit: "mm", format: [210, 297], orientation: "portrait" })
 
   const bold = () => doc.setFont("helvetica", "bold")
@@ -441,8 +452,8 @@ export async function generarPDFPresupuesto(servicio: Servicio, soloTotales = fa
     } else {
       normal(); doc.setFontSize(8)
       doc.text(up(r.desc!).substring(0, 72), ML + 5, r.ry + r.rh - 1.5)
-      // In detail mode prices are shown only on subtotal rows, not individual items
-      if ((r.monto || 0) > 0 && soloTotales) {
+      // "completo" mode: every item prints its individual price
+      if ((r.monto || 0) > 0 && itemsConPrecio) {
         doc.text(fmt(r.monto!), MR - 1, r.ry + r.rh - 1.5, { align: "right" })
       }
     }
