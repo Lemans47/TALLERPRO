@@ -292,8 +292,12 @@ export async function generarPDFPresupuesto(
     for (let i = 0; i < displayRows.length; i++) {
       const rh = measureRow(displayRows[i])
       while (yCur + rh > bottomAnchor && i > pageStart) {
+        // Find the LATEST category boundary in (pageStart, i] so the current
+        // page keeps the maximum content. Starting at j=i lets us break at
+        // the overflowing row itself when it's a category, avoiding bumping
+        // a preceding category that still fits.
         let cut = -1
-        for (let j = i - 1; j > pageStart; j--) {
+        for (let j = i; j > pageStart; j--) {
           if (displayRows[j].type === "category") { cut = j; break }
         }
         if (cut === -1 || cut === pageStart) cut = i  // mid-category break as last resort
