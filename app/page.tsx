@@ -92,10 +92,11 @@ export default function DashboardPage() {
   const [showBreakeven, setShowBreakeven] = useState(false)
   const { selectedMonth } = useMonth()
 
-  // Migración única: actualizar servicios existentes sin tarifa de mano de obra
+  // Migraciones únicas (una sola vez por navegador, gated con localStorage).
+  // Los servicios nuevos ya reciben numero_ot al crearse (createServicio → ensureNumeroOtInfra),
+  // así que migrate-numero-ot es solo backfill histórico — no hace falta en cada carga.
   useEffect(() => {
-    const migrated = localStorage.getItem("mano_obra_migrated")
-    if (!migrated) {
+    if (!localStorage.getItem("mano_obra_migrated")) {
       const tarifa = Number(localStorage.getItem("mano_obra_pintura_default") || 0)
       if (tarifa > 0) {
         fetch("/api/migrate-mano-obra", {
@@ -111,6 +112,16 @@ export default function DashboardPage() {
           .catch(console.error)
       }
     }
+
+    if (!localStorage.getItem("numero_ot_migrated")) {
+      fetch("/api/migrate-numero-ot", { method: "POST" })
+        .then((r) => r.ok ? r.json() : null)
+        .then((data) => {
+          if (data?.backfilled > 0) console.log("N° OT asignados:", data.backfilled)
+          localStorage.setItem("numero_ot_migrated", "true")
+        })
+        .catch((e) => console.error("migrate-numero-ot:", e))
+    }
   }, [])
 
   useEffect(() => {
@@ -120,17 +131,6 @@ export default function DashboardPage() {
   const loadData = async () => {
     setLoading(true)
     try {
-      // Asignar N° OT a servicios sin uno antes de cargar (idempotente)
-      try {
-        const res = await fetch("/api/migrate-numero-ot", { method: "POST" })
-        if (res.ok) {
-          const data = await res.json()
-          if (data?.backfilled > 0) console.log("N° OT asignados:", data.backfilled)
-        }
-      } catch (e) {
-        console.error("migrate-numero-ot:", e)
-      }
-
       const [year, month] = selectedMonth.split("-").map(Number)
       const response = await fetchDashboardData(year, month)
       const { servicios: serviciosData, gastos: gastosData, empleados: empleadosData, serviciosActivos: activosData, kpis: apiKpis, entregadosMes } = response
