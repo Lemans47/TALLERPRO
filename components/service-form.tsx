@@ -39,6 +39,7 @@ import {
   BookTemplate,
   BookMarked,
   Loader2,
+  AlertTriangle,
 } from "lucide-react"
 import { api, lookupPatente, type Servicio, type Presupuesto, type FotoServicio } from "@/lib/api-client"
 import { useToast } from "@/hooks/use-toast"
@@ -148,6 +149,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
     estado: "En Cola",
     iva: "sin",
     anticipo: 0,
+    detalle_pendiente: false,
   })
 
   const [cobros, setCobros] = useState<ItemsPorCategoria>({
@@ -294,6 +296,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         estado: servicioAEditar.estado || "En Cola",
         iva: servicioAEditar.iva || "sin",
         anticipo: Number(servicioAEditar.anticipo) || 0,
+        detalle_pendiente: Boolean((servicioAEditar as any).detalle_pendiente) || false,
       })
 
       // Cargar cobros por categoría
@@ -424,6 +427,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       estado: "En Cola",
       iva: "sin",
       anticipo: 0,
+      detalle_pendiente: false,
     })
     setCobros({
       desmontar: [],
@@ -800,6 +804,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         observaciones_checkboxes: [],
         fotos_ingreso: fotosIngreso,
         fotos_entrega: fotosEntrega,
+        detalle_pendiente: formData.detalle_pendiente,
       }
 
       console.log("[v0] servicioData prepared:", servicioData)
@@ -1514,6 +1519,17 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                     placeholder="Notas adicionales..."
                     className="bg-background/30 min-h-[80px] resize-none"
                   />
+                </div>
+                <div className="flex items-center gap-2 rounded-md border border-warning/30 bg-warning/5 px-3 py-2">
+                  <Checkbox
+                    id="detalle-pendiente"
+                    checked={formData.detalle_pendiente}
+                    onCheckedChange={(v) => setFormData({ ...formData, detalle_pendiente: Boolean(v) })}
+                  />
+                  <Label htmlFor="detalle-pendiente" className="text-xs cursor-pointer flex items-center gap-1.5 text-warning font-medium">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    Marcar como detalle pendiente de completar
+                  </Label>
                 </div>
               </div>
             </div>

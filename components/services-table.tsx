@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { api, type Servicio } from "@/lib/api-client"
 import { formatFechaDMA } from "@/lib/utils"
-import { FileText, Trash2, Edit, Calendar, User, Car, Wrench, ClipboardList, List, AlignJustify, ListChecks, TrendingUp, Receipt, ChevronDown, ChevronRight } from "lucide-react"
+import { FileText, Trash2, Edit, Calendar, User, Car, Wrench, ClipboardList, List, AlignJustify, ListChecks, TrendingUp, Receipt, ChevronDown, ChevronRight, AlertTriangle } from "lucide-react"
 
 const parseArr = (v: any): any[] => {
   let val = v
@@ -88,6 +88,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
   const { toast } = useToast()
   const [filtroEstado, setFiltroEstado] = useState("todos")
   const [sortBy, setSortBy] = useState("fecha_desc")
+  const [soloPendientes, setSoloPendientes] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
   const [montoPago, setMontoPago] = useState("")
   const [modoCorregir, setModoCorregir] = useState(false)
@@ -188,6 +189,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
 
   const serviciosFiltrados = servicios
     .filter((s) => filtroEstado === "todos" || s.estado === filtroEstado)
+    .filter((s) => !soloPendientes || Boolean((s as any).detalle_pendiente))
     .sort((a, b) => {
       switch (sortBy) {
         case "fecha_asc":  return (a.fecha_ingreso || "").localeCompare(b.fecha_ingreso || "")
@@ -372,6 +374,16 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
               ))}
             </SelectContent>
           </Select>
+          <Button
+            variant={soloPendientes ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSoloPendientes((v) => !v)}
+            className={`gap-1.5 h-10 ${soloPendientes ? "bg-warning text-warning-foreground hover:bg-warning/90" : "border-warning/40 text-warning hover:bg-warning/10 hover:text-warning"}`}
+            title="Mostrar solo servicios con detalle pendiente"
+          >
+            <AlertTriangle className="w-3.5 h-3.5" />
+            Solo pendientes
+          </Button>
         </div>}
       </div>
 
@@ -400,6 +412,12 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                       <span className="text-xs font-mono text-muted-foreground border border-border rounded px-1.5 py-0.5">
                         OT-{String(servicio.numero_ot).padStart(4, "0")}
                       </span>
+                    )}
+                    {(servicio as any).detalle_pendiente && (
+                      <Badge className="bg-warning/15 text-warning border border-warning/40 gap-1 hover:bg-warning/20">
+                        <AlertTriangle className="w-3 h-3" />
+                        Detalle pendiente
+                      </Badge>
                     )}
                   </div>
 

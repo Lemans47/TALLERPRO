@@ -63,6 +63,7 @@ export interface Servicio {
   fotos_entrega: FotoServicio[]
   numero_ot?: number
   mes_revision_tecnica?: string
+  detalle_pendiente: boolean
   created_at: string
   updated_at: string
 }
@@ -290,7 +291,7 @@ export async function createServicio(servicio: Omit<Servicio, "id" | "created_at
       fecha_ingreso, patente, marca, modelo, color, kilometraje, año, cliente, telefono, observaciones,
       mano_obra_pintura, cobros, costos, piezas_pintura, estado, iva,
       anticipo, saldo_pendiente, monto_total, monto_total_sin_iva, observaciones_checkboxes,
-      fotos_ingreso, fotos_entrega, numero_ot
+      fotos_ingreso, fotos_entrega, numero_ot, detalle_pendiente
     ) VALUES (
       ${servicio.fecha_ingreso}, ${servicio.patente}, ${servicio.marca}, ${servicio.modelo},
       ${servicio.color || null}, ${servicio.kilometraje || null}, ${servicio.año || null},
@@ -300,7 +301,7 @@ export async function createServicio(servicio: Omit<Servicio, "id" | "created_at
       ${servicio.anticipo}, ${servicio.saldo_pendiente}, ${servicio.monto_total},
       ${servicio.monto_total_sin_iva}, ${safeJson(servicio.observaciones_checkboxes)},
       ${safeJson(servicio.fotos_ingreso || [])}, ${safeJson(servicio.fotos_entrega || [])},
-      nextval('servicios_numero_ot_seq')::int
+      nextval('servicios_numero_ot_seq')::int, ${servicio.detalle_pendiente ?? false}
     ) RETURNING *
   `
   return data[0] as Servicio
@@ -333,6 +334,7 @@ export async function updateServicio(id: string, servicio: Partial<Servicio>) {
       observaciones_checkboxes = COALESCE(${servicio.observaciones_checkboxes != null ? safeJson(servicio.observaciones_checkboxes) : null}::jsonb, observaciones_checkboxes),
       fotos_ingreso = COALESCE(${servicio.fotos_ingreso != null ? safeJson(servicio.fotos_ingreso) : null}::jsonb, fotos_ingreso),
       fotos_entrega = COALESCE(${servicio.fotos_entrega != null ? safeJson(servicio.fotos_entrega) : null}::jsonb, fotos_entrega),
+      detalle_pendiente = COALESCE(${servicio.detalle_pendiente ?? null}, detalle_pendiente),
       updated_at = NOW()
     WHERE id = ${id}
     RETURNING *
