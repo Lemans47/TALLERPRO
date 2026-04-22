@@ -243,8 +243,9 @@ export async function generarPDFPresupuesto(
     }
   })
 
-  const CAT_H = 7
-  const ITEM_H = 5.5
+  const CAT_H_BASE = 7
+  const ITEM_H_BASE = 5.5
+  const SUBTOTAL_H_BASE = 6
 
   // ─── TABLE HEADER ─────────────────────────────────────────────────
   checkPageBreak(8)
@@ -257,7 +258,6 @@ export async function generarPDFPresupuesto(
   black(); y += 7
 
   // ─── PRE-CALCULATE all row positions ──────────────────────────────
-  const SUBTOTAL_H = 6
   type PlacedRow = {
     type: "category" | "item" | "subtotal" | "blank"
     label?: string
@@ -274,12 +274,29 @@ export async function generarPDFPresupuesto(
   const FIRMA_H = trh1 + trh * 2 + 2 + 10
   const bottomAnchor = PAGE_H - 15 - FIRMA_H
 
-  const measureRow = (row: DisplayRow): number =>
-    row.type === "category" ? CAT_H : row.type === "subtotal" ? SUBTOTAL_H : ITEM_H
-
   // Y where content starts on each page (after page header + table header/cont-header)
   const startY_p1 = y
   const startY_next = 60 + 7  // drawPageHeader returns 60 for page>1, + 7 for "DESCRIPCION (cont.)"
+
+  // ── Auto-fit: if content barely overflows page 1, shrink row heights a bit
+  // so it fits on a single page. Activates only for small overflows (≤15%);
+  // larger docs keep base heights and paginate normally.
+  const baseTotalH = displayRows.reduce(
+    (acc, row) =>
+      acc + (row.type === "category" ? CAT_H_BASE : row.type === "subtotal" ? SUBTOTAL_H_BASE : ITEM_H_BASE),
+    0,
+  )
+  const firstPageCapBase = bottomAnchor - startY_p1
+  const scale =
+    baseTotalH > firstPageCapBase && baseTotalH / firstPageCapBase <= 1.15
+      ? firstPageCapBase / baseTotalH
+      : 1
+  const CAT_H = CAT_H_BASE * scale
+  const ITEM_H = ITEM_H_BASE * scale
+  const SUBTOTAL_H = SUBTOTAL_H_BASE * scale
+
+  const measureRow = (row: DisplayRow): number =>
+    row.type === "category" ? CAT_H : row.type === "subtotal" ? SUBTOTAL_H : ITEM_H
 
   // ── Phase A/B: compute page breaks (indices into displayRows where a new page begins)
   // Strategy: greedy fill — pack each page up to its cap (bottomAnchor reserves footer
