@@ -50,7 +50,7 @@ export interface Servicio {
   observaciones: string | null
   mano_obra_pintura: number
   cobros: { categoria: string; descripcion: string; monto: number; isAuto?: boolean }[]
-  costos: { categoria?: string; descripcion: string; monto: number; isAuto?: boolean; costoReal?: number | null }[]
+  costos: { categoria?: string; descripcion: string; monto: number; isAuto?: boolean; costoReal?: number | null; tipo_documento?: "boleta" | "factura" }[]
   piezas_pintura: { nombre: string; cantidad: number; precio: number }[]
   estado: string
   iva: string
@@ -82,7 +82,7 @@ export interface Presupuesto {
   observaciones: string | null
   mano_obra_pintura: number
   cobros: { categoria: string; descripcion: string; monto: number; isAuto?: boolean }[]
-  costos: { categoria?: string; descripcion: string; monto: number; isAuto?: boolean; costoReal?: number | null }[]
+  costos: { categoria?: string; descripcion: string; monto: number; isAuto?: boolean; costoReal?: number | null; tipo_documento?: "boleta" | "factura" }[]
   piezas_pintura: { nombre: string; cantidad: number; precio: number }[]
   iva: string
   monto_total: number
@@ -99,6 +99,7 @@ export interface Gasto {
   descripcion: string
   monto: number
   pagado?: boolean
+  tipo_documento?: "boleta" | "factura"
   created_at: string
   updated_at: string
 }
@@ -470,11 +471,27 @@ export async function convertPresupuestoToServicio(presupuestoId: string) {
   })
 }
 
+// Auto-migrate: agrega columna tipo_documento a gastos si no existe (boleta | factura)
+let gastosTipoDocumentoReady: Promise<void> | null = null
+async function ensureGastosTipoDocumentoColumn(db: any): Promise<void> {
+  if (gastosTipoDocumentoReady) return gastosTipoDocumentoReady
+  gastosTipoDocumentoReady = (async () => {
+    try {
+      await db`ALTER TABLE gastos ADD COLUMN IF NOT EXISTS tipo_documento TEXT DEFAULT 'boleta'`
+    } catch (e) {
+      gastosTipoDocumentoReady = null
+      throw e
+    }
+  })()
+  return gastosTipoDocumentoReady
+}
+
 // Gastos
 export async function getGastos() {
   const db = getSQL()
+  await ensureGastosTipoDocumentoColumn(db)
   const data = await db`
-    SELECT * FROM gastos 
+    SELECT * FROM gastos
     ORDER BY fecha DESC
   `
   return data as Gasto[]
@@ -482,13 +499,14 @@ export async function getGastos() {
 
 export async function getGastosByMonth(year: number, month: number) {
   const db = getSQL()
+  await ensureGastosTipoDocumentoColumn(db)
   const startDate = `${year}-${String(month).padStart(2, "0")}-01`
   const lastDay = new Date(year, month, 0).getDate()
   const endDate = `${year}-${String(month).padStart(2, "0")}-${lastDay}`
 
   const data = await db`
-    SELECT * FROM gastos 
-    WHERE fecha >= ${startDate} 
+    SELECT * FROM gastos
+    WHERE fecha >= ${startDate}
     AND fecha <= ${endDate}
     ORDER BY fecha DESC
   `
@@ -497,8 +515,9 @@ export async function getGastosByMonth(year: number, month: number) {
 
 export async function getGastosByCategoria(categoria: string) {
   const db = getSQL()
+  await ensureGastosTipoDocumentoColumn(db)
   const data = await db`
-    SELECT * FROM gastos 
+    SELECT * FROM gastos
     WHERE categoria = ${categoria}
     ORDER BY fecha DESC
   `
@@ -507,10 +526,12 @@ export async function getGastosByCategoria(categoria: string) {
 
 export async function createGasto(gasto: Omit<Gasto, "id" | "created_at" | "updated_at">) {
   const db = getSQL()
+  await ensureGastosTipoDocumentoColumn(db)
   const pagado = gasto.pagado !== false // default true
+  const tipoDocumento = gasto.tipo_documento === "factura" ? "factura" : "boleta"
   const data = await db`
-    INSERT INTO gastos (fecha, categoria, descripcion, monto, pagado)
-    VALUES (${gasto.fecha}, ${gasto.categoria}, ${gasto.descripcion}, ${gasto.monto}, ${pagado})
+    INSERT INTO gastos (fecha, categoria, descripcion, monto, pagado, tipo_documento)
+    VALUES (${gasto.fecha}, ${gasto.categoria}, ${gasto.descripcion}, ${gasto.monto}, ${pagado}, ${tipoDocumento})
     RETURNING *
   `
   return data[0] as Gasto
@@ -518,6 +539,7 @@ export async function createGasto(gasto: Omit<Gasto, "id" | "created_at" | "upda
 
 export async function updateGasto(id: string, gasto: Partial<Gasto>) {
   const db = getSQL()
+  await ensureGastosTipoDocumentoColumn(db)
   const data = await db`
     UPDATE gastos SET
       fecha = COALESCE(${gasto.fecha ?? null}, fecha),
@@ -525,6 +547,7 @@ export async function updateGasto(id: string, gasto: Partial<Gasto>) {
       descripcion = COALESCE(${gasto.descripcion ?? null}, descripcion),
       monto = COALESCE(${gasto.monto ?? null}, monto),
       pagado = COALESCE(${gasto.pagado ?? null}, pagado),
+      tipo_documento = COALESCE(${gasto.tipo_documento ?? null}, tipo_documento),
       updated_at = NOW()
     WHERE id = ${id}
     RETURNING *

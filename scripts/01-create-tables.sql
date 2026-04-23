@@ -61,6 +61,7 @@ CREATE TABLE gastos (
   categoria TEXT NOT NULL,
   descripcion TEXT NOT NULL,
   monto DECIMAL(12, 0) NOT NULL,
+  tipo_documento TEXT DEFAULT 'boleta',
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
