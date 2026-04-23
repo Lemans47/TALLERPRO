@@ -11,11 +11,11 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
-import { Download, FileSpreadsheet, TrendingUp, TrendingDown, DollarSign, Wrench, RefreshCw, Users, ArrowUpRight, ArrowDownRight, Minus } from "lucide-react"
+import { Download, FileSpreadsheet, TrendingUp, TrendingDown, DollarSign, Wrench, RefreshCw, Users, ArrowUpRight, ArrowDownRight, Minus, Receipt } from "lucide-react"
 import { ProfitabilityAnalysis } from "@/components/profitability-analysis"
 import { useMonth } from "@/lib/month-context"
 import { api, type Servicio, type Gasto } from "@/lib/api-client"
-import { formatFechaDMA } from "@/lib/utils"
+import { formatFechaDMA, extraerIvaIncluido } from "@/lib/utils"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
@@ -316,6 +316,7 @@ export default function ReportsPage() {
           <TabsTrigger value="rentabilidad">Rentabilidad</TabsTrigger>
           <TabsTrigger value="pintura">Pintura</TabsTrigger>
           <TabsTrigger value="clientes">Top Clientes</TabsTrigger>
+          <TabsTrigger value="iva">IVA</TabsTrigger>
           <TabsTrigger value="comparar">Comparar meses</TabsTrigger>
         </TabsList>
 
@@ -684,6 +685,200 @@ export default function ReportsPage() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* ── IVA ── */}
+        <TabsContent value="iva" className="space-y-6">
+          {(() => {
+            const debitoRows = servicios
+              .filter((s) => s.iva === "con" && Number(s.monto_total_sin_iva || 0) > 0)
+              .map((s) => {
+                const neto = Number(s.monto_total_sin_iva || 0)
+                const total = Number(s.monto_total || 0)
+                return { id: s.id, fecha: s.fecha_ingreso, patente: s.patente, cliente: s.cliente, neto, iva: total - neto, total }
+              })
+              .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
+
+            const totalDebitoNeto = debitoRows.reduce((s, r) => s + r.neto, 0)
+            const totalDebitoIva = debitoRows.reduce((s, r) => s + r.iva, 0)
+            const totalDebitoBruto = debitoRows.reduce((s, r) => s + r.total, 0)
+
+            type CreditoRow = { fecha: string; origen: string; descripcion: string; bruto: number; iva: number }
+            const creditoGastos: CreditoRow[] = gastos
+              .filter((g) => g.tipo_documento === "factura")
+              .map((g) => ({
+                fecha: g.fecha,
+                origen: g.categoria,
+                descripcion: g.descripcion,
+                bruto: Number(g.monto || 0),
+                iva: extraerIvaIncluido(Number(g.monto || 0)),
+              }))
+
+            const creditoCostos: CreditoRow[] = servicios.flatMap((s) =>
+              parseArr(s.costos)
+                .filter((c: any) => c.tipo_documento === "factura")
+                .map((c: any) => ({
+                  fecha: s.fecha_ingreso,
+                  origen: `Costo servicio (${c.categoria || "—"})`,
+                  descripcion: `${s.patente} · ${c.descripcion || ""}`,
+                  bruto: Number(c.monto || 0),
+                  iva: extraerIvaIncluido(Number(c.monto || 0)),
+                }))
+            )
+            const creditoRows = [...creditoGastos, ...creditoCostos]
+              .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
+            const totalCreditoBruto = creditoRows.reduce((s, r) => s + r.bruto, 0)
+            const totalCreditoIva = creditoRows.reduce((s, r) => s + r.iva, 0)
+
+            const ivaNeto = totalDebitoIva - totalCreditoIva
+
+            return (
+              <>
+                {/* Resumen IVA */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30">
+                          <ArrowUpRight className="w-5 h-5 text-red-600" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">IVA Débito (ventas)</p>
+                          <p className="text-xl font-bold">${totalDebitoIva.toLocaleString("es-CL")}</p>
+                          <p className="text-xs text-muted-foreground">{debitoRows.length} servicio{debitoRows.length !== 1 ? "s" : ""} con IVA</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
+                          <ArrowDownRight className="w-5 h-5 text-green-600" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">IVA Crédito (compras c/factura)</p>
+                          <p className="text-xl font-bold">${totalCreditoIva.toLocaleString("es-CL")}</p>
+                          <p className="text-xs text-muted-foreground">{creditoRows.length} item{creditoRows.length !== 1 ? "s" : ""} con factura</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className={ivaNeto > 0 ? "border-orange-500/40 bg-orange-500/5" : "border-green-500/40 bg-green-500/5"}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-lg ${ivaNeto > 0 ? "bg-orange-100 dark:bg-orange-900/30" : "bg-green-100 dark:bg-green-900/30"}`}>
+                          <Receipt className={`w-5 h-5 ${ivaNeto > 0 ? "text-orange-600" : "text-green-600"}`} />
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">IVA Neto a pagar al SII</p>
+                          <p className={`text-xl font-bold ${ivaNeto > 0 ? "text-orange-600" : "text-green-600"}`}>
+                            ${ivaNeto.toLocaleString("es-CL")}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{ivaNeto > 0 ? "Débito > Crédito" : "Crédito ≥ Débito"}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Tabla Débito */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <ArrowUpRight className="w-4 h-4 text-red-600" /> IVA Débito — Servicios con IVA emitido
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {debitoRows.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Sin servicios con IVA este mes.</p>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className="border-b border-border">
+                            <tr className="text-left text-xs text-muted-foreground">
+                              <th className="py-2 pr-3 font-medium">Fecha</th>
+                              <th className="py-2 pr-3 font-medium">Patente</th>
+                              <th className="py-2 pr-3 font-medium">Cliente</th>
+                              <th className="py-2 pr-3 font-medium text-right">Neto</th>
+                              <th className="py-2 pr-3 font-medium text-right">IVA</th>
+                              <th className="py-2 pr-3 font-medium text-right">Total</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {debitoRows.map((r) => (
+                              <tr key={r.id} className="border-b border-border/50">
+                                <td className="py-2 pr-3 text-xs">{formatFechaDMA(r.fecha)}</td>
+                                <td className="py-2 pr-3 font-mono text-xs">{r.patente}</td>
+                                <td className="py-2 pr-3">{r.cliente}</td>
+                                <td className="py-2 pr-3 text-right">${r.neto.toLocaleString("es-CL")}</td>
+                                <td className="py-2 pr-3 text-right text-red-600 font-medium">${r.iva.toLocaleString("es-CL")}</td>
+                                <td className="py-2 pr-3 text-right font-semibold">${r.total.toLocaleString("es-CL")}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr className="font-semibold">
+                              <td colSpan={3} className="py-2 pr-3 text-right text-muted-foreground">Total</td>
+                              <td className="py-2 pr-3 text-right">${totalDebitoNeto.toLocaleString("es-CL")}</td>
+                              <td className="py-2 pr-3 text-right text-red-600">${totalDebitoIva.toLocaleString("es-CL")}</td>
+                              <td className="py-2 pr-3 text-right">${totalDebitoBruto.toLocaleString("es-CL")}</td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Tabla Crédito */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <ArrowDownRight className="w-4 h-4 text-green-600" /> IVA Crédito — Compras con factura
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {creditoRows.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Sin compras marcadas como factura este mes.</p>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className="border-b border-border">
+                            <tr className="text-left text-xs text-muted-foreground">
+                              <th className="py-2 pr-3 font-medium">Fecha</th>
+                              <th className="py-2 pr-3 font-medium">Origen</th>
+                              <th className="py-2 pr-3 font-medium">Descripción</th>
+                              <th className="py-2 pr-3 font-medium text-right">Bruto</th>
+                              <th className="py-2 pr-3 font-medium text-right">IVA recuperable</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {creditoRows.map((r, i) => (
+                              <tr key={i} className="border-b border-border/50">
+                                <td className="py-2 pr-3 text-xs">{formatFechaDMA(r.fecha)}</td>
+                                <td className="py-2 pr-3 text-xs text-muted-foreground">{r.origen}</td>
+                                <td className="py-2 pr-3">{r.descripcion}</td>
+                                <td className="py-2 pr-3 text-right">${r.bruto.toLocaleString("es-CL")}</td>
+                                <td className="py-2 pr-3 text-right text-green-600 font-medium">${r.iva.toLocaleString("es-CL")}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr className="font-semibold">
+                              <td colSpan={3} className="py-2 pr-3 text-right text-muted-foreground">Total</td>
+                              <td className="py-2 pr-3 text-right">${totalCreditoBruto.toLocaleString("es-CL")}</td>
+                              <td className="py-2 pr-3 text-right text-green-600">${totalCreditoIva.toLocaleString("es-CL")}</td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </>
+            )
+          })()}
         </TabsContent>
 
         {/* ── COMPARAR MESES ── */}
