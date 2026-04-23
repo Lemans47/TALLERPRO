@@ -421,7 +421,7 @@ export default function DashboardPage() {
   const formatCurrency = (value: number) => `$${Math.abs(value).toLocaleString("es-CL")}`
 
   const margenVariant =
-    kpis.margenGanancia >= 40 ? "success" : kpis.margenGanancia >= 20 ? "warning" : "destructive"
+    kpis.margenGanancia >= 20 ? "success" : kpis.margenGanancia >= 0 ? "warning" : "destructive"
 
   return (
     <div className="space-y-6">
