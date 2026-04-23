@@ -11,7 +11,7 @@ import { VehiclePipeline } from "@/components/vehicle-pipeline"
 import { AverageTicketChart } from "@/components/average-ticket-chart"
 import { MonthSelector } from "@/components/month-selector"
 import {
-  Car, ArrowUpDown, TrendingUp, CheckCircle2,
+  Car, ArrowUpDown, TrendingUp, TrendingDown, CheckCircle2,
   Activity, Clock, Wrench, Plus, RefreshCw, ChevronDown, ChevronUp,
   Paintbrush, Receipt,
 } from "lucide-react"
@@ -416,47 +416,52 @@ export default function DashboardPage() {
           variant="default"
         />
         {/* KPI Facturado del Mes con margen en esquina */}
-        <div className={`rounded-xl border p-5 transition-all hover:shadow-lg hover:shadow-black/5 ${
-          margenVariant === "success" ? "border-success/30 bg-success/5" :
-          margenVariant === "warning" ? "border-warning/30 bg-warning/5" :
-          "border-destructive/30 bg-destructive/5"
-        }`}>
-          <div className="flex items-start justify-between gap-4">
-            <p className="text-sm font-medium text-muted-foreground">Facturado del Mes</p>
-            <div className={`p-2.5 rounded-xl shrink-0 ${
-              margenVariant === "success" ? "text-success bg-success/10" :
-              margenVariant === "warning" ? "text-warning bg-warning/10" :
-              "text-destructive bg-destructive/10"
-            }`}>
-              <TrendingUp className="w-5 h-5" />
+        {(() => {
+          const isPositive = kpis.margenGanancia >= 0
+          const margenNeto = kpis.ingresosFacturado - kpis.gastosTotalMes
+          const styles = {
+            success:     { card: "border-success/30 bg-success/5",         icon: "text-success bg-success/10",         text: "text-success",         badge: "text-success bg-success/10" },
+            warning:     { card: "border-warning/30 bg-warning/5",         icon: "text-warning bg-warning/10",         text: "text-warning",         badge: "text-warning bg-warning/10" },
+            destructive: { card: "border-destructive/30 bg-destructive/5", icon: "text-destructive bg-destructive/10", text: "text-destructive", badge: "text-destructive bg-destructive/10" },
+          }[margenVariant]
+          return (
+            <div className={`rounded-xl border p-5 transition-all hover:shadow-lg hover:shadow-black/5 ${styles.card}`}>
+              <div className="flex items-start justify-between gap-4">
+                <p className="text-sm font-medium text-muted-foreground">Facturado del Mes</p>
+                <div className={`p-2.5 rounded-xl shrink-0 ${styles.icon}`}>
+                  {isPositive ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
+                </div>
+              </div>
+              <div className="mt-2 flex items-baseline gap-2 flex-wrap">
+                <p className={`text-2xl font-bold tracking-tight ${styles.text}`}>
+                  {formatCurrency(kpis.ingresosFacturado)}
+                </p>
+                <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[11px] font-semibold ${styles.badge}`}>
+                  {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                  {kpis.margenGanancia.toFixed(1)}%
+                </span>
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2 pt-3 border-t border-border/50">
+                <div className="min-w-0">
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Pagado</p>
+                  <p className="text-xs font-semibold text-foreground truncate">{formatCurrency(kpis.pagadoMes)}</p>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Pendiente</p>
+                  <p className="text-xs font-semibold text-foreground truncate">{formatCurrency(kpis.pendienteMes)}</p>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Gastos</p>
+                  <p className="text-xs font-semibold text-foreground truncate">{formatCurrency(kpis.gastosTotalMes)}</p>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Margen</p>
+                  <p className={`text-xs font-semibold truncate ${styles.text}`}>{formatCurrency(margenNeto)}</p>
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="flex items-end justify-between mt-2">
-            <p className={`text-2xl font-bold tracking-tight ${
-              margenVariant === "success" ? "text-success" :
-              margenVariant === "warning" ? "text-warning" :
-              "text-destructive"
-            }`}>
-              {formatCurrency(kpis.ingresosFacturado)}
-            </p>
-            <div className="text-right">
-              <p className={`text-xl font-bold leading-none ${
-                margenVariant === "success" ? "text-success" :
-                margenVariant === "warning" ? "text-warning" :
-                "text-destructive"
-              }`}>
-                {kpis.margenGanancia.toFixed(1)}%
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">margen</p>
-            </div>
-          </div>
-          <p className="text-xs text-muted-foreground mt-2">
-            Pagado {formatCurrency(kpis.pagadoMes)} · Pendiente {formatCurrency(kpis.pendienteMes)}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Gastos {formatCurrency(kpis.gastosTotalMes)} · Margen {formatCurrency(kpis.ingresosFacturado - kpis.gastosTotalMes)}
-          </p>
-        </div>
+          )
+        })()}
         <KPICard
           title="Flujo de Caja"
           value={`${kpis.flujoCaja < 0 ? "-" : ""}${formatCurrency(kpis.flujoCaja)}`}
