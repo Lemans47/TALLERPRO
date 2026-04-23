@@ -278,9 +278,9 @@ export async function generarPDFPresupuesto(
   const startY_p1 = y
   const startY_next = 60 + 7  // drawPageHeader returns 60 for page>1, + 7 for "DESCRIPCION (cont.)"
 
-  // ── Auto-fit: if content barely overflows page 1, shrink row heights a bit
-  // so it fits on a single page. Activates only for small overflows (≤15%);
-  // larger docs keep base heights and paginate normally.
+  // ── Auto-fit: shrink row heights so content fits on a single page when possible.
+  // Floor at MIN_SCALE to keep rows readable; beyond that, paginate normally.
+  const MIN_SCALE = 0.78
   const baseTotalH = displayRows.reduce(
     (acc, row) =>
       acc + (row.type === "category" ? CAT_H_BASE : row.type === "subtotal" ? SUBTOTAL_H_BASE : ITEM_H_BASE),
@@ -288,8 +288,8 @@ export async function generarPDFPresupuesto(
   )
   const firstPageCapBase = bottomAnchor - startY_p1
   const scale =
-    baseTotalH > firstPageCapBase && baseTotalH / firstPageCapBase <= 1.15
-      ? firstPageCapBase / baseTotalH
+    baseTotalH > firstPageCapBase
+      ? Math.max(MIN_SCALE, (firstPageCapBase * 0.995) / baseTotalH)
       : 1
   const CAT_H = CAT_H_BASE * scale
   const ITEM_H = ITEM_H_BASE * scale
