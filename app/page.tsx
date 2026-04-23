@@ -29,6 +29,8 @@ interface KPIs {
   margenGanancia: number
   ingresosCobrado: number
   ingresosFacturado: number
+  pagadoMes: number
+  pendienteMes: number
   porCobrar: number
   porCobrarDesglose: string
   entregadosEsteMes: number
@@ -64,6 +66,8 @@ export default function DashboardPage() {
     margenGanancia: 0,
     ingresosCobrado: 0,
     ingresosFacturado: 0,
+    pagadoMes: 0,
+    pendienteMes: 0,
     porCobrar: 0,
     porCobrarDesglose: "",
     entregadosEsteMes: 0,
@@ -161,6 +165,13 @@ export default function DashboardPage() {
     // Ingresos
     const ingresosCobrado = serviciosCerrados.reduce((sum, s) => sum + Number(s.monto_total_sin_iva || 0), 0)
     const ingresosFacturado = serviciosFacturados.reduce((sum, s) => sum + Number(s.monto_total_sin_iva || 0), 0)
+
+    // Pagado / Pendiente del mes facturado: cerrados aportan todo a Pagado (saldo=0);
+    // en proceso aportan (monto - saldo) a Pagado y saldo a Pendiente. Suma = Facturado.
+    const pendienteMes = serviciosFacturados.reduce(
+      (sum, s) => sum + Number(s.saldo_pendiente || 0), 0
+    )
+    const pagadoMes = ingresosFacturado - pendienteMes
 
     // Costos (excluye "materiales pintura" para evitar doble conteo con gastos de pintura)
     const costosCerrados = serviciosCerrados.reduce((sum, s) => {
@@ -293,6 +304,8 @@ export default function DashboardPage() {
       margenGanancia,
       ingresosCobrado,
       ingresosFacturado,
+      pagadoMes,
+      pendienteMes,
       porCobrar,
       porCobrarDesglose,
       entregadosEsteMes,
@@ -394,6 +407,9 @@ export default function DashboardPage() {
             </div>
           </div>
           <p className="text-xs text-muted-foreground mt-2">
+            Pagado {formatCurrency(kpis.pagadoMes)} · Pendiente {formatCurrency(kpis.pendienteMes)}
+          </p>
+          <p className="text-xs text-muted-foreground">
             Gastos {formatCurrency(kpis.gastosTotalMes)} · Margen {formatCurrency(kpis.ingresosFacturado - kpis.gastosTotalMes)}
           </p>
         </div>
