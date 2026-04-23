@@ -46,6 +46,15 @@ export function calculateIVA(base: number, applyIVA: boolean, rate = 0.19): IvaB
 }
 
 /**
+ * Extrae el IVA contenido en un monto bruto (con IVA incluido). Chile 19%.
+ * Ej: $11.900 con IVA → IVA = $1.900, neto = $10.000.
+ */
+export function extraerIvaIncluido(montoConIva: number, rate = 0.19): number {
+  if (!isFinite(montoConIva) || isNaN(montoConIva)) return 0
+  return roundMoney(montoConIva * (rate / (1 + rate)))
+}
+
+/**
  * Tasa de Absorción: qué porcentaje de los gastos fijos operativos cubre el ingreso por mano de obra.
  * Fórmula: (ingresosManoObra / gastosOperativos) * 100
  */

@@ -19,6 +19,7 @@ import { useMonth } from "@/lib/month-context"
 import { fetchDashboardData } from "@/lib/api-client"
 import type { Servicio, Gasto, Empleado } from "@/lib/database"
 import { useAuth } from "@/lib/auth-context"
+import { extraerIvaIncluido } from "@/lib/utils"
 
 interface KPIs {
   vehiculosEnTaller: number
@@ -31,6 +32,9 @@ interface KPIs {
   ingresosFacturado: number
   pagadoMes: number
   pendienteMes: number
+  ivaDebitoMes: number
+  ivaCreditoMes: number
+  ivaNetoMes: number
   porCobrar: number
   porCobrarDesglose: string
   entregadosEsteMes: number
@@ -68,6 +72,9 @@ export default function DashboardPage() {
     ingresosFacturado: 0,
     pagadoMes: 0,
     pendienteMes: 0,
+    ivaDebitoMes: 0,
+    ivaCreditoMes: 0,
+    ivaNetoMes: 0,
     porCobrar: 0,
     porCobrarDesglose: "",
     entregadosEsteMes: 0,
@@ -177,6 +184,26 @@ export default function DashboardPage() {
         const monto = Number(s.monto_total_sin_iva || 0)
         return sum + Math.max(0, monto - anticipoSinIva)
       }, 0)
+
+    // ---- IVA del mes ----
+    // Debito: IVA emitido en servicios facturados con iva='con'
+    const ivaDebitoMes = serviciosFacturados
+      .filter((s) => s.iva === "con")
+      .reduce((sum, s) => sum + (Number(s.monto_total || 0) - Number(s.monto_total_sin_iva || 0)), 0)
+
+    // Credito: IVA contenido en gastos y costos[] con tipo_documento='factura'
+    const ivaCreditoGastos = gastos
+      .filter((g) => g.tipo_documento === "factura")
+      .reduce((sum, g) => sum + extraerIvaIncluido(Number(g.monto || 0)), 0)
+
+    const ivaCreditoCostos = servicios.reduce((sum, s) => {
+      return sum + parseArr(s.costos)
+        .filter((c: any) => c.tipo_documento === "factura")
+        .reduce((c: number, costo: any) => c + extraerIvaIncluido(Number(costo.monto || 0)), 0)
+    }, 0)
+
+    const ivaCreditoMes = ivaCreditoGastos + ivaCreditoCostos
+    const ivaNetoMes = ivaDebitoMes - ivaCreditoMes
 
     // Costos (excluye "materiales pintura" para evitar doble conteo con gastos de pintura)
     const costosCerrados = serviciosCerrados.reduce((sum, s) => {
@@ -314,6 +341,9 @@ export default function DashboardPage() {
       ingresosFacturado,
       pagadoMes,
       pendienteMes,
+      ivaDebitoMes,
+      ivaCreditoMes,
+      ivaNetoMes,
       porCobrar,
       porCobrarDesglose,
       entregadosEsteMes,
