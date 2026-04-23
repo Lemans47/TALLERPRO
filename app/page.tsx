@@ -59,6 +59,33 @@ interface KPIs {
   margenPintura: number
 }
 
+function parseDesglose(
+  s: string,
+  total: number,
+): { label: string; value: string; highlight?: boolean }[] | null {
+  if (!s) return null
+  const labelMap: Record<string, string> = {
+    cola: "En cola",
+    reparación: "Reparación",
+    reparacion: "Reparación",
+    repuestos: "Repuestos",
+    "esperando repuestos": "Repuestos",
+  }
+  const parts = s
+    .split("·")
+    .map((p) => p.trim())
+    .map((p) => {
+      const m = p.match(/^(\d+)\s+(?:en\s+)?(.+)$/i)
+      if (!m) return null
+      const rawLabel = m[2].toLowerCase().trim()
+      const label = labelMap[rawLabel] ?? rawLabel.charAt(0).toUpperCase() + rawLabel.slice(1)
+      return { label, value: m[1] }
+    })
+    .filter((x): x is { label: string; value: string } => x !== null)
+  if (parts.length === 0) return null
+  return [...parts, { label: "Total", value: String(total), highlight: true }]
+}
+
 export default function DashboardPage() {
   const { role } = useAuth()
   const isOperador = role === "operador"
@@ -408,102 +435,79 @@ export default function DashboardPage() {
 
       {/* ZONA 1: KPIs principales */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-        <KPICard
-          title="Vehículos en Taller"
-          value={kpis.vehiculosEnTaller.toString()}
-          description={kpis.vehiculosDesglose}
-          icon={<Car className="w-5 h-5" />}
-          variant="default"
-        />
-        {/* KPI Facturado del Mes con margen en esquina */}
+        {(() => {
+          const vehStats = parseDesglose(kpis.vehiculosDesglose, kpis.vehiculosEnTaller)
+          return (
+            <KPICard
+              title="Vehículos en Taller"
+              value={kpis.vehiculosEnTaller.toString()}
+              description={vehStats ? undefined : kpis.vehiculosDesglose}
+              stats={vehStats ?? undefined}
+              icon={<Car className="w-5 h-5" />}
+              variant="default"
+            />
+          )
+        })()}
         {(() => {
           const isPositive = kpis.margenGanancia >= 0
           const margenNeto = kpis.ingresosFacturado - kpis.gastosTotalMes
-          const styles = {
-            success:     { card: "border-success/30 bg-success/5",         icon: "text-success bg-success/10",         text: "text-success",         badge: "text-success bg-success/10" },
-            warning:     { card: "border-warning/30 bg-warning/5",         icon: "text-warning bg-warning/10",         text: "text-warning",         badge: "text-warning bg-warning/10" },
-            destructive: { card: "border-destructive/30 bg-destructive/5", icon: "text-destructive bg-destructive/10", text: "text-destructive", badge: "text-destructive bg-destructive/10" },
-          }[margenVariant]
           return (
-            <div className={`rounded-xl border p-5 transition-all hover:shadow-lg hover:shadow-black/5 ${styles.card}`}>
-              <div className="flex items-start justify-between gap-4">
-                <p className="text-sm font-medium text-muted-foreground">Facturado del Mes</p>
-                <div className={`p-2.5 rounded-xl shrink-0 ${styles.icon}`}>
-                  {isPositive ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
-                </div>
-              </div>
-              <div className="mt-2 flex items-baseline gap-2 flex-wrap">
-                <p className={`text-2xl font-bold tracking-tight ${styles.text}`}>
-                  {formatCurrency(kpis.ingresosFacturado)}
-                </p>
-                <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[11px] font-semibold ${styles.badge}`}>
-                  {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                  {kpis.margenGanancia.toFixed(1)}%
-                </span>
-              </div>
-              <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2 pt-3 border-t border-border/50">
-                <div className="min-w-0">
-                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Pagado</p>
-                  <p className="text-xs font-semibold text-foreground truncate">{formatCurrency(kpis.pagadoMes)}</p>
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Pendiente</p>
-                  <p className="text-xs font-semibold text-foreground truncate">{formatCurrency(kpis.pendienteMes)}</p>
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Gastos</p>
-                  <p className="text-xs font-semibold text-foreground truncate">{formatCurrency(kpis.gastosTotalMes)}</p>
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Margen</p>
-                  <p className={`text-xs font-semibold truncate ${styles.text}`}>{formatCurrency(margenNeto)}</p>
-                </div>
-              </div>
-            </div>
+            <KPICard
+              title="Facturado del Mes"
+              value={formatCurrency(kpis.ingresosFacturado)}
+              icon={isPositive ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
+              variant={margenVariant}
+              badge={{ text: `${kpis.margenGanancia.toFixed(1)}%`, trend: isPositive ? "up" : "down" }}
+              stats={[
+                { label: "Pagado", value: formatCurrency(kpis.pagadoMes) },
+                { label: "Pendiente", value: formatCurrency(kpis.pendienteMes) },
+                { label: "Gastos", value: formatCurrency(kpis.gastosTotalMes) },
+                { label: "Margen", value: formatCurrency(margenNeto), highlight: true },
+              ]}
+            />
           )
         })()}
         <KPICard
           title="Flujo de Caja"
           value={`${kpis.flujoCaja < 0 ? "-" : ""}${formatCurrency(kpis.flujoCaja)}`}
-          description={`Entradas ${formatCurrency(kpis.flujoEntradas)} · Salidas ${formatCurrency(kpis.flujoSalidas)}`}
           icon={<ArrowUpDown className="w-5 h-5" />}
           variant={kpis.flujoCaja >= 0 ? "success" : "destructive"}
+          stats={[
+            { label: "Entradas", value: formatCurrency(kpis.flujoEntradas) },
+            { label: "Salidas", value: formatCurrency(kpis.flujoSalidas) },
+            { label: "Neto", value: `${kpis.flujoCaja < 0 ? "-" : ""}${formatCurrency(kpis.flujoCaja)}`, highlight: true },
+          ]}
         />
         <KPICard
           title="Entregados este Mes"
           value={kpis.entregadosEsteMes.toString()}
-          description={kpis.entregadosEsteMes > 0 ? `${kpis.entregadosEsteMes} vehículo${kpis.entregadosEsteMes !== 1 ? "s" : ""} entregado${kpis.entregadosEsteMes !== 1 ? "s" : ""}` : "Sin entregas este mes"}
           icon={<CheckCircle2 className="w-5 h-5" />}
           variant={kpis.entregadosEsteMes > 0 ? "success" : "default"}
+          stats={[
+            { label: "Cerrados", value: kpis.serviciosCerrados.toString() },
+            { label: "Activos", value: kpis.serviciosActivos.toString() },
+            { label: "Tasa cierre", value: `${kpis.tasaCierre.toFixed(0)}%` },
+            { label: "Tiempo prom.", value: `${kpis.tiempoPromedio} d` },
+          ]}
         />
         {(() => {
           const ivaVariant: "success" | "default" | "warning" =
             kpis.ivaNetoMes <= 0 ? "success"
             : kpis.ivaNetoMes < kpis.ivaDebitoMes * 0.5 ? "default"
             : "warning"
-          const styles = {
-            success: { border: "border-success/30 bg-success/5", icon: "text-success bg-success/10", value: "text-success" },
-            default: { border: "border-border bg-card", icon: "text-primary bg-primary/10", value: "text-foreground" },
-            warning: { border: "border-warning/30 bg-warning/5", icon: "text-warning bg-warning/10", value: "text-warning" },
-          }[ivaVariant]
           return (
-            <div className={`rounded-xl border p-5 transition-all hover:shadow-lg hover:shadow-black/5 ${styles.border}`}>
-              <div className="flex items-start justify-between gap-4">
-                <p className="text-sm font-medium text-muted-foreground">IVA del Mes</p>
-                <div className={`p-2.5 rounded-xl shrink-0 ${styles.icon}`}>
-                  <Receipt className="w-5 h-5" />
-                </div>
-              </div>
-              <p className={`text-2xl font-bold tracking-tight mt-2 ${styles.value}`}>
-                {`${kpis.ivaNetoMes < 0 ? "-" : ""}${formatCurrency(kpis.ivaNetoMes)}`}
-              </p>
-              <p className="text-xs text-muted-foreground mt-2">
-                Débito {formatCurrency(kpis.ivaDebitoMes)} · Crédito {formatCurrency(kpis.ivaCreditoMes)}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Ventas c/IVA {formatCurrency(kpis.ventasConIvaTotal)}
-              </p>
-            </div>
+            <KPICard
+              title="IVA del Mes"
+              value={`${kpis.ivaNetoMes < 0 ? "-" : ""}${formatCurrency(kpis.ivaNetoMes)}`}
+              icon={<Receipt className="w-5 h-5" />}
+              variant={ivaVariant}
+              stats={[
+                { label: "Débito", value: formatCurrency(kpis.ivaDebitoMes) },
+                { label: "Crédito", value: formatCurrency(kpis.ivaCreditoMes) },
+                { label: "Neto", value: formatCurrency(kpis.ivaNetoMes), highlight: true },
+                { label: "Ventas c/IVA", value: formatCurrency(kpis.ventasConIvaTotal) },
+              ]}
+            />
           )
         })()}
       </div>
