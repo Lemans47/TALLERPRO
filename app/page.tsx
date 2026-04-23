@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { KPICard } from "@/components/kpi-card"
 import { RevenueChart } from "@/components/revenue-chart"
 import { PendingPaymentsAlert } from "@/components/pending-payments-alert"
@@ -13,7 +14,7 @@ import { MonthSelector } from "@/components/month-selector"
 import {
   Car, ArrowUpDown, TrendingUp, TrendingDown, CheckCircle2,
   Activity, Clock, Wrench, Plus, RefreshCw, ChevronDown, ChevronUp,
-  Paintbrush, Receipt,
+  Paintbrush, Receipt, FileWarning,
 } from "lucide-react"
 import { useMonth } from "@/lib/month-context"
 import { fetchDashboardData } from "@/lib/api-client"
@@ -128,8 +129,10 @@ export default function DashboardPage() {
   const [servicios, setServicios] = useState<Servicio[]>([])
   const [serviciosActivos, setServiciosActivos] = useState<Servicio[]>([])
   const [gastos, setGastos] = useState<Gasto[]>([])
+  const [facturasPendientes, setFacturasPendientes] = useState<Servicio[]>([])
   const [loading, setLoading] = useState(true)
   const [showBreakeven, setShowBreakeven] = useState(false)
+  const [showFacturasPendientes, setShowFacturasPendientes] = useState(false)
   const { selectedMonth } = useMonth()
 
   // Migraciones únicas (una sola vez por navegador, gated con localStorage).
@@ -173,10 +176,11 @@ export default function DashboardPage() {
     try {
       const [year, month] = selectedMonth.split("-").map(Number)
       const response = await fetchDashboardData(year, month)
-      const { servicios: serviciosData, gastos: gastosData, empleados: empleadosData, serviciosActivos: activosData, kpis: apiKpis, entregadosMes, serviciosFacturadosMes } = response
+      const { servicios: serviciosData, gastos: gastosData, empleados: empleadosData, serviciosActivos: activosData, kpis: apiKpis, entregadosMes, serviciosFacturadosMes, facturasPendientes: pendientesData } = response
       setServicios(serviciosData)
       setServiciosActivos(activosData)
       setGastos(gastosData)
+      setFacturasPendientes(pendientesData || [])
       calculateKPIs(serviciosData, gastosData, empleadosData, activosData, apiKpis, entregadosMes, serviciosFacturadosMes)
     } catch (error) {
       console.error("Error loading dashboard data:", error)
@@ -512,6 +516,62 @@ export default function DashboardPage() {
           )
         })()}
       </div>
+
+      {/* Facturas pendientes de emitir (IVA): cerradas/entregadas/por cobrar con iva='con' sin fecha_facturacion */}
+      {facturasPendientes.length > 0 && (() => {
+        const totalBruto = facturasPendientes.reduce((s, f) => s + Number(f.monto_total || 0), 0)
+        const totalIva = facturasPendientes.reduce((s, f) => s + (Number(f.monto_total || 0) - Number(f.monto_total_sin_iva || 0)), 0)
+        return (
+          <div className="rounded-xl border border-warning/40 bg-warning/5 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowFacturasPendientes((v) => !v)}
+              className="w-full flex items-center justify-between gap-3 p-4 hover:bg-warning/10 transition-colors"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="p-2 rounded-lg bg-warning/15 text-warning shrink-0">
+                  <FileWarning className="w-5 h-5" />
+                </div>
+                <div className="text-left min-w-0">
+                  <p className="text-sm font-semibold text-warning">
+                    {facturasPendientes.length} factura{facturasPendientes.length !== 1 ? "s" : ""} pendiente{facturasPendientes.length !== 1 ? "s" : ""} de emitir
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Total bruto {formatCurrency(totalBruto)} · IVA débito no declarado {formatCurrency(totalIva)}
+                  </p>
+                </div>
+              </div>
+              {showFacturasPendientes ? <ChevronUp className="w-4 h-4 text-warning shrink-0" /> : <ChevronDown className="w-4 h-4 text-warning shrink-0" />}
+            </button>
+            {showFacturasPendientes && (
+              <div className="border-t border-warning/20 divide-y divide-warning/10">
+                {facturasPendientes.map((f) => {
+                  const ot = f.numero_ot != null ? `OT-${String(f.numero_ot).padStart(4, "0")}` : "(s/OT)"
+                  const iva = Number(f.monto_total || 0) - Number(f.monto_total_sin_iva || 0)
+                  return (
+                    <Link
+                      key={f.id}
+                      href="/servicios"
+                      className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-warning/10 transition-colors"
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <span className="text-xs font-mono text-muted-foreground border border-border rounded px-1.5 py-0.5 shrink-0">{ot}</span>
+                        <span className="font-semibold text-sm shrink-0">{f.patente}</span>
+                        <span className="text-sm text-muted-foreground truncate">{f.cliente}</span>
+                        <Badge variant="outline" className="text-[10px] shrink-0 border-warning/40 text-warning">{f.estado}</Badge>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-semibold">{formatCurrency(Number(f.monto_total || 0))}</p>
+                        <p className="text-[10px] text-muted-foreground">IVA {formatCurrency(iva)}</p>
+                      </div>
+                    </Link>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Punto de Equilibrio */}
       {!isOperador && (() => {

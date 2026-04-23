@@ -232,6 +232,23 @@ export async function getServiciosByMonth(year: number, month: number) {
   return data as Servicio[]
 }
 
+// Servicios facturables (con IVA) que todavia no tienen fecha_facturacion emitida.
+// Incluye estados donde el trabajo ya se deberia haber facturado al cliente.
+export async function getFacturasPendientesEmitir() {
+  const db = getSQL()
+  await ensureFechaFacturacionColumn(db)
+  const data = await db`
+    SELECT id, numero_ot, patente, cliente, estado, fecha_ingreso,
+           monto_total, monto_total_sin_iva
+    FROM servicios
+    WHERE iva = 'con'
+      AND fecha_facturacion IS NULL
+      AND estado IN ('Por Cobrar', 'Entregado', 'Cerrado/Pagado')
+    ORDER BY fecha_ingreso ASC
+  `
+  return data as Servicio[]
+}
+
 // Servicios cuya fecha_facturacion cae en el mes indicado. Usado para IVA debito
 // basado en fecha de emision real (criterio SII), independiente de fecha_ingreso.
 export async function getServiciosFacturadosByMes(year: number, month: number) {
