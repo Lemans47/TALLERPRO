@@ -27,7 +27,13 @@ export async function GET() {
           ), 0) AS cobrado,
           COALESCE(SUM(
             CASE WHEN monto_total_sin_iva > 0 AND jsonb_typeof(costos) = 'array' THEN (
-              SELECT COALESCE(SUM((item->>'monto')::numeric), 0)
+              SELECT COALESCE(SUM(
+                CASE
+                  WHEN (item->>'monto') ~ '^-?[0-9]+(\.[0-9]+)?$'
+                    THEN (item->>'monto')::numeric
+                  ELSE 0
+                END
+              ), 0)
               FROM jsonb_array_elements(costos) AS item
               WHERE LOWER(COALESCE(item->>'descripcion', '')) NOT LIKE '%materiales pintura%'
             ) ELSE 0 END
@@ -68,7 +74,15 @@ export async function GET() {
 
     return NextResponse.json({ monthlyData: rows })
   } catch (error) {
-    console.error("Chart API error:", error)
-    return NextResponse.json({ error: "Error loading chart data" }, { status: 500 })
+    const err = error as { message?: string; code?: string; detail?: string }
+    console.error("Chart API error:", {
+      message: err?.message,
+      code: err?.code,
+      detail: err?.detail,
+    })
+    return NextResponse.json(
+      { error: "Error loading chart data", detail: err?.message ?? String(error) },
+      { status: 500 },
+    )
   }
 }
