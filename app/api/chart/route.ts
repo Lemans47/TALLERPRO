@@ -19,7 +19,7 @@ export async function GET() {
       ),
       servicios_mes AS (
         SELECT
-          date_trunc('month', fecha_ingreso)::date AS mes,
+          date_trunc('month', fecha_ingreso::date)::date AS mes,
           COALESCE(SUM(CASE WHEN monto_total_sin_iva > 0 THEN monto_total_sin_iva ELSE 0 END), 0) AS facturado,
           COALESCE(SUM(
             CASE WHEN estado = 'Cerrado/Pagado' THEN monto_total_sin_iva
@@ -40,16 +40,16 @@ export async function GET() {
           ), 0) AS costos_internos,
           COUNT(*) FILTER (WHERE monto_total_sin_iva > 0) AS count_servicios
         FROM servicios
-        WHERE fecha_ingreso >= (date_trunc('month', CURRENT_DATE) - INTERVAL '5 months')::date
+        WHERE fecha_ingreso::date >= (date_trunc('month', CURRENT_DATE) - INTERVAL '5 months')::date
         GROUP BY 1
       ),
       gastos_mes AS (
         SELECT
-          date_trunc('month', fecha)::date AS mes,
+          date_trunc('month', fecha::date)::date AS mes,
           COALESCE(SUM(monto), 0) AS total
         FROM gastos
         WHERE categoria IS DISTINCT FROM 'Sueldos'
-          AND fecha >= (date_trunc('month', CURRENT_DATE) - INTERVAL '5 months')::date
+          AND fecha::date >= (date_trunc('month', CURRENT_DATE) - INTERVAL '5 months')::date
         GROUP BY 1
       ),
       sueldos AS (
