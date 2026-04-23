@@ -35,6 +35,7 @@ interface KPIs {
   ivaDebitoMes: number
   ivaCreditoMes: number
   ivaNetoMes: number
+  ventasConIvaTotal: number
   porCobrar: number
   porCobrarDesglose: string
   entregadosEsteMes: number
@@ -75,6 +76,7 @@ export default function DashboardPage() {
     ivaDebitoMes: 0,
     ivaCreditoMes: 0,
     ivaNetoMes: 0,
+    ventasConIvaTotal: 0,
     porCobrar: 0,
     porCobrarDesglose: "",
     entregadosEsteMes: 0,
@@ -186,9 +188,12 @@ export default function DashboardPage() {
       }, 0)
 
     // ---- IVA del mes ----
+    // Servicios afectos a IVA del mes (para ventas brutas y debito)
+    const serviciosConIva = serviciosFacturados.filter((s) => s.iva === "con")
+    // Total ventas con IVA incluido (lo que se factura al SII)
+    const ventasConIvaTotal = serviciosConIva.reduce((sum, s) => sum + Number(s.monto_total || 0), 0)
     // Debito: IVA emitido en servicios facturados con iva='con'
-    const ivaDebitoMes = serviciosFacturados
-      .filter((s) => s.iva === "con")
+    const ivaDebitoMes = serviciosConIva
       .reduce((sum, s) => sum + (Number(s.monto_total || 0) - Number(s.monto_total_sin_iva || 0)), 0)
 
     // Credito: IVA contenido en gastos y costos[] con tipo_documento='factura'
@@ -344,6 +349,7 @@ export default function DashboardPage() {
       ivaDebitoMes,
       ivaCreditoMes,
       ivaNetoMes,
+      ventasConIvaTotal,
       porCobrar,
       porCobrarDesglose,
       entregadosEsteMes,
@@ -465,13 +471,36 @@ export default function DashboardPage() {
           icon={<CheckCircle2 className="w-5 h-5" />}
           variant={kpis.entregadosEsteMes > 0 ? "success" : "default"}
         />
-        <KPICard
-          title="IVA del Mes"
-          value={`${kpis.ivaNetoMes < 0 ? "-" : ""}${formatCurrency(kpis.ivaNetoMes)}`}
-          description={`Débito ${formatCurrency(kpis.ivaDebitoMes)} · Crédito ${formatCurrency(kpis.ivaCreditoMes)}`}
-          icon={<Receipt className="w-5 h-5" />}
-          variant={kpis.ivaNetoMes <= 0 ? "success" : kpis.ivaNetoMes < kpis.ivaDebitoMes * 0.5 ? "default" : "warning"}
-        />
+        {(() => {
+          const ivaVariant: "success" | "default" | "warning" =
+            kpis.ivaNetoMes <= 0 ? "success"
+            : kpis.ivaNetoMes < kpis.ivaDebitoMes * 0.5 ? "default"
+            : "warning"
+          const styles = {
+            success: { border: "border-success/30 bg-success/5", icon: "text-success bg-success/10", value: "text-success" },
+            default: { border: "border-border bg-card", icon: "text-primary bg-primary/10", value: "text-foreground" },
+            warning: { border: "border-warning/30 bg-warning/5", icon: "text-warning bg-warning/10", value: "text-warning" },
+          }[ivaVariant]
+          return (
+            <div className={`rounded-xl border p-5 transition-all hover:shadow-lg hover:shadow-black/5 ${styles.border}`}>
+              <div className="flex items-start justify-between gap-4">
+                <p className="text-sm font-medium text-muted-foreground">IVA del Mes</p>
+                <div className={`p-2.5 rounded-xl shrink-0 ${styles.icon}`}>
+                  <Receipt className="w-5 h-5" />
+                </div>
+              </div>
+              <p className={`text-2xl font-bold tracking-tight mt-2 ${styles.value}`}>
+                {`${kpis.ivaNetoMes < 0 ? "-" : ""}${formatCurrency(kpis.ivaNetoMes)}`}
+              </p>
+              <p className="text-xs text-muted-foreground mt-2">
+                Débito {formatCurrency(kpis.ivaDebitoMes)} · Crédito {formatCurrency(kpis.ivaCreditoMes)}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Ventas c/IVA {formatCurrency(kpis.ventasConIvaTotal)}
+              </p>
+            </div>
+          )
+        })()}
       </div>
 
       {/* Punto de Equilibrio */}
