@@ -173,11 +173,11 @@ export default function DashboardPage() {
     try {
       const [year, month] = selectedMonth.split("-").map(Number)
       const response = await fetchDashboardData(year, month)
-      const { servicios: serviciosData, gastos: gastosData, empleados: empleadosData, serviciosActivos: activosData, kpis: apiKpis, entregadosMes } = response
+      const { servicios: serviciosData, gastos: gastosData, empleados: empleadosData, serviciosActivos: activosData, kpis: apiKpis, entregadosMes, serviciosFacturadosMes } = response
       setServicios(serviciosData)
       setServiciosActivos(activosData)
       setGastos(gastosData)
-      calculateKPIs(serviciosData, gastosData, empleadosData, activosData, apiKpis, entregadosMes)
+      calculateKPIs(serviciosData, gastosData, empleadosData, activosData, apiKpis, entregadosMes, serviciosFacturadosMes)
     } catch (error) {
       console.error("Error loading dashboard data:", error)
     } finally {
@@ -185,7 +185,7 @@ export default function DashboardPage() {
     }
   }
 
-  const calculateKPIs = (servicios: Servicio[], gastos: Gasto[], empleados: Empleado[], serviciosActivos: Servicio[], apiKpis?: any, entregadosMes?: number) => {
+  const calculateKPIs = (servicios: Servicio[], gastos: Gasto[], empleados: Empleado[], serviciosActivos: Servicio[], apiKpis?: any, entregadosMes?: number, serviciosFacturadosMes?: Servicio[]) => {
     const parseArr = (v: any): any[] => {
       if (Array.isArray(v)) return v
       if (typeof v === "string" && v) {
@@ -215,11 +215,12 @@ export default function DashboardPage() {
       }, 0)
 
     // ---- IVA del mes ----
-    // Servicios afectos a IVA del mes (para ventas brutas y debito)
-    const serviciosConIva = serviciosFacturados.filter((s) => s.iva === "con")
-    // Total ventas con IVA incluido (lo que se factura al SII)
+    // Criterio SII: debito por fecha_facturacion (emision real), no por fecha_ingreso.
+    // Un servicio ingresado en abril pero facturado en mayo suma al debito de mayo.
+    const serviciosConIva = serviciosFacturadosMes ?? []
+    // Total ventas con IVA incluido (lo que se declara al SII este mes)
     const ventasConIvaTotal = serviciosConIva.reduce((sum, s) => sum + Number(s.monto_total || 0), 0)
-    // Debito: IVA emitido en servicios facturados con iva='con'
+    // Debito: IVA emitido en servicios con fecha_facturacion en el mes
     const ivaDebitoMes = serviciosConIva
       .reduce((sum, s) => sum + (Number(s.monto_total || 0) - Number(s.monto_total_sin_iva || 0)), 0)
 

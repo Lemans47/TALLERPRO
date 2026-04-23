@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getServiciosByMonth, getGastosByMonth, getEmpleados, getActiveServicios, getAbonosByMonth, getEntregadosByMonth } from "@/lib/database"
+import { getServiciosByMonth, getGastosByMonth, getEmpleados, getActiveServicios, getAbonosByMonth, getEntregadosByMonth, getServiciosFacturadosByMes } from "@/lib/database"
 import { safeDivide, safeCalculateMargin, calculateAbsorptionRate } from "@/lib/utils"
 
 function computeKpis(
@@ -133,18 +133,19 @@ export async function GET(request: Request) {
 
     const useAbonos = searchParams.get("useAbonos") === "true"
 
-    const [servicios, gastos, empleados, serviciosActivos, abonosMes, entregadosMes] = await Promise.all([
+    const [servicios, gastos, empleados, serviciosActivos, abonosMes, entregadosMes, serviciosFacturadosMes] = await Promise.all([
       getServiciosByMonth(year, month),
       getGastosByMonth(year, month),
       getEmpleados(),
       getActiveServicios(),
       useAbonos ? getAbonosByMonth(year, month) : Promise.resolve(undefined),
       getEntregadosByMonth(year, month),
+      getServiciosFacturadosByMes(year, month),
     ])
 
     const kpis = computeKpis(servicios, gastos, empleados, abonosMes ?? undefined)
 
-    return NextResponse.json({ servicios, gastos, empleados, serviciosActivos, kpis, entregadosMes: entregadosMes.length })
+    return NextResponse.json({ servicios, gastos, empleados, serviciosActivos, kpis, entregadosMes: entregadosMes.length, serviciosFacturadosMes })
   } catch (error) {
     console.error("Dashboard API error:", error)
     return NextResponse.json({ error: "Error loading dashboard data" }, { status: 500 })

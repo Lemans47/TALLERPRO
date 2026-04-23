@@ -154,6 +154,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
     iva: "sin",
     anticipo: 0,
     detalle_pendiente: false,
+    fecha_facturacion: "" as string,
   })
 
   const [cobros, setCobros] = useState<ItemsPorCategoria>({
@@ -301,6 +302,15 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         iva: servicioAEditar.iva || "sin",
         anticipo: Number(servicioAEditar.anticipo) || 0,
         detalle_pendiente: Boolean((servicioAEditar as any).detalle_pendiente) || false,
+        fecha_facturacion: (() => {
+          const v: any = (servicioAEditar as any).fecha_facturacion
+          if (!v) return ""
+          if (v instanceof Date) {
+            const y = v.getFullYear(), m = String(v.getMonth()+1).padStart(2,"0"), d = String(v.getDate()).padStart(2,"0")
+            return `${y}-${m}-${d}`
+          }
+          return String(v).split("T")[0]
+        })(),
       })
 
       // Cargar cobros por categoría
@@ -437,6 +447,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       iva: "sin",
       anticipo: 0,
       detalle_pendiente: false,
+      fecha_facturacion: "",
     })
     setCobros({
       desmontar: [],
@@ -823,6 +834,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         fotos_ingreso: fotosIngreso,
         fotos_entrega: fotosEntrega,
         detalle_pendiente: formData.detalle_pendiente,
+        fecha_facturacion: formData.iva === "con" ? (formData.fecha_facturacion || null) : null,
       }
 
       console.log("[v0] servicioData prepared:", servicioData)
@@ -2204,6 +2216,22 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                     <SelectItem value="con">Con IVA (19%)</SelectItem>
                   </SelectContent>
                 </Select>
+                {formData.iva === "con" && (
+                  <div className="pt-1">
+                    <Label className="text-[10px] text-muted-foreground">Fecha Factura</Label>
+                    <Input
+                      type="date"
+                      value={formData.fecha_facturacion}
+                      onChange={(e) => setFormData({ ...formData, fecha_facturacion: e.target.value })}
+                      className="bg-background/50 h-8 text-xs"
+                    />
+                    {!formData.fecha_facturacion && (
+                      <p className="text-[10px] text-warning mt-0.5 leading-tight">
+                        Sin fecha → no cuenta en IVA débito aún
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Anticipo / Abono</Label>

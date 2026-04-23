@@ -64,6 +64,7 @@ export interface Servicio {
   numero_ot?: number
   mes_revision_tecnica?: string
   detalle_pendiente: boolean
+  fecha_facturacion?: string | null
   created_at: string
   updated_at: string
 }
@@ -209,6 +210,7 @@ export async function getEntregadosByMonth(year: number, month: number) {
 export async function getServiciosByMonth(year: number, month: number) {
   const db = getSQL()
   await ensurePatenteNormInfra(db)
+  await ensureFechaFacturacionColumn(db)
   const startDate = `${year}-${String(month).padStart(2, "0")}-01`
   const lastDay = new Date(year, month, 0).getDate()
   const endDate = `${year}-${String(month).padStart(2, "0")}-${lastDay}`
@@ -226,6 +228,25 @@ export async function getServiciosByMonth(year: number, month: number) {
     WHERE s.fecha_ingreso >= ${startDate}
     AND s.fecha_ingreso <= ${endDate}
     ORDER BY s.fecha_ingreso DESC
+  `
+  return data as Servicio[]
+}
+
+// Servicios cuya fecha_facturacion cae en el mes indicado. Usado para IVA debito
+// basado en fecha de emision real (criterio SII), independiente de fecha_ingreso.
+export async function getServiciosFacturadosByMes(year: number, month: number) {
+  const db = getSQL()
+  await ensureFechaFacturacionColumn(db)
+  const startDate = `${year}-${String(month).padStart(2, "0")}-01`
+  const lastDay = new Date(year, month, 0).getDate()
+  const endDate = `${year}-${String(month).padStart(2, "0")}-${lastDay}`
+
+  const data = await db`
+    SELECT * FROM servicios
+    WHERE iva = 'con'
+      AND fecha_facturacion >= ${startDate}
+      AND fecha_facturacion <= ${endDate}
+    ORDER BY fecha_facturacion DESC
   `
   return data as Servicio[]
 }
@@ -287,12 +308,13 @@ export async function createServicio(servicio: Omit<Servicio, "id" | "created_at
     return recent[0] as Servicio
   }
 
+  await ensureFechaFacturacionColumn(db)
   const data = await db`
     INSERT INTO servicios (
       fecha_ingreso, patente, marca, modelo, color, kilometraje, año, cliente, telefono, observaciones,
       mano_obra_pintura, cobros, costos, piezas_pintura, estado, iva,
       anticipo, saldo_pendiente, monto_total, monto_total_sin_iva, observaciones_checkboxes,
-      fotos_ingreso, fotos_entrega, numero_ot, detalle_pendiente
+      fotos_ingreso, fotos_entrega, numero_ot, detalle_pendiente, fecha_facturacion
     ) VALUES (
       ${servicio.fecha_ingreso}, ${servicio.patente}, ${servicio.marca}, ${servicio.modelo},
       ${servicio.color || null}, ${servicio.kilometraje || null}, ${servicio.año || null},
@@ -302,7 +324,8 @@ export async function createServicio(servicio: Omit<Servicio, "id" | "created_at
       ${servicio.anticipo}, ${servicio.saldo_pendiente}, ${servicio.monto_total},
       ${servicio.monto_total_sin_iva}, ${safeJson(servicio.observaciones_checkboxes)},
       ${safeJson(servicio.fotos_ingreso || [])}, ${safeJson(servicio.fotos_entrega || [])},
-      nextval('servicios_numero_ot_seq')::int, ${servicio.detalle_pendiente ?? false}
+      nextval('servicios_numero_ot_seq')::int, ${servicio.detalle_pendiente ?? false},
+      ${servicio.fecha_facturacion || null}
     ) RETURNING *
   `
   return data[0] as Servicio
@@ -310,6 +333,10 @@ export async function createServicio(servicio: Omit<Servicio, "id" | "created_at
 
 export async function updateServicio(id: string, servicio: Partial<Servicio>) {
   const db = getSQL()
+  await ensureFechaFacturacionColumn(db)
+  // fecha_facturacion: permitir "clear" (null explicito). Si la key no viene, mantener.
+  const fechaFacSet = "fecha_facturacion" in servicio
+  const fechaFacVal = servicio.fecha_facturacion || null
   const data = await db`
     UPDATE servicios SET
       fecha_ingreso = COALESCE(${servicio.fecha_ingreso ?? null}, fecha_ingreso),
@@ -336,6 +363,7 @@ export async function updateServicio(id: string, servicio: Partial<Servicio>) {
       fotos_ingreso = COALESCE(${servicio.fotos_ingreso != null ? safeJson(servicio.fotos_ingreso) : null}::jsonb, fotos_ingreso),
       fotos_entrega = COALESCE(${servicio.fotos_entrega != null ? safeJson(servicio.fotos_entrega) : null}::jsonb, fotos_entrega),
       detalle_pendiente = COALESCE(${servicio.detalle_pendiente ?? null}, detalle_pendiente),
+      fecha_facturacion = CASE WHEN ${fechaFacSet}::boolean THEN ${fechaFacVal}::date ELSE fecha_facturacion END,
       updated_at = NOW()
     WHERE id = ${id}
     RETURNING *
@@ -484,6 +512,22 @@ async function ensureGastosTipoDocumentoColumn(db: any): Promise<void> {
     }
   })()
   return gastosTipoDocumentoReady
+}
+
+// Auto-migrate: agrega columna fecha_facturacion a servicios (nullable, para IVA por emision real)
+let fechaFacturacionReady: Promise<void> | null = null
+async function ensureFechaFacturacionColumn(db: any): Promise<void> {
+  if (fechaFacturacionReady) return fechaFacturacionReady
+  fechaFacturacionReady = (async () => {
+    try {
+      await db`ALTER TABLE servicios ADD COLUMN IF NOT EXISTS fecha_facturacion DATE NULL`
+      await db`CREATE INDEX IF NOT EXISTS idx_servicios_fecha_facturacion ON servicios (fecha_facturacion)`
+    } catch (e) {
+      fechaFacturacionReady = null
+      throw e
+    }
+  })()
+  return fechaFacturacionReady
 }
 
 // Gastos
