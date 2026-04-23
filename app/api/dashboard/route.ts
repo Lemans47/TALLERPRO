@@ -2,6 +2,9 @@ import { NextResponse } from "next/server"
 import { getServiciosByMonth, getGastosByMonth, getEmpleados, getActiveServicios, getAbonosByMonth, getEntregadosByMonth, getServiciosFacturadosByMes, getFacturasPendientesEmitir } from "@/lib/database"
 import { safeDivide, safeCalculateMargin, calculateAbsorptionRate } from "@/lib/utils"
 
+export const dynamic = "force-dynamic"
+export const revalidate = 0
+
 function computeKpis(
   servicios: Awaited<ReturnType<typeof getServiciosByMonth>>,
   gastos: Awaited<ReturnType<typeof getGastosByMonth>>,

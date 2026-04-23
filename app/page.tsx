@@ -171,6 +171,19 @@ export default function DashboardPage() {
     loadData()
   }, [selectedMonth])
 
+  // Refetch cuando la pestaña vuelve a foco (ej. usuario editó un servicio y volvió)
+  useEffect(() => {
+    const onFocus = () => {
+      if (document.visibilityState === "visible") loadData()
+    }
+    window.addEventListener("focus", onFocus)
+    document.addEventListener("visibilitychange", onFocus)
+    return () => {
+      window.removeEventListener("focus", onFocus)
+      document.removeEventListener("visibilitychange", onFocus)
+    }
+  }, [selectedMonth])
+
   const loadData = async () => {
     setLoading(true)
     try {

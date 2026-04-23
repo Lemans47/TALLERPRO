@@ -27,7 +27,7 @@ export async function fetchDashboardData(
 ): Promise<{ servicios: Servicio[]; gastos: Gasto[]; empleados: Empleado[]; serviciosActivos: Servicio[]; kpis: any; entregadosMes: number; serviciosFacturadosMes: Servicio[]; facturasPendientes: Servicio[] }> {
   const params = new URLSearchParams({ year: String(year), month: String(month) })
   if (options?.useAbonos) params.set("useAbonos", "true")
-  const res = await fetch(`/api/dashboard?${params}`)
+  const res = await fetch(`/api/dashboard?${params}`, { cache: "no-store" })
   if (!res.ok) throw new Error("Error fetching dashboard data")
   return res.json()
 }
