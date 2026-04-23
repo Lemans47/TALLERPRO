@@ -69,6 +69,16 @@ export async function fetchServicios(year?: number, month?: number): Promise<Ser
   return res.json()
 }
 
+// Servicios activos (cualquier mes) para mostrar como "pendientes historicos"
+// junto con los del mes en la pantalla de Servicios. Filtra server-side por
+// estado in (En Cola, En Proceso, ...) -- reemplaza al antiguo getAll() que
+// traia todo el historial y filtraba en JS.
+export async function fetchServiciosActivos(): Promise<Servicio[]> {
+  const res = await fetch(`/api/servicios?activos=1`)
+  if (!res.ok) throw new Error("Error fetching servicios activos")
+  return res.json()
+}
+
 export async function createServicioApi(data: Partial<Servicio>): Promise<Servicio> {
   const res = await fetch("/api/servicios", {
     method: "POST",
@@ -328,6 +338,7 @@ export const api = {
   servicios: {
     getAll: fetchServicios,
     getByMonth: fetchServicios,
+    getActivos: fetchServiciosActivos,
     create: createServicioApi,
     update: updateServicioApi,
     delete: deleteServicioApi,

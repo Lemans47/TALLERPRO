@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getServicios, getServiciosByMonth, createServicio, updateServicio, deleteServicio, getServicioById, upsertClienteYVehiculo } from "@/lib/database"
+import { getServicios, getServiciosByMonth, getServiciosActivosParaLista, createServicio, updateServicio, deleteServicio, getServicioById, upsertClienteYVehiculo } from "@/lib/database"
 import crypto from "crypto"
 
 const CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME
@@ -23,9 +23,12 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const year = searchParams.get("year")
     const month = searchParams.get("month")
+    const activos = searchParams.get("activos")
 
     let servicios
-    if (year && month) {
+    if (activos === "1") {
+      servicios = await getServiciosActivosParaLista()
+    } else if (year && month) {
       servicios = await getServiciosByMonth(Number.parseInt(year), Number.parseInt(month))
     } else {
       servicios = await getServicios()

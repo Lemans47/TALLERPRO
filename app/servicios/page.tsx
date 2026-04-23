@@ -54,8 +54,6 @@ export default function ServicesPage() {
     }
   }
 
-  const ESTADOS_ACTIVOS = ["En Cola", "En Proceso", "En Reparación", "Esperando Repuestos", "Control de Calidad", "Listo para Entrega", "Entregado", "Por Cobrar"]
-
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
@@ -67,18 +65,17 @@ export default function ServicesPage() {
       }
 
       const [year, month] = selectedMonth.split("-").map(Number)
-      const [delMes, todos, presupuestosDelMes, todosPresupuestos] = await Promise.all([
+      // Servicios: del mes + activos historicos (filtrados server-side por estado).
+      // Presupuestos: del mes + todos los demas (todos son activos hasta convertirse).
+      const [delMes, activosHistoricos, presupuestosDelMes, todosPresupuestos] = await Promise.all([
         api.servicios.getByMonth(year, month),
-        api.servicios.getAll(),
+        api.servicios.getActivos(),
         api.presupuestos.getByMonth(year, month),
         api.presupuestos.getAll(),
       ])
-      // Servicios del mes + activos de cualquier mes, sin duplicados
-      const activos = todos.filter((s) => ESTADOS_ACTIVOS.includes(s.estado))
       const idsDelMes = new Set(delMes.map((s) => s.id))
-      const extra = activos.filter((s) => !idsDelMes.has(s.id))
+      const extra = activosHistoricos.filter((s) => !idsDelMes.has(s.id))
       setServicios([...delMes, ...extra])
-      // Presupuestos del mes + todos los demás (todos son activos hasta convertirse)
       const idsPresDelMes = new Set(presupuestosDelMes.map((p) => p.id))
       const extraPres = todosPresupuestos.filter((p) => !idsPresDelMes.has(p.id))
       setPresupuestos([...presupuestosDelMes, ...extraPres])

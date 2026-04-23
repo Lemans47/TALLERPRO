@@ -26,7 +26,9 @@ export function getSQL() {
     throw new Error("Database connection string not found")
   }
 
-  global._pgSql = postgres(connectionString, { ssl: "require", max: 5, prepare: false })
+  // max:10 con el pooler de Supabase (puerto 6543, PgBouncer transaction mode).
+  // prepare:false es OBLIGATORIO en transaction mode (cambiar a true rompe queries).
+  global._pgSql = postgres(connectionString, { ssl: "require", max: 10, prepare: false })
   return global._pgSql as any
 }
 
@@ -164,7 +166,6 @@ export async function getHistorialByCliente(nombre: string) {
 
 export async function getServicios() {
   const db = getSQL()
-  await ensurePatenteNormInfra(db)
   const data = await db`
     SELECT s.*, v.mes_revision_tecnica
     FROM servicios s
@@ -190,6 +191,31 @@ export async function getActiveServicios() {
   return data as Servicio[]
 }
 
+// Servicios "en la vista de taller": estados que el usuario quiere seguir viendo
+// en la pantalla de Servicios aunque sean de meses anteriores. Se usa junto con
+// getServiciosByMonth para mostrar "los del mes + los activos historicos".
+// Server-side filter evita traer todo el historial para filtrar en JS.
+export async function getServiciosActivosParaLista() {
+  const db = getSQL()
+  const data = await db`
+    SELECT s.*, v.mes_revision_tecnica
+    FROM servicios s
+    LEFT JOIN LATERAL (
+      SELECT mes_revision_tecnica
+      FROM vehiculos
+      WHERE patente_norm = s.patente_norm
+      ORDER BY (mes_revision_tecnica IS NOT NULL) DESC, updated_at DESC NULLS LAST
+      LIMIT 1
+    ) v ON true
+    WHERE s.estado IN (
+      'En Cola','En Proceso','En Reparación','Esperando Repuestos',
+      'Control de Calidad','Listo para Entrega','Entregado','Por Cobrar'
+    )
+    ORDER BY s.fecha_ingreso DESC
+  `
+  return data as Servicio[]
+}
+
 export async function getEntregadosByMonth(year: number, month: number) {
   const db = getSQL()
   const startDate = `${year}-${String(month).padStart(2, "0")}-01`
@@ -209,8 +235,6 @@ export async function getEntregadosByMonth(year: number, month: number) {
 
 export async function getServiciosByMonth(year: number, month: number) {
   const db = getSQL()
-  await ensurePatenteNormInfra(db)
-  await ensureFechaFacturacionColumn(db)
   const startDate = `${year}-${String(month).padStart(2, "0")}-01`
   const lastDay = new Date(year, month, 0).getDate()
   const endDate = `${year}-${String(month).padStart(2, "0")}-${lastDay}`
@@ -236,7 +260,6 @@ export async function getServiciosByMonth(year: number, month: number) {
 // Incluye estados donde el trabajo ya se deberia haber facturado al cliente.
 export async function getFacturasPendientesEmitir() {
   const db = getSQL()
-  await ensureFechaFacturacionColumn(db)
   const data = await db`
     SELECT id, numero_ot, patente, cliente, estado, fecha_ingreso,
            monto_total, monto_total_sin_iva
@@ -253,7 +276,6 @@ export async function getFacturasPendientesEmitir() {
 // basado en fecha de emision real (criterio SII), independiente de fecha_ingreso.
 export async function getServiciosFacturadosByMes(year: number, month: number) {
   const db = getSQL()
-  await ensureFechaFacturacionColumn(db)
   const startDate = `${year}-${String(month).padStart(2, "0")}-01`
   const lastDay = new Date(year, month, 0).getDate()
   const endDate = `${year}-${String(month).padStart(2, "0")}-${lastDay}`
@@ -268,45 +290,12 @@ export async function getServiciosFacturadosByMes(year: number, month: number) {
   return data as Servicio[]
 }
 
-async function ensureNumeroOtInfra(db: any) {
-  await db`ALTER TABLE servicios ADD COLUMN IF NOT EXISTS numero_ot INTEGER`
-  await db`CREATE SEQUENCE IF NOT EXISTS servicios_numero_ot_seq`
-  const maxRow = await db`SELECT COALESCE(MAX(numero_ot), 0)::int AS max FROM servicios`
-  const currentMax = Number(maxRow[0]?.max || 0)
-  const seqRow = await db`SELECT last_value::int AS last FROM servicios_numero_ot_seq`
-  const seqLast = Number(seqRow[0]?.last || 0)
-  if (currentMax > seqLast) {
-    await db`SELECT setval('servicios_numero_ot_seq', ${currentMax})`
-  }
-}
-
-// Columnas generadas + índices para eliminar REGEXP_REPLACE en LATERAL JOINs.
-// Antes: full scan de vehiculos por cada fila de servicios (O(N×M)).
-// Ahora: lookup indexado O(log N). Memoizado en memoria para correr una sola vez por proceso.
-let patenteNormInfraReady: Promise<void> | null = null
-async function ensurePatenteNormInfra(db: any): Promise<void> {
-  if (patenteNormInfraReady) return patenteNormInfraReady
-  patenteNormInfraReady = (async () => {
-    try {
-      await db`ALTER TABLE vehiculos ADD COLUMN IF NOT EXISTS patente_norm TEXT
-        GENERATED ALWAYS AS (UPPER(REGEXP_REPLACE(patente, '[^A-Za-z0-9]', '', 'g'))) STORED`
-      await db`ALTER TABLE servicios ADD COLUMN IF NOT EXISTS patente_norm TEXT
-        GENERATED ALWAYS AS (UPPER(REGEXP_REPLACE(patente, '[^A-Za-z0-9]', '', 'g'))) STORED`
-      await db`CREATE INDEX IF NOT EXISTS idx_vehiculos_patente_norm ON vehiculos(patente_norm)`
-      await db`CREATE INDEX IF NOT EXISTS idx_servicios_patente_norm ON servicios(patente_norm)`
-      await db`CREATE INDEX IF NOT EXISTS idx_servicios_fecha_ingreso ON servicios(fecha_ingreso DESC)`
-    } catch (e) {
-      // Si falla, reintentar en el próximo query (no dejar la promesa envenenada).
-      patenteNormInfraReady = null
-      throw e
-    }
-  })()
-  return patenteNormInfraReady
-}
+// NOTA: las funciones ensure* (DDL en runtime) fueron eliminadas.
+// Toda esa infraestructura ahora vive en scripts/02-runtime-migration.sql,
+// que debe correrse una vez manualmente en Supabase SQL Editor despues de deploy.
 
 export async function createServicio(servicio: Omit<Servicio, "id" | "created_at" | "updated_at">) {
   const db = getSQL()
-  await ensureNumeroOtInfra(db)
 
   // Idempotencia: si llegó un POST duplicado (misma patente+cliente en los últimos 30s) devolver el existente.
   // Normaliza patente (ignora espacios/guiones/case) y cliente (trim+upper) para cubrir diferencias triviales.
@@ -325,7 +314,6 @@ export async function createServicio(servicio: Omit<Servicio, "id" | "created_at
     return recent[0] as Servicio
   }
 
-  await ensureFechaFacturacionColumn(db)
   const data = await db`
     INSERT INTO servicios (
       fecha_ingreso, patente, marca, modelo, color, kilometraje, año, cliente, telefono, observaciones,
@@ -350,7 +338,6 @@ export async function createServicio(servicio: Omit<Servicio, "id" | "created_at
 
 export async function updateServicio(id: string, servicio: Partial<Servicio>) {
   const db = getSQL()
-  await ensureFechaFacturacionColumn(db)
   // fecha_facturacion: permitir "clear" (null explicito). Si la key no viene, mantener.
   const fechaFacSet = "fecha_facturacion" in servicio
   const fechaFacVal = servicio.fecha_facturacion || null
@@ -482,7 +469,6 @@ export async function deletePresupuesto(id: string) {
 
 export async function convertPresupuestoToServicio(presupuestoId: string) {
   const db = getSQL()
-  await ensureNumeroOtInfra(db)
   return await db.begin(async (sql: any) => {
     // Get presupuesto within transaction to lock the row
     const presupuestoData = await sql`SELECT * FROM presupuestos WHERE id = ${presupuestoId} FOR UPDATE`
@@ -516,41 +502,9 @@ export async function convertPresupuestoToServicio(presupuestoId: string) {
   })
 }
 
-// Auto-migrate: agrega columna tipo_documento a gastos si no existe (boleta | factura)
-let gastosTipoDocumentoReady: Promise<void> | null = null
-async function ensureGastosTipoDocumentoColumn(db: any): Promise<void> {
-  if (gastosTipoDocumentoReady) return gastosTipoDocumentoReady
-  gastosTipoDocumentoReady = (async () => {
-    try {
-      await db`ALTER TABLE gastos ADD COLUMN IF NOT EXISTS tipo_documento TEXT DEFAULT 'boleta'`
-    } catch (e) {
-      gastosTipoDocumentoReady = null
-      throw e
-    }
-  })()
-  return gastosTipoDocumentoReady
-}
-
-// Auto-migrate: agrega columna fecha_facturacion a servicios (nullable, para IVA por emision real)
-let fechaFacturacionReady: Promise<void> | null = null
-async function ensureFechaFacturacionColumn(db: any): Promise<void> {
-  if (fechaFacturacionReady) return fechaFacturacionReady
-  fechaFacturacionReady = (async () => {
-    try {
-      await db`ALTER TABLE servicios ADD COLUMN IF NOT EXISTS fecha_facturacion DATE NULL`
-      await db`CREATE INDEX IF NOT EXISTS idx_servicios_fecha_facturacion ON servicios (fecha_facturacion)`
-    } catch (e) {
-      fechaFacturacionReady = null
-      throw e
-    }
-  })()
-  return fechaFacturacionReady
-}
-
 // Gastos
 export async function getGastos() {
   const db = getSQL()
-  await ensureGastosTipoDocumentoColumn(db)
   const data = await db`
     SELECT * FROM gastos
     ORDER BY fecha DESC
@@ -560,7 +514,6 @@ export async function getGastos() {
 
 export async function getGastosByMonth(year: number, month: number) {
   const db = getSQL()
-  await ensureGastosTipoDocumentoColumn(db)
   const startDate = `${year}-${String(month).padStart(2, "0")}-01`
   const lastDay = new Date(year, month, 0).getDate()
   const endDate = `${year}-${String(month).padStart(2, "0")}-${lastDay}`
@@ -576,7 +529,6 @@ export async function getGastosByMonth(year: number, month: number) {
 
 export async function getGastosByCategoria(categoria: string) {
   const db = getSQL()
-  await ensureGastosTipoDocumentoColumn(db)
   const data = await db`
     SELECT * FROM gastos
     WHERE categoria = ${categoria}
@@ -587,7 +539,6 @@ export async function getGastosByCategoria(categoria: string) {
 
 export async function createGasto(gasto: Omit<Gasto, "id" | "created_at" | "updated_at">) {
   const db = getSQL()
-  await ensureGastosTipoDocumentoColumn(db)
   const pagado = gasto.pagado !== false // default true
   const tipoDocumento = gasto.tipo_documento === "factura" ? "factura" : "boleta"
   const data = await db`
@@ -600,7 +551,6 @@ export async function createGasto(gasto: Omit<Gasto, "id" | "created_at" | "upda
 
 export async function updateGasto(id: string, gasto: Partial<Gasto>) {
   const db = getSQL()
-  await ensureGastosTipoDocumentoColumn(db)
   const data = await db`
     UPDATE gastos SET
       fecha = COALESCE(${gasto.fecha ?? null}, fecha),
@@ -1171,40 +1121,14 @@ export interface GastoFijoPlantilla {
   created_at: string
 }
 
-async function ensurePlantillasTable(db: any) {
-  await db`
-    CREATE TABLE IF NOT EXISTS gastos_fijos_plantillas (
-      id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-      descripcion TEXT NOT NULL,
-      monto_estimado INTEGER NOT NULL DEFAULT 0,
-      orden INTEGER DEFAULT 0,
-      activo BOOLEAN DEFAULT TRUE,
-      created_at TIMESTAMP DEFAULT NOW()
-    )
-  `
-  // Seed defaults if empty
-  const count = await db`SELECT COUNT(*) AS n FROM gastos_fijos_plantillas`
-  if (Number(count[0].n) === 0) {
-    await db`
-      INSERT INTO gastos_fijos_plantillas (descripcion, monto_estimado, orden) VALUES
-      ('Luz', 0, 1),
-      ('Agua', 0, 2),
-      ('Convenio Contribuciones', 0, 3),
-      ('Boleta Electrónica', 0, 4)
-    `
-  }
-}
-
 export async function getPlantillas() {
   const db = getSQL()
-  await ensurePlantillasTable(db)
   const data = await db`SELECT * FROM gastos_fijos_plantillas WHERE activo = TRUE ORDER BY orden ASC, created_at ASC`
   return data as GastoFijoPlantilla[]
 }
 
 export async function createPlantilla(p: { descripcion: string; monto_estimado: number }) {
   const db = getSQL()
-  await ensurePlantillasTable(db)
   const maxOrden = await db`SELECT COALESCE(MAX(orden), 0) AS m FROM gastos_fijos_plantillas`
   const data = await db`
     INSERT INTO gastos_fijos_plantillas (descripcion, monto_estimado, orden)
@@ -1241,28 +1165,14 @@ export interface PlantillaServicio {
   created_at?: string
 }
 
-async function ensurePlantillasServicioTable(db: any) {
-  await db`
-    CREATE TABLE IF NOT EXISTS plantillas_servicio (
-      id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-      nombre TEXT NOT NULL,
-      cobros JSONB DEFAULT '[]',
-      costos JSONB DEFAULT '[]',
-      created_at TIMESTAMPTZ DEFAULT NOW()
-    )
-  `
-}
-
 export async function getPlantillasServicio() {
   const db = getSQL()
-  await ensurePlantillasServicioTable(db)
   const data = await db`SELECT * FROM plantillas_servicio ORDER BY nombre ASC`
   return data as PlantillaServicio[]
 }
 
 export async function createPlantillaServicio(p: { nombre: string; cobros: any; costos: any }) {
   const db = getSQL()
-  await ensurePlantillasServicioTable(db)
   const data = await db`
     INSERT INTO plantillas_servicio (nombre, cobros, costos)
     VALUES (${p.nombre}, ${safeJson(p.cobros)}::jsonb, ${safeJson(p.costos)}::jsonb)

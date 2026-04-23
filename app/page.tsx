@@ -136,7 +136,7 @@ export default function DashboardPage() {
   const { selectedMonth } = useMonth()
 
   // Migraciones únicas (una sola vez por navegador, gated con localStorage).
-  // Los servicios nuevos ya reciben numero_ot al crearse (createServicio → ensureNumeroOtInfra),
+  // Los servicios nuevos ya reciben numero_ot al crearse (via servicios_numero_ot_seq),
   // así que migrate-numero-ot es solo backfill histórico — no hace falta en cada carga.
   useEffect(() => {
     if (!localStorage.getItem("mano_obra_migrated")) {
