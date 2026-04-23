@@ -13,7 +13,7 @@ import { MonthSelector } from "@/components/month-selector"
 import {
   Car, ArrowUpDown, TrendingUp, CheckCircle2,
   Activity, Clock, Wrench, Plus, RefreshCw, ChevronDown, ChevronUp,
-  Paintbrush,
+  Paintbrush, Receipt,
 } from "lucide-react"
 import { useMonth } from "@/lib/month-context"
 import { fetchDashboardData } from "@/lib/api-client"
@@ -401,7 +401,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ZONA 1: KPIs principales */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         <KPICard
           title="Vehículos en Taller"
           value={kpis.vehiculosEnTaller.toString()}
@@ -464,6 +464,13 @@ export default function DashboardPage() {
           description={kpis.entregadosEsteMes > 0 ? `${kpis.entregadosEsteMes} vehículo${kpis.entregadosEsteMes !== 1 ? "s" : ""} entregado${kpis.entregadosEsteMes !== 1 ? "s" : ""}` : "Sin entregas este mes"}
           icon={<CheckCircle2 className="w-5 h-5" />}
           variant={kpis.entregadosEsteMes > 0 ? "success" : "default"}
+        />
+        <KPICard
+          title="IVA del Mes"
+          value={`${kpis.ivaNetoMes < 0 ? "-" : ""}${formatCurrency(kpis.ivaNetoMes)}`}
+          description={`Débito ${formatCurrency(kpis.ivaDebitoMes)} · Crédito ${formatCurrency(kpis.ivaCreditoMes)}`}
+          icon={<Receipt className="w-5 h-5" />}
+          variant={kpis.ivaNetoMes <= 0 ? "success" : kpis.ivaNetoMes < kpis.ivaDebitoMes * 0.5 ? "default" : "warning"}
         />
       </div>
 
