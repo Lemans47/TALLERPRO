@@ -166,12 +166,10 @@ export default function DashboardPage() {
     const ingresosCobrado = serviciosCerrados.reduce((sum, s) => sum + Number(s.monto_total_sin_iva || 0), 0)
     const ingresosFacturado = serviciosFacturados.reduce((sum, s) => sum + Number(s.monto_total_sin_iva || 0), 0)
 
-    // Pagado / Pendiente del mes facturado: cerrados aportan todo a Pagado (saldo=0);
-    // en proceso aportan (monto - saldo) a Pagado y saldo a Pendiente. Suma = Facturado.
+    // Pendiente: saldo real adeudado por clientes sobre lo facturado del mes.
     const pendienteMes = serviciosFacturados.reduce(
       (sum, s) => sum + Number(s.saldo_pendiente || 0), 0
     )
-    const pagadoMes = ingresosFacturado - pendienteMes
 
     // Costos (excluye "materiales pintura" para evitar doble conteo con gastos de pintura)
     const costosCerrados = serviciosCerrados.reduce((sum, s) => {
@@ -218,6 +216,9 @@ export default function DashboardPage() {
     const flujoEntradas = ingresosCobrado + anticiposNoCerrados
     const flujoSalidas = gastosOperacionales + costosCerrados + sueldosComprometidos
     const flujoCaja = flujoEntradas - flujoSalidas
+    // Pagado: dinero efectivamente recibido en el mes. Igual a flujoEntradas
+    // para que el dato coincida en card Facturado y card Flujo de Caja.
+    const pagadoMes = flujoEntradas
 
     // ---- KPI 3: Margen de ganancia (consistente con gráfico: ingresos vs todos los gastos) ----
     const gastosTotalMes = costosFacturados + gastosOperacionales + sueldosComprometidos
