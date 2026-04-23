@@ -71,7 +71,11 @@ interface ItemDetalle {
   id: string
   descripcion: string
   monto: number
+  tipo_documento?: "boleta" | "factura"
 }
+
+// Categorias de costos donde el usuario suele comprar con factura (para recuperar IVA credito)
+const FACTURA_TOGGLE_CATEGORIAS: ReadonlySet<string> = new Set(["repuestos", "reparar", "otros"])
 
 interface ItemsPorCategoria {
   desmontar: ItemDetalle[]
@@ -366,11 +370,16 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         repuestos: [],
         otros: [],
       }
-      costosData.forEach((c: { categoria?: string; descripcion: string; monto: number }) => {
+      costosData.forEach((c: { categoria?: string; descripcion: string; monto: number; tipo_documento?: "boleta" | "factura" }) => {
         // Skip auto-generated pintura cost items — they'll be recalculated from selected piezas
         if (isAutoItem(c.descripcion)) return
         const cat = normalizeCat(c.categoria)
-        newCostos[cat].push({ id: crypto.randomUUID(), descripcion: c.descripcion, monto: c.monto })
+        newCostos[cat].push({
+          id: crypto.randomUUID(),
+          descripcion: c.descripcion,
+          monto: c.monto,
+          tipo_documento: c.tipo_documento === "factura" ? "factura" : "boleta",
+        })
       })
       console.log("[v0] newCostos after mapping:", newCostos)
       setCostos(newCostos)
@@ -553,7 +562,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   }, [])
 
   const upsertItemCostoByIndex = useCallback(
-    (categoria: keyof ItemsPorCategoria, index: number, field: "descripcion" | "monto", value: string | number) => {
+    (categoria: keyof ItemsPorCategoria, index: number, field: "descripcion" | "monto" | "tipo_documento", value: string | number) => {
       setCostos((prev) => {
         const arr = [...prev[categoria]]
         if (arr[index]) {
@@ -561,6 +570,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         } else {
           while (arr.length < index) arr.push({ id: crypto.randomUUID(), descripcion: "", monto: 0 })
           arr[index] = { id: crypto.randomUUID(), descripcion: "", monto: field === "monto" ? (value as number) : 0 }
+          if (field === "tipo_documento") arr[index].tipo_documento = value as "boleta" | "factura"
         }
         return { ...prev, [categoria]: arr }
       })
@@ -735,12 +745,20 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
 
       // Convertir costos por categoría a array con descripción
       // Para pintura: excluir items auto-gestionados (se recalculan abajo)
-      const costosArray: { categoria: string; descripcion: string; monto: number; isAuto?: boolean; costoReal?: number | null }[] = []
+      const costosArray: { categoria: string; descripcion: string; monto: number; isAuto?: boolean; costoReal?: number | null; tipo_documento?: "boleta" | "factura" }[] = []
       Object.entries(costos).forEach(([categoria, items]) => {
         safeArr(items).forEach((item) => {
           if (item.monto > 0 || item.descripcion) {
             if (categoria === "pintura" && isAutoItem(item.descripcion)) return
-            costosArray.push({ categoria, descripcion: item.descripcion || categoria, monto: item.monto })
+            const out: { categoria: string; descripcion: string; monto: number; tipo_documento?: "boleta" | "factura" } = {
+              categoria,
+              descripcion: item.descripcion || categoria,
+              monto: item.monto,
+            }
+            if (FACTURA_TOGGLE_CATEGORIAS.has(categoria)) {
+              out.tipo_documento = item.tipo_documento === "factura" ? "factura" : "boleta"
+            }
+            costosArray.push(out)
           }
         })
       })
@@ -860,12 +878,20 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
 
       // Convertir costos por categoría a array con descripción
       // Para pintura: excluir items auto-gestionados (se recalculan abajo)
-      const costosArray: { categoria: string; descripcion: string; monto: number; isAuto?: boolean; costoReal?: number | null }[] = []
+      const costosArray: { categoria: string; descripcion: string; monto: number; isAuto?: boolean; costoReal?: number | null; tipo_documento?: "boleta" | "factura" }[] = []
       Object.entries(costos).forEach(([categoria, items]) => {
         safeArr(items).forEach((item) => {
           if (item.monto > 0 || item.descripcion) {
             if (categoria === "pintura" && isAutoItem(item.descripcion)) return
-            costosArray.push({ categoria, descripcion: item.descripcion || categoria, monto: item.monto })
+            const out: { categoria: string; descripcion: string; monto: number; tipo_documento?: "boleta" | "factura" } = {
+              categoria,
+              descripcion: item.descripcion || categoria,
+              monto: item.monto,
+            }
+            if (FACTURA_TOGGLE_CATEGORIAS.has(categoria)) {
+              out.tipo_documento = item.tipo_documento === "factura" ? "factura" : "boleta"
+            }
+            costosArray.push(out)
           }
         })
       })
@@ -2071,15 +2097,36 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                                       </div>
                                     </td>
                                     <td className="p-3 text-right">
-                                      <div className="flex items-center justify-end gap-1">
-                                        <span className="text-muted-foreground text-xs">$</span>
-                                        <Input
-                                          type="number"
-                                          value={itemCosto?.monto || ""}
-                                          onChange={(e) => upsertItemCostoByIndex(categoria as keyof ItemsPorCategoria, index, "monto", Number(e.target.value) || 0)}
-                                          placeholder="0"
-                                          className="bg-background/50 text-xs h-8 border-0 text-right w-32"
-                                        />
+                                      <div className="flex flex-col items-end gap-1">
+                                        <div className="flex items-center justify-end gap-1">
+                                          <span className="text-muted-foreground text-xs">$</span>
+                                          <Input
+                                            type="number"
+                                            value={itemCosto?.monto || ""}
+                                            onChange={(e) => upsertItemCostoByIndex(categoria as keyof ItemsPorCategoria, index, "monto", Number(e.target.value) || 0)}
+                                            placeholder="0"
+                                            className="bg-background/50 text-xs h-8 border-0 text-right w-32"
+                                          />
+                                        </div>
+                                        {FACTURA_TOGGLE_CATEGORIAS.has(categoria) && itemCosto && Number(itemCosto.monto) > 0 && (
+                                          <button
+                                            type="button"
+                                            onClick={() => upsertItemCostoByIndex(
+                                              categoria as keyof ItemsPorCategoria,
+                                              index,
+                                              "tipo_documento",
+                                              itemCosto.tipo_documento === "factura" ? "boleta" : "factura"
+                                            )}
+                                            className={`text-[10px] px-1.5 py-0.5 rounded font-medium transition-colors ${
+                                              itemCosto.tipo_documento === "factura"
+                                                ? "bg-blue-500/20 text-blue-400 hover:bg-blue-500/30"
+                                                : "bg-secondary/50 text-muted-foreground hover:bg-secondary"
+                                            }`}
+                                            title="Click para alternar entre boleta y factura (afecta IVA crédito)"
+                                          >
+                                            {itemCosto.tipo_documento === "factura" ? "Factura" : "Boleta"}
+                                          </button>
+                                        )}
                                       </div>
                                     </td>
                                     <td className={`p-3 text-right font-semibold ${utilidad >= 0 ? "text-success" : "text-destructive"}`}>

@@ -40,6 +40,7 @@ export function ExpenseForm({ defaultCategory, gastoAEditar, onSaved, onCancel }
     monto: "",
     fecha: localToday(),
     pagado: true,
+    tipo_documento: "boleta" as "boleta" | "factura",
   })
 
   useEffect(() => {
@@ -49,6 +50,7 @@ export function ExpenseForm({ defaultCategory, gastoAEditar, onSaved, onCancel }
         monto: String(gastoAEditar.monto),
         fecha: toDateStr(gastoAEditar.fecha),
         pagado: gastoAEditar.pagado !== false,
+        tipo_documento: gastoAEditar.tipo_documento === "factura" ? "factura" : "boleta",
       })
     } else {
       setFormData({
@@ -56,6 +58,7 @@ export function ExpenseForm({ defaultCategory, gastoAEditar, onSaved, onCancel }
         monto: "",
         fecha: localToday(),
         pagado: true,
+        tipo_documento: "boleta",
       })
     }
   }, [gastoAEditar])
@@ -75,6 +78,7 @@ export function ExpenseForm({ defaultCategory, gastoAEditar, onSaved, onCancel }
         monto: Number(formData.monto),
         fecha: formData.fecha,
         pagado: formData.pagado,
+        tipo_documento: formData.tipo_documento,
       }
 
       if (gastoAEditar) {
@@ -90,6 +94,7 @@ export function ExpenseForm({ defaultCategory, gastoAEditar, onSaved, onCancel }
         monto: "",
         fecha: localToday(),
         pagado: true,
+        tipo_documento: "boleta",
       })
       onSaved()
     } catch (error) {
@@ -106,6 +111,7 @@ export function ExpenseForm({ defaultCategory, gastoAEditar, onSaved, onCancel }
       monto: "",
       fecha: localToday(),
       pagado: true,
+      tipo_documento: "boleta",
     })
     onCancel()
   }
@@ -154,23 +160,44 @@ export function ExpenseForm({ defaultCategory, gastoAEditar, onSaved, onCancel }
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <Label className="text-xs">Estado de pago</Label>
-            <div className="flex rounded-lg border border-border overflow-hidden text-sm">
-              <button
-                type="button"
-                className={`flex-1 py-2 font-medium transition-colors ${formData.pagado ? "bg-green-500/20 text-green-400" : "hover:bg-secondary text-muted-foreground"}`}
-                onClick={() => setFormData({ ...formData, pagado: true })}
-              >
-                ✓ Pagado
-              </button>
-              <button
-                type="button"
-                className={`flex-1 py-2 font-medium transition-colors ${!formData.pagado ? "bg-orange-500/20 text-orange-400" : "hover:bg-secondary text-muted-foreground"}`}
-                onClick={() => setFormData({ ...formData, pagado: false })}
-              >
-                ⏳ Pendiente
-              </button>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Estado de pago</Label>
+              <div className="flex rounded-lg border border-border overflow-hidden text-sm">
+                <button
+                  type="button"
+                  className={`flex-1 py-2 font-medium transition-colors ${formData.pagado ? "bg-green-500/20 text-green-400" : "hover:bg-secondary text-muted-foreground"}`}
+                  onClick={() => setFormData({ ...formData, pagado: true })}
+                >
+                  ✓ Pagado
+                </button>
+                <button
+                  type="button"
+                  className={`flex-1 py-2 font-medium transition-colors ${!formData.pagado ? "bg-orange-500/20 text-orange-400" : "hover:bg-secondary text-muted-foreground"}`}
+                  onClick={() => setFormData({ ...formData, pagado: false })}
+                >
+                  ⏳ Pendiente
+                </button>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Documento</Label>
+              <div className="flex rounded-lg border border-border overflow-hidden text-sm">
+                <button
+                  type="button"
+                  className={`flex-1 py-2 font-medium transition-colors ${formData.tipo_documento === "boleta" ? "bg-secondary text-foreground" : "hover:bg-secondary/50 text-muted-foreground"}`}
+                  onClick={() => setFormData({ ...formData, tipo_documento: "boleta" })}
+                >
+                  Boleta
+                </button>
+                <button
+                  type="button"
+                  className={`flex-1 py-2 font-medium transition-colors ${formData.tipo_documento === "factura" ? "bg-blue-500/20 text-blue-400" : "hover:bg-secondary/50 text-muted-foreground"}`}
+                  onClick={() => setFormData({ ...formData, tipo_documento: "factura" })}
+                >
+                  Factura
+                </button>
+              </div>
             </div>
           </div>
 
