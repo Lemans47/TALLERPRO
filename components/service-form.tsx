@@ -2224,6 +2224,11 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Total a Cobrar</Label>
                 <div className="text-xl font-bold text-success">${montoConIva.toLocaleString("es-CL")}</div>
+                {formData.iva === "con" && (
+                  <p className="text-[10px] text-muted-foreground leading-tight">
+                    Neto ${cobroTotal.toLocaleString("es-CL")} · IVA ${montoIVA.toLocaleString("es-CL")}
+                  </p>
+                )}
               </div>
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Utilidad Estimada</Label>

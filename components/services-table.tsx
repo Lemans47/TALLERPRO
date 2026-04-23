@@ -436,6 +436,15 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                     <div className="p-2.5 rounded-lg bg-secondary/50 flex flex-col justify-between min-h-[68px]">
                       <p className="text-xs text-muted-foreground">Total</p>
                       <p className="font-semibold">${Number(servicio.monto_total).toLocaleString("es-CL")}</p>
+                      {servicio.iva === "con" && (() => {
+                        const neto = Number(servicio.monto_total_sin_iva) || 0
+                        const iva = Math.round(neto * 0.19)
+                        return (
+                          <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">
+                            Neto ${neto.toLocaleString("es-CL")} · IVA ${iva.toLocaleString("es-CL")}
+                          </p>
+                        )
+                      })()}
                     </div>
                     <div className="p-2.5 rounded-lg bg-success/5 border border-success/20 cursor-pointer flex flex-col justify-between min-h-[68px]" onClick={() => {
                       setServicioSeleccionado(servicio)
