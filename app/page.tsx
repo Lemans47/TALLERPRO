@@ -166,10 +166,17 @@ export default function DashboardPage() {
     const ingresosCobrado = serviciosCerrados.reduce((sum, s) => sum + Number(s.monto_total_sin_iva || 0), 0)
     const ingresosFacturado = serviciosFacturados.reduce((sum, s) => sum + Number(s.monto_total_sin_iva || 0), 0)
 
-    // Pendiente: saldo real adeudado por clientes sobre lo facturado del mes.
-    const pendienteMes = serviciosFacturados.reduce(
-      (sum, s) => sum + Number(s.saldo_pendiente || 0), 0
-    )
+    // Pendiente: derivado de monto sin IVA - anticipo sin IVA para evitar el bug
+    // del campo saldo_pendiente, que se guarda con IVA y no es comparable con
+    // monto_total_sin_iva. Solo no-cerrados (cerrados tienen saldo=0 por definicion).
+    const pendienteMes = serviciosFacturados
+      .filter((s) => s.estado !== "Cerrado/Pagado")
+      .reduce((sum, s) => {
+        const factor = s.iva === "con" ? 1.19 : 1
+        const anticipoSinIva = Number(s.anticipo || 0) / factor
+        const monto = Number(s.monto_total_sin_iva || 0)
+        return sum + Math.max(0, monto - anticipoSinIva)
+      }, 0)
 
     // Costos (excluye "materiales pintura" para evitar doble conteo con gastos de pintura)
     const costosCerrados = serviciosCerrados.reduce((sum, s) => {
