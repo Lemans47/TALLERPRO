@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { api, type Servicio } from "@/lib/api-client"
 import { formatFechaDMA } from "@/lib/utils"
-import { FileText, Trash2, Edit, Calendar, User, Car, Wrench, ClipboardList, List, AlignJustify, ListChecks, TrendingUp, Receipt, ChevronDown, ChevronRight, AlertTriangle } from "lucide-react"
+import { FileText, Trash2, Edit, Calendar, User, Car, Wrench, ClipboardList, List, AlignJustify, ListChecks, TrendingUp, Receipt, ChevronDown, ChevronRight, AlertTriangle, CheckCircle2 } from "lucide-react"
 
 const parseArr = (v: any): any[] => {
   let val = v
@@ -89,6 +89,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
   const [filtroEstado, setFiltroEstado] = useState("todos")
   const [sortBy, setSortBy] = useState("fecha_desc")
   const [soloPendientes, setSoloPendientes] = useState(false)
+  const [soloPagados, setSoloPagados] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
   const [montoPago, setMontoPago] = useState("")
   const [modoCorregir, setModoCorregir] = useState(false)
@@ -190,6 +191,13 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
   const serviciosFiltrados = servicios
     .filter((s) => filtroEstado === "todos" || s.estado === filtroEstado)
     .filter((s) => !soloPendientes || Boolean((s as any).detalle_pendiente))
+    .filter((s) => !soloPagados || s.estado === "Cerrado/Pagado")
+    .filter((s) => {
+      if (sortBy !== "estado") return true
+      if (soloPagados) return true
+      if (filtroEstado === "Cerrado/Pagado") return true
+      return s.estado !== "Cerrado/Pagado"
+    })
     .sort((a, b) => {
       switch (sortBy) {
         case "fecha_asc":  return (a.fecha_ingreso || "").localeCompare(b.fecha_ingreso || "")
@@ -377,12 +385,34 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
           <Button
             variant={soloPendientes ? "default" : "outline"}
             size="sm"
-            onClick={() => setSoloPendientes((v) => !v)}
+            onClick={() => {
+              setSoloPendientes((v) => {
+                const next = !v
+                if (next) setSoloPagados(false)
+                return next
+              })
+            }}
             className={`gap-1.5 h-10 ${soloPendientes ? "bg-warning text-warning-foreground hover:bg-warning/90" : "border-warning/40 text-warning hover:bg-warning/10 hover:text-warning"}`}
             title="Mostrar solo servicios con detalle pendiente"
           >
             <AlertTriangle className="w-3.5 h-3.5" />
-            Solo pendientes
+            Pendientes
+          </Button>
+          <Button
+            variant={soloPagados ? "default" : "outline"}
+            size="sm"
+            onClick={() => {
+              setSoloPagados((v) => {
+                const next = !v
+                if (next) setSoloPendientes(false)
+                return next
+              })
+            }}
+            className={`gap-1.5 h-10 ${soloPagados ? "bg-green-500 text-white hover:bg-green-500/90" : "border-green-500/40 text-green-400 hover:bg-green-500/10 hover:text-green-400"}`}
+            title="Mostrar solo servicios cerrados/pagados"
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            Pagados
           </Button>
         </div>}
       </div>
