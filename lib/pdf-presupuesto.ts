@@ -278,19 +278,23 @@ export async function generarPDFPresupuesto(
   const startY_p1 = y
   const startY_next = 60 + 7  // drawPageHeader returns 60 for page>1, + 7 for "DESCRIPCION (cont.)"
 
-  // ── Auto-fit: shrink row heights so content fits on a single page when possible.
-  // Floor at MIN_SCALE to keep rows readable; beyond that, paginate normally.
-  const MIN_SCALE = 0.78
+  // ── Auto-fit: shrink row heights ONLY if a small squeeze avoids going to page 2.
+  // If content is far too big for a single page, use natural row height and paginate —
+  // compressing rows with no chance of single-page fit just looks cramped.
+  const MIN_SCALE = 0.92
   const baseTotalH = displayRows.reduce(
     (acc, row) =>
       acc + (row.type === "category" ? CAT_H_BASE : row.type === "subtotal" ? SUBTOTAL_H_BASE : ITEM_H_BASE),
     0,
   )
   const firstPageCapBase = bottomAnchor - startY_p1
+  const neededScale = (firstPageCapBase * 0.995) / baseTotalH
   const scale =
-    baseTotalH > firstPageCapBase
-      ? Math.max(MIN_SCALE, (firstPageCapBase * 0.995) / baseTotalH)
-      : 1
+    baseTotalH <= firstPageCapBase
+      ? 1
+      : neededScale >= MIN_SCALE
+        ? neededScale
+        : 1
   const CAT_H = CAT_H_BASE * scale
   const ITEM_H = ITEM_H_BASE * scale
   const SUBTOTAL_H = SUBTOTAL_H_BASE * scale
@@ -298,44 +302,92 @@ export async function generarPDFPresupuesto(
   const measureRow = (row: DisplayRow): number =>
     row.type === "category" ? CAT_H : row.type === "subtotal" ? SUBTOTAL_H : ITEM_H
 
-  // ── Phase A/B: compute page breaks (indices into displayRows where a new page begins)
-  // Strategy: greedy fill — pack each page up to its cap (bottomAnchor reserves footer
-  // space on every page, yielding ~24 item lines on page 1). Prefer breaks at category
-  // boundaries; fall back to mid-category only when a single category overflows a page.
+  // ── Phase A/B: compute page breaks for continuous distribution.
+  // Intermediate pages fill to fullPageAnchor (282mm); only the last page reserves
+  // footer space (bottomAnchor = 242mm). Prefer category-boundary breaks, but cut
+  // mid-category when keeping it whole would leave a large gap (> GAP_THRESHOLD).
+  // When cutting mid-category, the next page shows "<CAT> (CONTINUACIÓN):" header.
+  const fullPageAnchor = PAGE_H - 15
+  const GAP_THRESHOLD = 3 * ITEM_H  // ~16.5mm — split mid-category when gap would fit >=2 more items
+
+  const findCategoryLabel = (beforeIdx: number): string | null => {
+    for (let j = beforeIdx - 1; j >= 0; j--) {
+      if (displayRows[j].type === "category") return (displayRows[j] as any).label
+    }
+    return null
+  }
+
   let pageBreaks: number[] = [0]
+  const midCategoryBreaks = new Set<number>()  // pageBreaks indices that start mid-category
+
+  const chooseCut = (pageStart: number, overflowIdx: number, startY: number, anchor: number, yAtOverflow: number): { cut: number; mid: boolean } => {
+    let categoryCut = -1
+    for (let j = overflowIdx; j > pageStart; j--) {
+      if (displayRows[j].type === "category") { categoryCut = j; break }
+    }
+    if (categoryCut === -1 || categoryCut === pageStart) {
+      // No usable category boundary → must mid-cut
+      const isMid = displayRows[overflowIdx].type !== "category"
+      return { cut: overflowIdx, mid: isMid }
+    }
+    // Gap if we cut at category boundary: space between last kept row and anchor
+    let bumped = 0
+    for (let j = categoryCut; j < overflowIdx; j++) bumped += measureRow(displayRows[j])
+    const keptBottom = yAtOverflow - bumped
+    const gap = anchor - keptBottom
+    if (gap > GAP_THRESHOLD) {
+      // Prefer mid-cut to avoid wasting space
+      const isMid = displayRows[overflowIdx].type !== "category"
+      return { cut: overflowIdx, mid: isMid }
+    }
+    return { cut: categoryCut, mid: false }
+  }
+
   {
     let pageStart = 0
     let yCur = startY_p1
     for (let i = 0; i < displayRows.length; i++) {
       const rh = measureRow(displayRows[i])
-      while (yCur + rh > bottomAnchor && i > pageStart) {
-        // Find the LATEST category boundary in (pageStart, i] so the current
-        // page keeps the maximum content. Starting at j=i lets us break at
-        // the overflowing row itself when it's a category, avoiding bumping
-        // a preceding category that still fits.
-        let cut = -1
-        for (let j = i; j > pageStart; j--) {
-          if (displayRows[j].type === "category") { cut = j; break }
-        }
-        if (cut === -1 || cut === pageStart) cut = i  // mid-category break as last resort
+      while (yCur + rh > fullPageAnchor && i > pageStart) {
+        const startY = pageStart === 0 ? startY_p1 : startY_next
+        const { cut, mid } = chooseCut(pageStart, i, startY, fullPageAnchor, yCur)
         pageBreaks.push(cut)
+        if (mid) midCategoryBreaks.add(pageBreaks.length - 1)
         pageStart = cut
         yCur = startY_next
+        if (mid) yCur += CAT_H  // continuation header on next page
         for (let j = cut; j < i; j++) yCur += measureRow(displayRows[j])
       }
       yCur += rh
     }
   }
 
-  // ── Phase C: emit placed[] page-by-page, filling blanks at the end of each page
+  // Post-hoc: last page must fit within bottomAnchor (reserve footer space).
+  {
+    const lastIdx = pageBreaks.length - 1
+    const lastPageStart = pageBreaks[lastIdx]
+    const startY = lastIdx === 0 ? startY_p1 : (midCategoryBreaks.has(lastIdx) ? startY_next + CAT_H : startY_next)
+    let yLast = startY
+    let overflowIdx = -1
+    for (let i = lastPageStart; i < displayRows.length; i++) {
+      const rh = measureRow(displayRows[i])
+      if (yLast + rh > bottomAnchor) { overflowIdx = i; break }
+      yLast += rh
+    }
+    if (overflowIdx !== -1 && overflowIdx > lastPageStart) {
+      const { cut, mid } = chooseCut(lastPageStart, overflowIdx, startY, bottomAnchor, yLast)
+      pageBreaks.push(cut)
+      if (mid) midCategoryBreaks.add(pageBreaks.length - 1)
+    }
+  }
+
+  // ── Phase C: emit placed[] page-by-page (no blank padding — content flows naturally)
   const placed: PlacedRow[] = []
   let cy = startY_p1
   let cp = pageNum
-  const lastPageIdx = pageBreaks.length - 1
 
   for (let pi = 0; pi < pageBreaks.length; pi++) {
     const isFirstPage = pi === 0
-    const isLastPage = pi === lastPageIdx
     const rowStart = pageBreaks[pi]
     const rowEnd = pi + 1 < pageBreaks.length ? pageBreaks[pi + 1] : displayRows.length
 
@@ -351,6 +403,15 @@ export async function generarPDFPresupuesto(
       cy += 7
     }
 
+    // Inject continuation category header if this page started mid-category
+    if (midCategoryBreaks.has(pi)) {
+      const catLabel = findCategoryLabel(rowStart)
+      if (catLabel) {
+        placed.push({ type: "category", label: `${catLabel} (continuación)`, ry: cy, rh: CAT_H, pg: cp })
+        cy += CAT_H
+      }
+    }
+
     for (let i = rowStart; i < rowEnd; i++) {
       const row = displayRows[i]
       const rh = measureRow(row)
@@ -364,14 +425,17 @@ export async function generarPDFPresupuesto(
       cy += rh
     }
 
-    // Last page leaves room for the footer; intermediate pages fill to the bottom margin
-    const fillTo = isLastPage ? bottomAnchor : (PAGE_H - 15)
-    const spaceLeft = fillTo - cy
-    if (spaceLeft > 0) {
-      const blanksNeeded = Math.floor(spaceLeft / ITEM_H)
-      for (let k = 0; k < blanksNeeded; k++) {
-        placed.push({ type: "blank", ry: cy, rh: ITEM_H, pg: cp })
-        cy += ITEM_H
+    // On the last page, fill the gap between content and footer with blank rows
+    // so the table looks continuous instead of leaving an empty band before firma.
+    const isLastPage = pi === pageBreaks.length - 1
+    if (isLastPage) {
+      const spaceLeft = bottomAnchor - cy
+      if (spaceLeft > 0) {
+        const blanksNeeded = Math.floor(spaceLeft / ITEM_H)
+        for (let k = 0; k < blanksNeeded; k++) {
+          placed.push({ type: "blank", ry: cy, rh: ITEM_H, pg: cp })
+          cy += ITEM_H
+        }
       }
     }
   }
