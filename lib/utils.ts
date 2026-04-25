@@ -55,6 +55,24 @@ export function extraerIvaIncluido(montoConIva: number, rate = 0.19): number {
 }
 
 /**
+ * Costo económico real de un item de costo: si es factura, descuenta el IVA
+ * crédito recuperable; si es boleta o no especifica, usa el monto bruto.
+ */
+export function costoNetoItem(item: { monto?: number | string; tipo_documento?: string } | null | undefined): number {
+  const monto = Number(item?.monto || 0)
+  if (!isFinite(monto) || isNaN(monto)) return 0
+  if (item?.tipo_documento === "factura") {
+    return roundMoney(monto - extraerIvaIncluido(monto))
+  }
+  return monto
+}
+
+export function sumCostosNetos(items: Array<{ monto?: number | string; tipo_documento?: string }> | null | undefined): number {
+  if (!Array.isArray(items)) return 0
+  return items.reduce((sum, it) => sum + costoNetoItem(it), 0)
+}
+
+/**
  * Tasa de Absorción: qué porcentaje de los gastos fijos operativos cubre el ingreso por mano de obra.
  * Fórmula: (ingresosManoObra / gastosOperativos) * 100
  */

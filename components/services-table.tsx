@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { api, type Servicio } from "@/lib/api-client"
-import { formatFechaDMA } from "@/lib/utils"
+import { formatFechaDMA, sumCostosNetos } from "@/lib/utils"
 import { FileText, Trash2, Edit, Calendar, User, Car, Wrench, ClipboardList, List, AlignJustify, ListChecks, TrendingUp, Receipt, ChevronDown, ChevronRight, AlertTriangle, CheckCircle2 } from "lucide-react"
 
 const parseArr = (v: any): any[] => {
@@ -28,7 +28,7 @@ function calcGanancia(servicio: Servicio) {
   const ingreso = Number(servicio.monto_total_sin_iva || 0)
   const costos = parseArr(servicio.costos)
   if (costos.length === 0) return null
-  const totalCostos = costos.reduce((s: number, c: any) => s + Number(c.monto || 0), 0)
+  const totalCostos = sumCostosNetos(costos)
   const ganancia = ingreso - totalCostos
   const margen = ingreso > 0 ? (ganancia / ingreso) * 100 : 0
   return { ganancia, margen }

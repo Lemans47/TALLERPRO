@@ -47,7 +47,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { generarPDFPresupuesto } from "@/lib/pdf-presupuesto"
 import { PDFPreviewModal } from "@/components/pdf-preview-modal"
-import { roundMoney } from "@/lib/utils"
+import { roundMoney, costoNetoItem, sumCostosNetos } from "@/lib/utils"
 
 interface ServiceFormProps {
   servicioAEditar?: (Servicio & { isPresupuesto?: boolean }) | null
@@ -680,11 +680,17 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
     .flatMap((v) => safeArr(v))
     .reduce((sum, item) => sum + (Number(item.monto) || 0), 0)
 
-  const costosOtros = [...safeArr(costos.desmontar), ...safeArr(costos.desabolladura), ...safeArr(costos.reparar), ...safeArr(costos.mecanica), ...safeArr(costos.repuestos), ...safeArr(costos.otros)]
-    .reduce((sum, item) => sum + (Number(item.monto) || 0), 0)
+  const costosOtros = sumCostosNetos([
+    ...safeArr(costos.desmontar),
+    ...safeArr(costos.desabolladura),
+    ...safeArr(costos.reparar),
+    ...safeArr(costos.mecanica),
+    ...safeArr(costos.repuestos),
+    ...safeArr(costos.otros),
+  ])
 
   // costos.pintura nunca contiene auto-items (se filtran al cargar) — sumar manual + recalculado
-  const costosManualPintura = safeArr(costos.pintura).reduce((sum, item) => sum + (Number(item.monto) || 0), 0)
+  const costosManualPintura = sumCostosNetos(safeArr(costos.pintura))
 
   const totalCostos = costosManualPintura + costosOtros + autoCostoManoObra + autoCostoMateriales
 
@@ -1894,7 +1900,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                             safeArr(cobros.pintura).map((itemCobro, index) => {
                               const itemCosto = safeArr(costos.pintura)[index]
                               const cobro = Number(itemCobro.monto) || 0
-                              const costo = itemCosto ? Number(itemCosto.monto) || 0 : 0
+                              const costo = itemCosto ? costoNetoItem(itemCosto) : 0
                               const utilidad = cobro - costo
                               return (
                                 <tr key={itemCobro.id} className="border-b border-border hover:bg-secondary/20 transition-colors">
@@ -1967,9 +1973,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                     {(() => {
                       const cobrosPintura = safeArr(cobros.pintura).reduce((sum, item) => sum + (Number(item.monto) || 0), 0)
                       // Costos manuales (excluir auto-gestionados para evitar doble conteo)
-                      const costosManual = costos.pintura
-                        .filter((item) => !isAutoItem(item.descripcion))
-                        .reduce((sum, item) => sum + (Number(item.monto) || 0), 0)
+                      const costosManual = sumCostosNetos(costos.pintura.filter((item) => !isAutoItem(item.descripcion)))
                       const costosPintura = costosManual + autoCostoManoObra + autoCostoMateriales
                       const totalCobradoPintura = totalPiezasPintura + cobrosPintura
                       const utilidadPintura = totalCobradoPintura - costosPintura
@@ -2084,7 +2088,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                               safeArr(cobros[categoria as keyof ItemsPorCategoria]).map((itemCobro, index) => {
                                 const itemCosto = safeArr(costos[categoria as keyof ItemsPorCategoria])[index]
                                 const cobro = Number(itemCobro.monto) || 0
-                                const costo = itemCosto ? Number(itemCosto.monto) || 0 : 0
+                                const costo = itemCosto ? costoNetoItem(itemCosto) : 0
                                 const utilidad = cobro - costo
                                 return (
                                   <tr key={itemCobro.id} className="border-b border-border hover:bg-secondary/20 transition-colors">
@@ -2175,26 +2179,33 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                       </Button>
 
                       {/* Totales por categoría */}
-                      <div className="grid grid-cols-3 gap-2 p-3 rounded-lg bg-secondary/20 border border-border">
-                        <div>
-                          <p className="text-xs text-muted-foreground">Total Cobrado</p>
-                          <p className="text-lg font-bold text-success">
-                            ${Object.values(cobros[categoria as keyof ItemsPorCategoria]).reduce((sum, item) => sum + (Number(item.monto) || 0), 0).toLocaleString("es-CL")}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Total Costo</p>
-                          <p className="text-lg font-bold text-warning">
-                            ${safeArr(costos[categoria as keyof ItemsPorCategoria]).reduce((sum, item) => sum + (Number(item.monto) || 0), 0).toLocaleString("es-CL")}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Utilidad</p>
-                          <p className={`text-lg font-bold ${(safeArr(cobros[categoria as keyof ItemsPorCategoria]).reduce((sum, item) => sum + (Number(item.monto) || 0), 0) - safeArr(costos[categoria as keyof ItemsPorCategoria]).reduce((sum, item) => sum + (Number(item.monto) || 0), 0)) >= 0 ? "text-info" : "text-destructive"}`}>
-                            ${(safeArr(cobros[categoria as keyof ItemsPorCategoria]).reduce((sum, item) => sum + (Number(item.monto) || 0), 0) - safeArr(costos[categoria as keyof ItemsPorCategoria]).reduce((sum, item) => sum + (Number(item.monto) || 0), 0)).toLocaleString("es-CL")}
-                          </p>
-                        </div>
-                      </div>
+                      {(() => {
+                        const totalCobrado = safeArr(cobros[categoria as keyof ItemsPorCategoria]).reduce((sum, item) => sum + (Number(item.monto) || 0), 0)
+                        const totalCosto = sumCostosNetos(safeArr(costos[categoria as keyof ItemsPorCategoria]))
+                        const utilidadCat = totalCobrado - totalCosto
+                        return (
+                          <div className="grid grid-cols-3 gap-2 p-3 rounded-lg bg-secondary/20 border border-border">
+                            <div>
+                              <p className="text-xs text-muted-foreground">Total Cobrado</p>
+                              <p className="text-lg font-bold text-success">
+                                ${totalCobrado.toLocaleString("es-CL")}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Total Costo</p>
+                              <p className="text-lg font-bold text-warning">
+                                ${totalCosto.toLocaleString("es-CL")}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Utilidad</p>
+                              <p className={`text-lg font-bold ${utilidadCat >= 0 ? "text-info" : "text-destructive"}`}>
+                                ${utilidadCat.toLocaleString("es-CL")}
+                              </p>
+                            </div>
+                          </div>
+                        )
+                      })()}
                     </TabsContent>
                   ))}
                 </Tabs>
