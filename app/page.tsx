@@ -20,6 +20,7 @@ import { useMonth } from "@/lib/month-context"
 import { fetchDashboardData } from "@/lib/api-client"
 import type { Servicio, Gasto, Empleado } from "@/lib/database"
 import { useAuth } from "@/lib/auth-context"
+import { useEstados } from "@/lib/estados"
 import { extraerIvaIncluido } from "@/lib/utils"
 
 interface KPIs {
@@ -89,6 +90,7 @@ function parseDesglose(
 
 export default function DashboardPage() {
   const { role } = useAuth()
+  const { esCerrado, esPorCobrar, esFinalizado, nombresPorTipo } = useEstados()
   const isOperador = role === "operador"
   const [kpis, setKpis] = useState<KPIs>({
     vehiculosEnTaller: 0,
@@ -211,7 +213,7 @@ export default function DashboardPage() {
       return []
     }
 
-    const serviciosCerrados = servicios.filter((s) => s.estado === "Cerrado/Pagado")
+    const serviciosCerrados = servicios.filter((s) => esCerrado(s.estado))
     // Facturado = todos los servicios con monto asignado (igual que el gráfico)
     const serviciosFacturados = servicios.filter((s) => Number(s.monto_total_sin_iva || 0) > 0)
 
@@ -223,7 +225,7 @@ export default function DashboardPage() {
     // del campo saldo_pendiente, que se guarda con IVA y no es comparable con
     // monto_total_sin_iva. Solo no-cerrados (cerrados tienen saldo=0 por definicion).
     const pendienteMes = serviciosFacturados
-      .filter((s) => s.estado !== "Cerrado/Pagado")
+      .filter((s) => !esCerrado(s.estado))
       .reduce((sum, s) => {
         const factor = s.iva === "con" ? 1.19 : 1
         const anticipoSinIva = Number(s.anticipo || 0) / factor
@@ -278,7 +280,7 @@ export default function DashboardPage() {
       .reduce((sum, g) => sum + Number(g.monto || 0), 0)
 
     // ---- KPI 1: Vehículos en taller (usa TODOS los activos, no solo los del mes) ----
-    const PIPELINE_STAGES = ["En Cola", "En Proceso", "En Reparación", "Esperando Repuestos", "Control de Calidad", "Listo para Entrega"]
+    const PIPELINE_STAGES = nombresPorTipo(["activo"])
     const vehiculosEnTaller = serviciosActivos
     const vehiculosEnTallerCount = PIPELINE_STAGES.reduce(
       (sum, estado) => sum + serviciosActivos.filter((s) => s.estado === estado).length, 0
@@ -289,13 +291,13 @@ export default function DashboardPage() {
       .slice(0, 3)
       .map((x) => `${x.n} ${x.e.toLowerCase()}`)
     const vehiculosDesglose = desgloseParts.length > 0 ? desgloseParts.join(" · ") : "Sin vehículos activos"
-    // Entregados: viene del backend (busca por updated_at, no fecha_ingreso)
-    const entregadosEsteMes = entregadosMes ?? servicios.filter((s) => s.estado === "Entregado").length
+    // Entregados del mes: backend usa por_cobrar+cerrado por updated_at
+    const entregadosEsteMes = entregadosMes ?? servicios.filter((s) => esPorCobrar(s.estado)).length
 
     // ---- KPI 2: Flujo de caja ----
     // Anticipos solo de servicios NO cerrados (los cerrados ya están en ingresosCobrado)
     const anticiposNoCerrados = servicios
-      .filter((s) => s.estado !== "Cerrado/Pagado")
+      .filter((s) => !esCerrado(s.estado))
       .reduce((s, sv) => s + Number(sv.anticipo || 0), 0)
     const flujoEntradas = ingresosCobrado + anticiposNoCerrados
     const flujoSalidas = gastosOperacionales + costosCerrados + sueldosComprometidos
@@ -314,7 +316,7 @@ export default function DashboardPage() {
     const hoy = new Date()
     let edadVieja = 0, edadMedia = 0, edadReciente = 0
     const porCobrar = servicios
-      .filter((s) => Number(s.saldo_pendiente || 0) > 0 && ["Entregado", "Por Cobrar"].includes(s.estado))
+      .filter((s) => Number(s.saldo_pendiente || 0) > 0 && esPorCobrar(s.estado))
       .reduce((sum, s) => {
         const dias = Math.floor((hoy.getTime() - new Date(s.fecha_ingreso).getTime()) / 86400000)
         const monto = Number(s.saldo_pendiente)
@@ -369,9 +371,7 @@ export default function DashboardPage() {
       : 0
 
     const serviciosTotal = servicios.length
-    const serviciosCompletadosCount = servicios.filter((s) =>
-      ["Cerrado/Pagado", "Entregado", "Por Cobrar"].includes(s.estado)
-    ).length
+    const serviciosCompletadosCount = servicios.filter((s) => esFinalizado(s.estado)).length
     const tasaCierre = serviciosTotal > 0 ? (serviciosCompletadosCount / serviciosTotal) * 100 : 0
 
     // ---- Punto de equilibrio (desde API para consistencia) ----

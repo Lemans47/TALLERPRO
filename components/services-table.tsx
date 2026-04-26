@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { api, type Servicio } from "@/lib/api-client"
 import { formatFechaDMA, sumCostosNetos } from "@/lib/utils"
+import { useEstados } from "@/lib/estados"
 import { FileText, Trash2, Edit, Calendar, User, Car, Wrench, ClipboardList, List, AlignJustify, ListChecks, TrendingUp, Receipt, ChevronDown, ChevronRight, AlertTriangle, CheckCircle2 } from "lucide-react"
 
 const parseArr = (v: any): any[] => {
@@ -72,20 +73,10 @@ interface ServicesTableProps {
   loading?: boolean
 }
 
-const ESTADOS = [
-  "En Cola",
-  "En Proceso",
-  "Esperando Repuestos",
-  "En Reparación",
-  "Control de Calidad",
-  "Listo para Entrega",
-  "Entregado",
-  "Por Cobrar",
-  "Cerrado/Pagado",
-]
-
 export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }: ServicesTableProps) {
   const { toast } = useToast()
+  const { estados: estadosConfig, esCerrado } = useEstados()
+  const estadosVisibles = estadosConfig.filter((e) => e.visible)
   const [filtroEstado, setFiltroEstado] = useState("todos")
   const [sortBy, setSortBy] = useState("fecha_desc")
   const [soloPendientes, setSoloPendientes] = useState(false)
@@ -186,17 +177,18 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
     return styles[estado] || "bg-gray-500/10 text-gray-400 border-gray-500/30"
   }
 
-  const ESTADO_ORDER = ["En Cola","En Proceso","Esperando Repuestos","En Reparación","Control de Calidad","Listo para Entrega","Entregado","Por Cobrar","Cerrado/Pagado"]
+  const ESTADO_ORDER = estadosConfig.map((e) => e.nombre)
+  const filtroEstadoIsCerrado = esCerrado(filtroEstado)
 
   const serviciosFiltrados = servicios
     .filter((s) => filtroEstado === "todos" || s.estado === filtroEstado)
     .filter((s) => !soloPendientes || Boolean((s as any).detalle_pendiente))
-    .filter((s) => !soloPagados || s.estado === "Cerrado/Pagado")
+    .filter((s) => !soloPagados || esCerrado(s.estado))
     .filter((s) => {
       if (sortBy !== "estado") return true
       if (soloPagados) return true
-      if (filtroEstado === "Cerrado/Pagado") return true
-      return s.estado !== "Cerrado/Pagado"
+      if (filtroEstadoIsCerrado) return true
+      return !esCerrado(s.estado)
     })
     .sort((a, b) => {
       switch (sortBy) {
@@ -377,8 +369,8 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
             </SelectTrigger>
             <SelectContent className="bg-card border-border">
               <SelectItem value="todos" className="focus:bg-secondary">Todos los Estados</SelectItem>
-              {ESTADOS.map((e) => (
-                <SelectItem key={e} value={e} className="focus:bg-secondary">{e}</SelectItem>
+              {estadosVisibles.map((e) => (
+                <SelectItem key={e.id} value={e.nombre} className="focus:bg-secondary">{e.nombre}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -527,9 +519,9 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-card border-border">
-                      {ESTADOS.map((e) => (
-                        <SelectItem key={e} value={e} className="focus:bg-secondary">
-                          {e}
+                      {estadosVisibles.map((e) => (
+                        <SelectItem key={e.id} value={e.nombre} className="focus:bg-secondary">
+                          {e.nombre}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -573,7 +565,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                   </div>
-                  {servicio.estado === "Cerrado/Pagado" && (
+                  {esCerrado(servicio.estado) && (
                     <Button
                       variant="outline"
                       size="sm"

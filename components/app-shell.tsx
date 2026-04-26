@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect } from "react"
 import { AuthProvider, useAuth } from "@/lib/auth-context"
+import { EstadosProvider } from "@/lib/estados"
 import { SidebarNav } from "@/components/sidebar-nav"
 
 function ShellContent({ children }: { children: React.ReactNode }) {
@@ -48,7 +49,9 @@ function ShellContent({ children }: { children: React.ReactNode }) {
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
-      <ShellContent>{children}</ShellContent>
+      <EstadosProvider>
+        <ShellContent>{children}</ShellContent>
+      </EstadosProvider>
     </AuthProvider>
   )
 }

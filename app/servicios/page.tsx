@@ -10,6 +10,7 @@ import { PresupuestosTable } from "@/components/presupuestos-table"
 import { SearchBar } from "@/components/search-bar"
 import { useMonth } from "@/lib/month-context"
 import { api, type Servicio, type Presupuesto } from "@/lib/api-client"
+import { useEstados } from "@/lib/estados"
 import { RefreshCw, Wrench, FileText, ClipboardList, Plus, ChevronUp, ChevronDown, Calendar } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -23,6 +24,7 @@ export default function ServicesPage() {
   const [loading, setLoading] = useState(true)
   const [showFormDialog, setShowFormDialog] = useState(false)
   const { selectedMonth } = useMonth()
+  const { esCerrado } = useEstados()
   const [serviciosOpen, setServiciosOpen] = useState(true)
   const [presupuestosOpen, setPresupuestosOpen] = useState(true)
   const [backfilling, setBackfilling] = useState(false)
@@ -218,7 +220,7 @@ export default function ServicesPage() {
               <ClipboardList className="w-4 h-4 text-info" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{servicios.filter((s) => s.estado === "Cerrado/Pagado").length}</p>
+              <p className="text-2xl font-bold">{servicios.filter((s) => esCerrado(s.estado)).length}</p>
               <p className="text-xs text-muted-foreground">Completados</p>
             </div>
           </div>

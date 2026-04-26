@@ -3,7 +3,10 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts"
 import { Activity } from "lucide-react"
 import type { Servicio } from "@/lib/database"
+import { useEstados } from "@/lib/estados"
 
+// Colores legacy para los 9 estados originales. Estados nuevos creados por
+// el usuario caen al color por tipo (más abajo).
 const STATUS_COLORS: Record<string, string> = {
   "En Cola": "#3b82f6",
   "En Proceso": "#8b5cf6",
@@ -16,11 +19,17 @@ const STATUS_COLORS: Record<string, string> = {
   "Cerrado/Pagado": "#22c55e",
 }
 
+const TIPO_COLORS = { activo: "#3b82f6", por_cobrar: "#f97316", cerrado: "#22c55e" } as const
+
 interface ServicesStatusChartProps {
   servicios: Servicio[]
 }
 
 export function ServicesStatusChart({ servicios }: ServicesStatusChartProps) {
+  const { estados, esCerrado } = useEstados()
+  const tipoByNombre = new Map(estados.map((e) => [e.nombre, e.tipo]))
+  const colorFor = (nombre: string) =>
+    STATUS_COLORS[nombre] || TIPO_COLORS[tipoByNombre.get(nombre) as keyof typeof TIPO_COLORS] || "#6b7280"
   const statusCount: Record<string, number> = {}
 
   servicios.forEach((s) => {
@@ -33,7 +42,7 @@ export function ServicesStatusChart({ servicios }: ServicesStatusChartProps) {
     .map(([name, value]) => ({
       name,
       value,
-      color: STATUS_COLORS[name] || "#6b7280",
+      color: colorFor(name),
     }))
 
   if (chartData.length === 0) {
@@ -102,7 +111,7 @@ export function ServicesStatusChart({ servicios }: ServicesStatusChartProps) {
 
       {/* Tasa de cierre */}
       {servicios.length > 0 && (() => {
-        const cerrados = servicios.filter((s) => s.estado === "Cerrado/Pagado").length
+        const cerrados = servicios.filter((s) => esCerrado(s.estado)).length
         const pct = Math.round((cerrados / servicios.length) * 100)
         return (
           <div className="mt-5 pt-4 border-t border-border">

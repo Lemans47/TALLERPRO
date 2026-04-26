@@ -29,11 +29,17 @@ import {
   Save,
   Settings,
   Users,
+  ListChecks,
+  ArrowUp,
+  ArrowDown,
+  Eye,
+  EyeOff,
 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { api, type PrecioPintura, type PiezaPintura } from "@/lib/api-client"
+import { api, type PrecioPintura, type PiezaPintura, type EstadoServicio, type EstadoTipo } from "@/lib/api-client"
 import { formatFechaDMA } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
+import { useEstados } from "@/lib/estados"
 
 type UsuarioRow = { id: string; email: string; role: string | null; created_at: string; last_sign_in_at: string | null }
 
@@ -58,6 +64,13 @@ export default function ConfiguracionPage() {
   const [inviteEmail, setInviteEmail] = useState("")
   const [inviteRole, setInviteRole] = useState("operador")
   const [inviting, setInviting] = useState(false)
+  const { estados: estadosConfig, reload: reloadEstados } = useEstados()
+  const [editingNombre, setEditingNombre] = useState<Record<string, string>>({})
+  const [savingEstadoId, setSavingEstadoId] = useState<string | null>(null)
+  const [nuevoEstado, setNuevoEstado] = useState<{ nombre: string; tipo: EstadoTipo }>({ nombre: "", tipo: "activo" })
+  const [estadoABorrar, setEstadoABorrar] = useState<EstadoServicio | null>(null)
+  const [estadoMigrarA, setEstadoMigrarA] = useState<string>("")
+  const [estadoConflict, setEstadoConflict] = useState<{ count: number } | null>(null)
 
   useEffect(() => {
     loadData()
@@ -202,6 +215,103 @@ export default function ConfiguracionPage() {
     }
   }
 
+  // ─── Estados de servicio ──────────────────────────────────────────────
+  const handleAddEstado = async () => {
+    const nombre = nuevoEstado.nombre.trim()
+    if (!nombre) {
+      toast({ title: "Error", description: "El nombre es requerido", variant: "destructive" })
+      return
+    }
+    try {
+      await api.estadosServicio.create(nombre, nuevoEstado.tipo)
+      setNuevoEstado({ nombre: "", tipo: "activo" })
+      await reloadEstados()
+      toast({ title: "Estado agregado", description: `${nombre} se agregó correctamente` })
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" })
+    }
+  }
+
+  const handleSaveNombre = async (id: string) => {
+    const nombre = editingNombre[id]?.trim()
+    if (!nombre) return
+    setSavingEstadoId(id)
+    try {
+      await api.estadosServicio.update(id, { nombre })
+      setEditingNombre((p) => { const n = { ...p }; delete n[id]; return n })
+      await reloadEstados()
+      toast({ title: "Estado actualizado" })
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" })
+    } finally {
+      setSavingEstadoId(null)
+    }
+  }
+
+  const handleChangeTipo = async (id: string, tipo: EstadoTipo) => {
+    setSavingEstadoId(id)
+    try {
+      await api.estadosServicio.update(id, { tipo })
+      await reloadEstados()
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" })
+    } finally {
+      setSavingEstadoId(null)
+    }
+  }
+
+  const handleToggleVisible = async (estado: EstadoServicio) => {
+    setSavingEstadoId(estado.id)
+    try {
+      await api.estadosServicio.update(estado.id, { visible: !estado.visible })
+      await reloadEstados()
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" })
+    } finally {
+      setSavingEstadoId(null)
+    }
+  }
+
+  const handleMover = async (id: string, direccion: -1 | 1) => {
+    const ordenados = [...estadosConfig].sort((a, b) => a.orden - b.orden)
+    const idx = ordenados.findIndex((e) => e.id === id)
+    if (idx < 0) return
+    const swap = idx + direccion
+    if (swap < 0 || swap >= ordenados.length) return
+    const a = ordenados[idx]
+    const b = ordenados[swap]
+    setSavingEstadoId(id)
+    try {
+      await Promise.all([
+        api.estadosServicio.update(a.id, { orden: b.orden }),
+        api.estadosServicio.update(b.id, { orden: a.orden }),
+      ])
+      await reloadEstados()
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" })
+    } finally {
+      setSavingEstadoId(null)
+    }
+  }
+
+  const handleConfirmDeleteEstado = async () => {
+    if (!estadoABorrar) return
+    try {
+      const result = await api.estadosServicio.delete(estadoABorrar.id, estadoMigrarA || undefined)
+      if ("error" in result && result.error === "HAS_SERVICIOS") {
+        setEstadoConflict({ count: result.count })
+        return
+      }
+      toast({ title: "Estado eliminado", description: estadoABorrar.nombre })
+      setEstadoABorrar(null)
+      setEstadoMigrarA("")
+      setEstadoConflict(null)
+      await reloadEstados()
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" })
+    }
+  }
+
   const handleDeleteAll = async () => {
     try {
       const res = await fetch("/api/reset", { method: "DELETE" })
@@ -244,6 +354,15 @@ export default function ConfiguracionPage() {
             <Paintbrush className="w-4 h-4 mr-2" />
             Precios Pintura
           </TabsTrigger>
+          {myRole === "admin" && (
+            <TabsTrigger
+              value="estados"
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            >
+              <ListChecks className="w-4 h-4 mr-2" />
+              Estados
+            </TabsTrigger>
+          )}
           {myRole === "admin" && (
             <TabsTrigger
               value="usuarios"
@@ -487,6 +606,209 @@ export default function ConfiguracionPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Estados Tab */}
+        {myRole === "admin" && (
+          <TabsContent value="estados" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ListChecks className="w-5 h-5" /> Estados de Servicio
+                </CardTitle>
+                <CardDescription>
+                  Administra la lista de estados disponibles. El <strong>tipo</strong> conserva la lógica de negocio
+                  aunque renombres el estado:
+                  <span className="block mt-2 text-xs">
+                    · <strong>Activo</strong>: el servicio sigue en taller.
+                    <br />· <strong>Por cobrar</strong>: dispara alertas de cobros pendientes.
+                    <br />· <strong>Cerrado</strong>: servicio terminado/pagado.
+                  </span>
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Lista de estados */}
+                <div className="space-y-2">
+                  {estadosConfig.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-6">
+                      No hay estados configurados.
+                    </p>
+                  )}
+                  {[...estadosConfig].sort((a, b) => a.orden - b.orden).map((estado, idx, arr) => {
+                    const isEditing = editingNombre[estado.id] !== undefined
+                    const value = isEditing ? editingNombre[estado.id] : estado.nombre
+                    return (
+                      <div
+                        key={estado.id}
+                        className={`flex flex-wrap items-center gap-2 p-3 rounded-lg border border-border ${
+                          estado.visible ? "bg-secondary/30" : "bg-secondary/10 opacity-60"
+                        }`}
+                      >
+                        <div className="flex flex-col">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            disabled={idx === 0 || savingEstadoId === estado.id}
+                            onClick={() => handleMover(estado.id, -1)}
+                            title="Subir"
+                          >
+                            <ArrowUp className="w-3 h-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            disabled={idx === arr.length - 1 || savingEstadoId === estado.id}
+                            onClick={() => handleMover(estado.id, 1)}
+                            title="Bajar"
+                          >
+                            <ArrowDown className="w-3 h-3" />
+                          </Button>
+                        </div>
+                        <Input
+                          value={value}
+                          onChange={(e) =>
+                            setEditingNombre((p) => ({ ...p, [estado.id]: e.target.value }))
+                          }
+                          onBlur={() => isEditing && handleSaveNombre(estado.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") (e.target as HTMLInputElement).blur()
+                          }}
+                          className="flex-1 min-w-[180px] bg-background"
+                          disabled={savingEstadoId === estado.id}
+                        />
+                        <Select
+                          value={estado.tipo}
+                          onValueChange={(v) => handleChangeTipo(estado.id, v as EstadoTipo)}
+                          disabled={savingEstadoId === estado.id}
+                        >
+                          <SelectTrigger className="w-36">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="activo">Activo</SelectItem>
+                            <SelectItem value="por_cobrar">Por cobrar</SelectItem>
+                            <SelectItem value="cerrado">Cerrado</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9"
+                          onClick={() => handleToggleVisible(estado)}
+                          disabled={savingEstadoId === estado.id}
+                          title={estado.visible ? "Ocultar del dropdown" : "Mostrar en dropdown"}
+                        >
+                          {estado.visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9 text-destructive hover:bg-destructive/10"
+                          onClick={() => {
+                            setEstadoABorrar(estado)
+                            setEstadoMigrarA("")
+                            setEstadoConflict(null)
+                          }}
+                          title="Eliminar"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Agregar nuevo */}
+                <div className="p-4 border border-dashed border-border rounded-lg space-y-2">
+                  <Label className="text-sm font-medium">Agregar nuevo estado</Label>
+                  <div className="flex flex-wrap gap-2">
+                    <Input
+                      placeholder="Nombre (ej: En Espera Cliente)"
+                      value={nuevoEstado.nombre}
+                      onChange={(e) => setNuevoEstado((p) => ({ ...p, nombre: e.target.value }))}
+                      className="flex-1 min-w-[200px] bg-background"
+                    />
+                    <Select
+                      value={nuevoEstado.tipo}
+                      onValueChange={(v) => setNuevoEstado((p) => ({ ...p, tipo: v as EstadoTipo }))}
+                    >
+                      <SelectTrigger className="w-36">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="activo">Activo</SelectItem>
+                        <SelectItem value="por_cobrar">Por cobrar</SelectItem>
+                        <SelectItem value="cerrado">Cerrado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button onClick={handleAddEstado} className="bg-primary">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Agregar
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Diálogo de borrado con migración */}
+            <AlertDialog open={!!estadoABorrar} onOpenChange={(o) => !o && setEstadoABorrar(null)}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Eliminar estado &quot;{estadoABorrar?.nombre}&quot;</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {estadoConflict
+                      ? `${estadoConflict.count} servicio(s) usan este estado. Selecciona a cuál migrarlos antes de borrar:`
+                      : "Esta acción es irreversible. Si hay servicios usando el estado, te pediremos un destino para migrarlos."}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                {estadoConflict && (
+                  <div className="my-2">
+                    <Label className="text-xs mb-1 block">Migrar servicios a:</Label>
+                    <Select value={estadoMigrarA} onValueChange={setEstadoMigrarA}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona un estado destino" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {estadosConfig
+                          .filter((e) => e.id !== estadoABorrar?.id)
+                          .map((e) => (
+                            <SelectItem key={e.id} value={e.nombre}>
+                              {e.nombre}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <AlertDialogFooter>
+                  <AlertDialogCancel
+                    onClick={() => {
+                      setEstadoABorrar(null)
+                      setEstadoMigrarA("")
+                      setEstadoConflict(null)
+                    }}
+                  >
+                    Cancelar
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={(e) => {
+                      // Por defecto AlertDialogAction cierra el modal. En el primer click
+                      // (sin migrarA) la API puede responder 409 y necesitamos mantener el
+                      // modal abierto para mostrar el selector de migración.
+                      e.preventDefault()
+                      handleConfirmDeleteEstado()
+                    }}
+                    disabled={!!estadoConflict && !estadoMigrarA}
+                    className="bg-destructive hover:bg-destructive/90"
+                  >
+                    {estadoConflict ? "Migrar y borrar" : "Borrar"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </TabsContent>
+        )}
 
         {/* Usuarios Tab */}
         {myRole === "admin" && (

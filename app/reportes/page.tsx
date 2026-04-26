@@ -16,6 +16,7 @@ import { ProfitabilityAnalysis } from "@/components/profitability-analysis"
 import { useMonth } from "@/lib/month-context"
 import { api, type Servicio, type Gasto } from "@/lib/api-client"
 import { formatFechaDMA, extraerIvaIncluido } from "@/lib/utils"
+import { useEstados } from "@/lib/estados"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
@@ -23,6 +24,7 @@ import * as XLSX from "xlsx"
 
 export default function ReportsPage() {
   const { selectedMonth } = useMonth()
+  const { esCerrado } = useEstados()
   const [servicios, setServicios] = useState<Servicio[]>([])
   const [gastos, setGastos] = useState<Gasto[]>([])
   const [abonos, setAbonos] = useState<any[]>([])
@@ -63,7 +65,7 @@ export default function ReportsPage() {
   }, [loadData])
 
   // Calculate KPIs
-  const serviciosCerrados = servicios.filter((s) => s.estado === "Cerrado/Pagado")
+  const serviciosCerrados = servicios.filter((s) => esCerrado(s.estado))
   const ingresosTotales = serviciosCerrados.reduce((sum, s) => sum + Number(s.monto_total_sin_iva), 0)
   const ingresosBrutos = serviciosCerrados.reduce((sum, s) => sum + Number(s.monto_total), 0)
 
@@ -165,7 +167,7 @@ export default function ReportsPage() {
   ].filter(d => d.value > 0)
 
   // Comparison KPIs
-  const compIngresos = compServicios.filter(s => s.estado === "Cerrado/Pagado").reduce((sum, s) => sum + Number(s.monto_total_sin_iva), 0)
+  const compIngresos = compServicios.filter(s => esCerrado(s.estado)).reduce((sum, s) => sum + Number(s.monto_total_sin_iva), 0)
   const compGastosTot = compGastos.filter(g => g.categoria !== "Sueldos").reduce((sum, g) => sum + Number(g.monto), 0) + gastosSueldos
   const compCostos = compServicios.reduce((sum, s) => sum + parseArr(s.costos).filter((x: any) => !String(x.descripcion || "").toLowerCase().includes("materiales pintura")).reduce((c: number, x: any) => c + Number(x.monto), 0), 0)
   const compUtilidad = compIngresos - compGastosTot - compCostos

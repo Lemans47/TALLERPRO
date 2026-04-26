@@ -4,15 +4,11 @@ import { ChevronRight, Clock, CheckCircle2, AlertCircle } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import type { Servicio } from "@/lib/database"
+import { useEstados } from "@/lib/estados"
 
-const PIPELINE_STAGES = [
-  { key: "En Cola", color: "#3b82f6" },
-  { key: "En Proceso", color: "#8b5cf6" },
-  { key: "En Reparación", color: "#f59e0b" },
-  { key: "Esperando Repuestos", color: "#ef4444" },
-  { key: "Control de Calidad", color: "#10b981" },
-  { key: "Listo para Entrega", color: "#06b6d4" },
-]
+// Paleta cíclica para los stages del pipeline. Si el usuario crea más de 6
+// estados activos, los colores se repiten en orden.
+const PIPELINE_COLORS = ["#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#10b981", "#06b6d4"]
 
 interface VehiclePipelineProps {
   servicios: Servicio[]
@@ -20,10 +16,13 @@ interface VehiclePipelineProps {
 
 export function VehiclePipeline({ servicios }: VehiclePipelineProps) {
   const hoy = new Date()
+  const { estados, esCerrado, esPorCobrar, esFinalizado } = useEstados()
 
-  const activos = servicios.filter(
-    (s) => !["Cerrado/Pagado", "Entregado", "Por Cobrar"].includes(s.estado),
-  )
+  const PIPELINE_STAGES = estados
+    .filter((e) => e.tipo === "activo" && e.visible)
+    .map((e, idx) => ({ key: e.nombre, color: PIPELINE_COLORS[idx % PIPELINE_COLORS.length] }))
+
+  const activos = servicios.filter((s) => !esFinalizado(s.estado))
 
   const counts: Record<string, number> = {}
   PIPELINE_STAGES.forEach((stage) => {
@@ -33,8 +32,10 @@ export function VehiclePipeline({ servicios }: VehiclePipelineProps) {
   const countValues = Object.values(counts)
   const maxCount = countValues.length > 0 ? Math.max(...countValues) : 0
 
-  const entregados = servicios.filter((s) => s.estado === "Entregado").length
-  const cerrados = servicios.filter((s) => s.estado === "Cerrado/Pagado").length
+  // "Entregados" mantiene el sentido del antiguo conteo: servicios con tipo `por_cobrar`
+  // (ya entregados pero pendientes de cobro). "Cerrados" = tipo `cerrado`.
+  const entregados = servicios.filter((s) => esPorCobrar(s.estado)).length
+  const cerrados = servicios.filter((s) => esCerrado(s.estado)).length
 
   const atascados = activos
     .map((s) => ({

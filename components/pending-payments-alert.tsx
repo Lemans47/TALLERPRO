@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { AlertCircle, Clock, Phone, CheckCircle2, ChevronRight, MessageCircle } from "lucide-react"
 import Link from "next/link"
 import type { Servicio } from "@/lib/database"
+import { useEstados } from "@/lib/estados"
 
 interface PendingPaymentsAlertProps {
   servicios: Servicio[]
@@ -13,9 +14,10 @@ interface PendingPaymentsAlertProps {
 
 export function PendingPaymentsAlert({ servicios, maxItems = 5 }: PendingPaymentsAlertProps) {
   const ahora = new Date()
+  const { esPorCobrar } = useEstados()
 
   const pendingPayments = servicios
-    .filter((s) => Number(s.saldo_pendiente) > 0 && (s.estado === "Entregado" || s.estado === "Por Cobrar"))
+    .filter((s) => Number(s.saldo_pendiente) > 0 && esPorCobrar(s.estado))
     .map((servicio) => {
       const fechaIngreso = new Date(servicio.fecha_ingreso)
       const diasTranscurridos = Math.floor((ahora.getTime() - fechaIngreso.getTime()) / (1000 * 60 * 60 * 24))

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getServiciosByMonth, getGastosByMonth, getEmpleados, getActiveServicios, getAbonosByMonth, getEntregadosByMonth, getServiciosFacturadosByMes, getFacturasPendientesEmitir } from "@/lib/database"
+import { getServiciosByMonth, getGastosByMonth, getEmpleados, getActiveServicios, getAbonosByMonth, getEntregadosByMonth, getServiciosFacturadosByMes, getFacturasPendientesEmitir, getNombresEstadosPorTipo } from "@/lib/database"
 import { safeDivide, safeCalculateMargin, calculateAbsorptionRate } from "@/lib/utils"
 
 export const dynamic = "force-dynamic"
@@ -9,6 +9,7 @@ function computeKpis(
   servicios: Awaited<ReturnType<typeof getServiciosByMonth>>,
   gastos: Awaited<ReturnType<typeof getGastosByMonth>>,
   empleados: Awaited<ReturnType<typeof getEmpleados>>,
+  estadosFinalizados: Set<string>,
   abonosMes?: Awaited<ReturnType<typeof getAbonosByMonth>>,
 ) {
   // Helper: parsea campo JSONB que puede llegar como string o array ya parseado
@@ -27,9 +28,7 @@ function computeKpis(
 
   // Base: todos los servicios del mes con monto asignado (igual que "Facturado del Mes" en el dashboard)
   const serviciosConMonto = servicios.filter((s) => Number(s.monto_total_sin_iva || 0) > 0)
-  const serviciosFinalizadosCount = servicios.filter((s) =>
-    ["Cerrado/Pagado", "Entregado", "Por Cobrar"].includes(s.estado),
-  ).length
+  const serviciosFinalizadosCount = servicios.filter((s) => estadosFinalizados.has(s.estado)).length
 
   // Ingresos netos (sin IVA)
   const ingresoNeto = serviciosConMonto.reduce((sum, sv) => sum + Number(sv.monto_total_sin_iva || 0), 0)
@@ -136,7 +135,7 @@ export async function GET(request: Request) {
 
     const useAbonos = searchParams.get("useAbonos") === "true"
 
-    const [servicios, gastos, empleados, serviciosActivos, abonosMes, entregadosMes, serviciosFacturadosMes, facturasPendientes] = await Promise.all([
+    const [servicios, gastos, empleados, serviciosActivos, abonosMes, entregadosMes, serviciosFacturadosMes, facturasPendientes, finalizadosNombres] = await Promise.all([
       getServiciosByMonth(year, month),
       getGastosByMonth(year, month),
       getEmpleados(),
@@ -145,9 +144,11 @@ export async function GET(request: Request) {
       getEntregadosByMonth(year, month),
       getServiciosFacturadosByMes(year, month),
       getFacturasPendientesEmitir(),
+      getNombresEstadosPorTipo(["por_cobrar", "cerrado"]),
     ])
+    const estadosFinalizados = new Set(finalizadosNombres)
 
-    const kpis = computeKpis(servicios, gastos, empleados, abonosMes ?? undefined)
+    const kpis = computeKpis(servicios, gastos, empleados, estadosFinalizados, abonosMes ?? undefined)
 
     return NextResponse.json({ servicios, gastos, empleados, serviciosActivos, kpis, entregadosMes: entregadosMes.length, serviciosFacturadosMes, facturasPendientes })
   } catch (error) {

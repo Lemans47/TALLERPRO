@@ -183,9 +183,11 @@ export async function getServicios() {
 
 export async function getActiveServicios() {
   const db = getSQL()
+  // Estados "activos" = todo lo que no es cerrado ni por_cobrar, según la tabla configurable.
+  const inactivos = await getNombresEstadosPorTipo(["cerrado", "por_cobrar"])
   const data = await db`
     SELECT * FROM servicios
-    WHERE estado NOT IN ('Cerrado/Pagado', 'Entregado')
+    WHERE estado <> ALL(${inactivos.length ? inactivos : [""]}::text[])
     ORDER BY fecha_ingreso DESC
   `
   return data as Servicio[]
@@ -197,6 +199,8 @@ export async function getActiveServicios() {
 // Server-side filter evita traer todo el historial para filtrar en JS.
 export async function getServiciosActivosParaLista() {
   const db = getSQL()
+  // Lista visible en /servicios = activos + por_cobrar (todo menos los cerrados).
+  const visibles = await getNombresEstadosPorTipo(["activo", "por_cobrar"])
   const data = await db`
     SELECT s.*, v.mes_revision_tecnica
     FROM servicios s
@@ -207,10 +211,7 @@ export async function getServiciosActivosParaLista() {
       ORDER BY (mes_revision_tecnica IS NOT NULL) DESC, updated_at DESC NULLS LAST
       LIMIT 1
     ) v ON true
-    WHERE s.estado IN (
-      'En Cola','En Proceso','En Reparación','Esperando Repuestos',
-      'Control de Calidad','Listo para Entrega','Entregado','Por Cobrar'
-    )
+    WHERE s.estado = ANY(${visibles.length ? visibles : [""]}::text[])
     ORDER BY s.fecha_ingreso DESC
   `
   return data as Servicio[]
@@ -223,9 +224,11 @@ export async function getEntregadosByMonth(year: number, month: number) {
   const nextMonth = month === 12 ? 1 : month + 1
   const endDate = `${nextYear}-${String(nextMonth).padStart(2, "0")}-01`
 
+  // "Entregados/finalizados" del mes = por_cobrar + cerrado (cualquier estado configurado con esos tipos).
+  const finalizados = await getNombresEstadosPorTipo(["por_cobrar", "cerrado"])
   const data = await db`
     SELECT * FROM servicios
-    WHERE estado IN ('Entregado', 'Cerrado/Pagado', 'Por Cobrar')
+    WHERE estado = ANY(${finalizados.length ? finalizados : [""]}::text[])
     AND updated_at >= ${startDate}
     AND updated_at < ${endDate}
     ORDER BY updated_at DESC
@@ -257,16 +260,18 @@ export async function getServiciosByMonth(year: number, month: number) {
 }
 
 // Servicios facturables (con IVA) que todavia no tienen fecha_facturacion emitida.
-// Incluye estados donde el trabajo ya se deberia haber facturado al cliente.
+// Incluye estados donde el trabajo ya se deberia haber facturado al cliente
+// (todos los estados con tipo por_cobrar o cerrado).
 export async function getFacturasPendientesEmitir() {
   const db = getSQL()
+  const finalizados = await getNombresEstadosPorTipo(["por_cobrar", "cerrado"])
   const data = await db`
     SELECT id, numero_ot, patente, cliente, estado, fecha_ingreso,
            monto_total, monto_total_sin_iva
     FROM servicios
     WHERE iva = 'con'
       AND fecha_facturacion IS NULL
-      AND estado IN ('Por Cobrar', 'Entregado', 'Cerrado/Pagado')
+      AND estado = ANY(${finalizados.length ? finalizados : [""]}::text[])
     ORDER BY fecha_ingreso ASC
   `
   return data as Servicio[]
@@ -738,8 +743,10 @@ export async function deleteAbonoWithGastos(id: string) {
 export async function getDashboardKPIs(year: number, month: number) {
   const servicios = await getServiciosByMonth(year, month)
   const gastos = await getGastosByMonth(year, month)
+  const cerrados = new Set(await getNombresEstadosPorTipo(["cerrado"]))
+  const porCobrarSet = new Set(await getNombresEstadosPorTipo(["por_cobrar"]))
 
-  const serviciosCerrados = servicios.filter((s) => s.estado === "Cerrado/Pagado")
+  const serviciosCerrados = servicios.filter((s) => cerrados.has(s.estado))
   const ingresosSinIVA = serviciosCerrados.reduce((sum, s) => sum + Number(s.monto_total_sin_iva), 0)
   const ingresosConIVA = serviciosCerrados.reduce((sum, s) => sum + Number(s.monto_total), 0)
   const totalGastos = gastos.reduce((sum, g) => sum + Number(g.monto), 0)
@@ -752,7 +759,7 @@ export async function getDashboardKPIs(year: number, month: number) {
   const margenPromedio = ingresosSinIVA > 0 ? (utilidadOperacional / ingresosSinIVA) * 100 : 0
 
   const porCobrar = servicios
-    .filter((s) => s.estado === "Por Cobrar" || Number(s.saldo_pendiente) > 0)
+    .filter((s) => porCobrarSet.has(s.estado) || Number(s.saldo_pendiente) > 0)
     .reduce((sum, s) => sum + Number(s.saldo_pendiente), 0)
 
   return {
@@ -762,7 +769,7 @@ export async function getDashboardKPIs(year: number, month: number) {
     utilidadOperacional,
     margenPromedio,
     porCobrar,
-    serviciosActivos: servicios.filter((s) => s.estado !== "Cerrado/Pagado").length,
+    serviciosActivos: servicios.filter((s) => !cerrados.has(s.estado)).length,
     serviciosTotal: servicios.length,
   }
 }
@@ -908,6 +915,122 @@ export async function deletePiezaPintura(id: string) {
     console.error("[v0] Error deleting pieza_pintura:", error?.message)
     throw error
   }
+}
+
+// ─── Estados de Servicio (configurables) ────────────────────────────────────
+
+export type EstadoTipo = "activo" | "por_cobrar" | "cerrado"
+
+export interface EstadoServicio {
+  id: string
+  nombre: string
+  tipo: EstadoTipo
+  orden: number
+  visible: boolean
+  created_at?: string
+  updated_at?: string
+}
+
+export async function getEstadosServicio(): Promise<EstadoServicio[]> {
+  try {
+    const db = getSQL()
+    const data = await db`SELECT * FROM estados_servicio ORDER BY orden ASC, nombre ASC`
+    return data as EstadoServicio[]
+  } catch (error: any) {
+    console.error("[v0] Error fetching estados_servicio:", error?.message)
+    return []
+  }
+}
+
+export async function getNombresEstadosPorTipo(tipos: EstadoTipo[]): Promise<string[]> {
+  if (!tipos.length) return []
+  const db = getSQL()
+  const data = await db`SELECT nombre FROM estados_servicio WHERE tipo = ANY(${tipos}::text[])`
+  return (data as { nombre: string }[]).map((r) => r.nombre)
+}
+
+export async function createEstadoServicio(nombre: string, tipo: EstadoTipo, orden?: number) {
+  const db = getSQL()
+  const ordenFinal =
+    typeof orden === "number"
+      ? orden
+      : Number(((await db`SELECT COALESCE(MAX(orden), 0) + 1 AS next FROM estados_servicio`)[0] as any).next)
+  const data = await db`
+    INSERT INTO estados_servicio (nombre, tipo, orden)
+    VALUES (${nombre}, ${tipo}, ${ordenFinal})
+    RETURNING *
+  `
+  return data[0] as EstadoServicio
+}
+
+export async function updateEstadoServicio(
+  id: string,
+  patch: { nombre?: string; tipo?: EstadoTipo; orden?: number; visible?: boolean },
+) {
+  const db = getSQL()
+  // Si cambia el nombre, propagar el cambio a todos los servicios que lo usaban.
+  // Lo hacemos en una transacción para mantener consistencia.
+  return await db.begin(async (tx: any) => {
+    const [actual] = (await tx`SELECT * FROM estados_servicio WHERE id = ${id}`) as EstadoServicio[]
+    if (!actual) throw new Error("Estado no encontrado")
+
+    if (patch.nombre && patch.nombre !== actual.nombre) {
+      await tx`UPDATE servicios SET estado = ${patch.nombre} WHERE estado = ${actual.nombre}`
+    }
+
+    const [updated] = (await tx`
+      UPDATE estados_servicio
+      SET nombre   = COALESCE(${patch.nombre ?? null}, nombre),
+          tipo     = COALESCE(${patch.tipo ?? null}, tipo),
+          orden    = COALESCE(${patch.orden ?? null}, orden),
+          visible  = COALESCE(${patch.visible ?? null}, visible),
+          updated_at = NOW()
+      WHERE id = ${id}
+      RETURNING *
+    `) as EstadoServicio[]
+    return updated
+  })
+}
+
+// Cuenta los servicios que usan un estado dado (por nombre).
+export async function countServiciosByEstado(nombre: string): Promise<number> {
+  const db = getSQL()
+  const [{ count }] = (await db`
+    SELECT COUNT(*)::int AS count FROM servicios WHERE estado = ${nombre}
+  `) as { count: number }[]
+  return count
+}
+
+// Borra un estado. Si hay servicios que lo usan y se pasa migrarA, los migra primero.
+// Si hay servicios y no se pasa migrarA, lanza error con el conteo.
+export async function deleteEstadoServicio(id: string, migrarA?: string) {
+  const db = getSQL()
+  return await db.begin(async (tx: any) => {
+    const [actual] = (await tx`SELECT * FROM estados_servicio WHERE id = ${id}`) as EstadoServicio[]
+    if (!actual) throw new Error("Estado no encontrado")
+
+    const [{ count }] = (await tx`
+      SELECT COUNT(*)::int AS count FROM servicios WHERE estado = ${actual.nombre}
+    `) as { count: number }[]
+
+    if (count > 0) {
+      if (!migrarA) {
+        const err: any = new Error("HAS_SERVICIOS")
+        err.code = "HAS_SERVICIOS"
+        err.count = count
+        err.estado = actual.nombre
+        throw err
+      }
+      const [destino] = (await tx`
+        SELECT id FROM estados_servicio WHERE nombre = ${migrarA}
+      `) as { id: string }[]
+      if (!destino) throw new Error("Estado destino no existe")
+      await tx`UPDATE servicios SET estado = ${migrarA} WHERE estado = ${actual.nombre}`
+    }
+
+    await tx`DELETE FROM estados_servicio WHERE id = ${id}`
+    return { migrated: count, estado: actual.nombre }
+  })
 }
 
 // ─── Clientes ───────────────────────────────────────────────────────────────

@@ -48,6 +48,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { generarPDFPresupuesto } from "@/lib/pdf-presupuesto"
 import { PDFPreviewModal } from "@/components/pdf-preview-modal"
 import { roundMoney, costoNetoItem, sumCostosNetos } from "@/lib/utils"
+import { useEstados } from "@/lib/estados"
 
 interface ServiceFormProps {
   servicioAEditar?: (Servicio & { isPresupuesto?: boolean }) | null
@@ -55,17 +56,9 @@ interface ServiceFormProps {
   onSaved: () => void
 }
 
-const ESTADOS = [
-  "En Cola",
-  "En Proceso",
-  "Esperando Repuestos",
-  "En Reparación",
-  "Control de Calidad",
-  "Listo para Entrega",
-  "Entregado",
-  "Por Cobrar",
-  "Cerrado/Pagado",
-]
+// La lista canónica vive en la tabla `estados_servicio` (ver `lib/estados.ts`).
+// Aquí solo se conserva un default para el primer render del formulario.
+const ESTADO_DEFAULT = "En Cola"
 
 interface ItemDetalle {
   id: string
@@ -102,6 +95,8 @@ const isAutoItem = (desc: string | null | undefined) => {
 
 export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFormProps) {
   const { toast } = useToast() // Declare useToast hook
+  const { estados: estadosConfig, esCerrado } = useEstados()
+  const estadosVisibles = estadosConfig.filter((e) => e.visible)
   const [loading, setLoading] = useState(false)
   const submittingRef = useRef(false)
   const [pdfFormatDialog, setPdfFormatDialog] = useState(false)
@@ -150,7 +145,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
     cliente: "",
     telefono: "",
     observaciones: "",
-    estado: "En Cola",
+    estado: ESTADO_DEFAULT,
     iva: "sin",
     anticipo: 0,
     detalle_pendiente: false,
@@ -298,7 +293,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         cliente: servicioAEditar.cliente,
         telefono: servicioAEditar.telefono || "",
         observaciones: servicioAEditar.observaciones || "",
-        estado: servicioAEditar.estado || "En Cola",
+        estado: servicioAEditar.estado || ESTADO_DEFAULT,
         iva: servicioAEditar.iva || "sin",
         anticipo: Number(servicioAEditar.anticipo) || 0,
         detalle_pendiente: Boolean((servicioAEditar as any).detalle_pendiente) || false,
@@ -443,7 +438,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       cliente: "",
       telefono: "",
       observaciones: "",
-      estado: "En Cola",
+      estado: ESTADO_DEFAULT,
       iva: "sin",
       anticipo: 0,
       detalle_pendiente: false,
@@ -1536,7 +1531,9 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                   <div className="space-y-1">
                     <Label className="text-xs">Estado</Label>
                     <Select value={formData.estado} onValueChange={(v) => {
-                      if (v === "Cerrado/Pagado" && formData.estado !== "Cerrado/Pagado") {
+                      // Al pasar a un estado de tipo "cerrado", asentamos el anticipo al total
+                      // (mismo comportamiento que tenía el viejo check contra "Cerrado/Pagado").
+                      if (esCerrado(v) && !esCerrado(formData.estado)) {
                         setFormData({ ...formData, estado: v, anticipo: montoConIva })
                       } else {
                         setFormData({ ...formData, estado: v })
@@ -1546,9 +1543,9 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-card border-border">
-                        {ESTADOS.map((estado) => (
-                          <SelectItem key={estado} value={estado}>
-                            {estado}
+                        {estadosVisibles.map((estado) => (
+                          <SelectItem key={estado.id} value={estado.nombre}>
+                            {estado.nombre}
                           </SelectItem>
                         ))}
                       </SelectContent>

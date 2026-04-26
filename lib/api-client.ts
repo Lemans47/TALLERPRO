@@ -1,4 +1,4 @@
-import type { Servicio, Presupuesto, Gasto, PrecioPintura, PiezaPintura, FotoServicio, Cliente, Vehiculo, Empleado } from "./database"
+import type { Servicio, Presupuesto, Gasto, PrecioPintura, PiezaPintura, FotoServicio, Cliente, Vehiculo, Empleado, EstadoServicio, EstadoTipo } from "./database"
 
 // Patentes Chile — Boostr.cl
 export interface VehiculoLookup {
@@ -229,6 +229,54 @@ export async function deletePiezaPinturaApi(id: string): Promise<void> {
   if (!res.ok) throw new Error("Error deleting pieza pintura")
 }
 
+// Estados de Servicio (configurables)
+export async function fetchEstadosServicio(): Promise<EstadoServicio[]> {
+  const res = await fetch("/api/estados-servicio")
+  if (!res.ok) throw new Error("Error fetching estados")
+  return res.json()
+}
+
+export async function createEstadoServicioApi(nombre: string, tipo: EstadoTipo, orden?: number): Promise<EstadoServicio> {
+  const res = await fetch("/api/estados-servicio", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ nombre, tipo, orden }),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || "Error creando estado")
+  return data
+}
+
+export async function updateEstadoServicioApi(
+  id: string,
+  patch: { nombre?: string; tipo?: EstadoTipo; orden?: number; visible?: boolean },
+): Promise<EstadoServicio> {
+  const res = await fetch("/api/estados-servicio", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, ...patch }),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || "Error actualizando estado")
+  return data
+}
+
+export type DeleteEstadoConflict = { error: "HAS_SERVICIOS"; count: number; estado: string; message: string }
+
+export async function deleteEstadoServicioApi(
+  id: string,
+  migrarA?: string,
+): Promise<{ success: true } | DeleteEstadoConflict> {
+  const url = migrarA
+    ? `/api/estados-servicio?id=${id}&migrarA=${encodeURIComponent(migrarA)}`
+    : `/api/estados-servicio?id=${id}`
+  const res = await fetch(url, { method: "DELETE" })
+  const data = await res.json()
+  if (res.status === 409 && data?.error === "HAS_SERVICIOS") return data as DeleteEstadoConflict
+  if (!res.ok) throw new Error(data.error || "Error eliminando estado")
+  return { success: true }
+}
+
 // Clientes
 export async function fetchClientes(): Promise<Cliente[]> {
   const res = await fetch("/api/clientes")
@@ -308,7 +356,7 @@ export async function deleteAbonoApi(id: string) {
   if (!res.ok) throw new Error("Error deleting abono")
 }
 
-export type { Servicio, Presupuesto, Gasto, PrecioPintura, PiezaPintura, FotoServicio, Cliente, Vehiculo, Empleado, AbonoEmpleado } from "./database"
+export type { Servicio, Presupuesto, Gasto, PrecioPintura, PiezaPintura, FotoServicio, Cliente, Vehiculo, Empleado, AbonoEmpleado, EstadoServicio, EstadoTipo } from "./database"
 
 export const api = {
   empleados: {
@@ -367,6 +415,12 @@ export const api = {
     create: createPiezaPinturaApi,
     update: updatePiezaPinturaApi,
     delete: deletePiezaPinturaApi,
+  },
+  estadosServicio: {
+    getAll: fetchEstadosServicio,
+    create: createEstadoServicioApi,
+    update: updateEstadoServicioApi,
+    delete: deleteEstadoServicioApi,
   },
   proveedores: {
     getAll: fetchProveedores,
