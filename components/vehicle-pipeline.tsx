@@ -6,10 +6,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import type { Servicio } from "@/lib/database"
 import { useEstados } from "@/lib/estados"
 
-// Paleta cíclica para los stages del pipeline. Si el usuario crea más de 6
-// estados activos, los colores se repiten en orden.
-const PIPELINE_COLORS = ["#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#10b981", "#06b6d4"]
-
 interface VehiclePipelineProps {
   servicios: Servicio[]
 }
@@ -18,9 +14,11 @@ export function VehiclePipeline({ servicios }: VehiclePipelineProps) {
   const hoy = new Date()
   const { estados, esCerrado, esPorCobrar, esFinalizado } = useEstados()
 
+  // Stages del pipeline = estados de tipo activo, en el orden configurado.
+  // Cada stage usa el color editable del estado.
   const PIPELINE_STAGES = estados
     .filter((e) => e.tipo === "activo" && e.visible)
-    .map((e, idx) => ({ key: e.nombre, color: PIPELINE_COLORS[idx % PIPELINE_COLORS.length] }))
+    .map((e) => ({ key: e.nombre, color: e.color || "#6b7280" }))
 
   const activos = servicios.filter((s) => !esFinalizado(s.estado))
 

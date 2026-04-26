@@ -5,31 +5,12 @@ import { Activity } from "lucide-react"
 import type { Servicio } from "@/lib/database"
 import { useEstados } from "@/lib/estados"
 
-// Colores legacy para los 9 estados originales. Estados nuevos creados por
-// el usuario caen al color por tipo (más abajo).
-const STATUS_COLORS: Record<string, string> = {
-  "En Cola": "#3b82f6",
-  "En Proceso": "#8b5cf6",
-  "En Reparación": "#f59e0b",
-  "Esperando Repuestos": "#ef4444",
-  "Control de Calidad": "#10b981",
-  "Listo para Entrega": "#06b6d4",
-  Entregado: "#6366f1",
-  "Por Cobrar": "#f97316",
-  "Cerrado/Pagado": "#22c55e",
-}
-
-const TIPO_COLORS = { activo: "#3b82f6", por_cobrar: "#f97316", cerrado: "#22c55e" } as const
-
 interface ServicesStatusChartProps {
   servicios: Servicio[]
 }
 
 export function ServicesStatusChart({ servicios }: ServicesStatusChartProps) {
-  const { estados, esCerrado } = useEstados()
-  const tipoByNombre = new Map(estados.map((e) => [e.nombre, e.tipo]))
-  const colorFor = (nombre: string) =>
-    STATUS_COLORS[nombre] || TIPO_COLORS[tipoByNombre.get(nombre) as keyof typeof TIPO_COLORS] || "#6b7280"
+  const { esCerrado, colorOf } = useEstados()
   const statusCount: Record<string, number> = {}
 
   servicios.forEach((s) => {
@@ -42,7 +23,7 @@ export function ServicesStatusChart({ servicios }: ServicesStatusChartProps) {
     .map(([name, value]) => ({
       name,
       value,
-      color: colorFor(name),
+      color: colorOf(name),
     }))
 
   if (chartData.length === 0) {

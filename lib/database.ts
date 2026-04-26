@@ -927,6 +927,7 @@ export interface EstadoServicio {
   tipo: EstadoTipo
   orden: number
   visible: boolean
+  color: string
   created_at?: string
   updated_at?: string
 }
@@ -949,15 +950,16 @@ export async function getNombresEstadosPorTipo(tipos: EstadoTipo[]): Promise<str
   return (data as { nombre: string }[]).map((r) => r.nombre)
 }
 
-export async function createEstadoServicio(nombre: string, tipo: EstadoTipo, orden?: number) {
+export async function createEstadoServicio(nombre: string, tipo: EstadoTipo, orden?: number, color?: string) {
   const db = getSQL()
   const ordenFinal =
     typeof orden === "number"
       ? orden
       : Number(((await db`SELECT COALESCE(MAX(orden), 0) + 1 AS next FROM estados_servicio`)[0] as any).next)
+  const colorFinal = color || "#6b7280"
   const data = await db`
-    INSERT INTO estados_servicio (nombre, tipo, orden)
-    VALUES (${nombre}, ${tipo}, ${ordenFinal})
+    INSERT INTO estados_servicio (nombre, tipo, orden, color)
+    VALUES (${nombre}, ${tipo}, ${ordenFinal}, ${colorFinal})
     RETURNING *
   `
   return data[0] as EstadoServicio
@@ -965,7 +967,7 @@ export async function createEstadoServicio(nombre: string, tipo: EstadoTipo, ord
 
 export async function updateEstadoServicio(
   id: string,
-  patch: { nombre?: string; tipo?: EstadoTipo; orden?: number; visible?: boolean },
+  patch: { nombre?: string; tipo?: EstadoTipo; orden?: number; visible?: boolean; color?: string },
 ) {
   const db = getSQL()
   // Si cambia el nombre, propagar el cambio a todos los servicios que lo usaban.
@@ -984,6 +986,7 @@ export async function updateEstadoServicio(
           tipo     = COALESCE(${patch.tipo ?? null}, tipo),
           orden    = COALESCE(${patch.orden ?? null}, orden),
           visible  = COALESCE(${patch.visible ?? null}, visible),
+          color    = COALESCE(${patch.color ?? null}, color),
           updated_at = NOW()
       WHERE id = ${id}
       RETURNING *

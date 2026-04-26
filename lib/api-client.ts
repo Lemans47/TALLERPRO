@@ -236,11 +236,11 @@ export async function fetchEstadosServicio(): Promise<EstadoServicio[]> {
   return res.json()
 }
 
-export async function createEstadoServicioApi(nombre: string, tipo: EstadoTipo, orden?: number): Promise<EstadoServicio> {
+export async function createEstadoServicioApi(nombre: string, tipo: EstadoTipo, orden?: number, color?: string): Promise<EstadoServicio> {
   const res = await fetch("/api/estados-servicio", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ nombre, tipo, orden }),
+    body: JSON.stringify({ nombre, tipo, orden, color }),
   })
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || "Error creando estado")
@@ -249,7 +249,7 @@ export async function createEstadoServicioApi(nombre: string, tipo: EstadoTipo, 
 
 export async function updateEstadoServicioApi(
   id: string,
-  patch: { nombre?: string; tipo?: EstadoTipo; orden?: number; visible?: boolean },
+  patch: { nombre?: string; tipo?: EstadoTipo; orden?: number; visible?: boolean; color?: string },
 ): Promise<EstadoServicio> {
   const res = await fetch("/api/estados-servicio", {
     method: "PUT",

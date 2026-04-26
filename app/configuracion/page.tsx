@@ -67,7 +67,7 @@ export default function ConfiguracionPage() {
   const { estados: estadosConfig, reload: reloadEstados } = useEstados()
   const [editingNombre, setEditingNombre] = useState<Record<string, string>>({})
   const [savingEstadoId, setSavingEstadoId] = useState<string | null>(null)
-  const [nuevoEstado, setNuevoEstado] = useState<{ nombre: string; tipo: EstadoTipo }>({ nombre: "", tipo: "activo" })
+  const [nuevoEstado, setNuevoEstado] = useState<{ nombre: string; tipo: EstadoTipo; color: string }>({ nombre: "", tipo: "activo", color: "#3b82f6" })
   const [estadoABorrar, setEstadoABorrar] = useState<EstadoServicio | null>(null)
   const [estadoMigrarA, setEstadoMigrarA] = useState<string>("")
   const [estadoConflict, setEstadoConflict] = useState<{ count: number } | null>(null)
@@ -223,12 +223,24 @@ export default function ConfiguracionPage() {
       return
     }
     try {
-      await api.estadosServicio.create(nombre, nuevoEstado.tipo)
-      setNuevoEstado({ nombre: "", tipo: "activo" })
+      await api.estadosServicio.create(nombre, nuevoEstado.tipo, undefined, nuevoEstado.color)
+      setNuevoEstado({ nombre: "", tipo: "activo", color: "#3b82f6" })
       await reloadEstados()
       toast({ title: "Estado agregado", description: `${nombre} se agregó correctamente` })
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" })
+    }
+  }
+
+  const handleChangeColor = async (id: string, color: string) => {
+    setSavingEstadoId(id)
+    try {
+      await api.estadosServicio.update(id, { color })
+      await reloadEstados()
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" })
+    } finally {
+      setSavingEstadoId(null)
     }
   }
 
@@ -677,6 +689,14 @@ export default function ConfiguracionPage() {
                           className="flex-1 min-w-[180px] bg-background"
                           disabled={savingEstadoId === estado.id}
                         />
+                        <input
+                          type="color"
+                          value={estado.color || "#6b7280"}
+                          onChange={(e) => handleChangeColor(estado.id, e.target.value)}
+                          disabled={savingEstadoId === estado.id}
+                          title="Color"
+                          className="h-9 w-10 rounded border border-border bg-background cursor-pointer p-0.5"
+                        />
                         <Select
                           value={estado.tipo}
                           onValueChange={(v) => handleChangeTipo(estado.id, v as EstadoTipo)}
@@ -728,6 +748,13 @@ export default function ConfiguracionPage() {
                       value={nuevoEstado.nombre}
                       onChange={(e) => setNuevoEstado((p) => ({ ...p, nombre: e.target.value }))}
                       className="flex-1 min-w-[200px] bg-background"
+                    />
+                    <input
+                      type="color"
+                      value={nuevoEstado.color}
+                      onChange={(e) => setNuevoEstado((p) => ({ ...p, color: e.target.value }))}
+                      title="Color"
+                      className="h-9 w-10 rounded border border-border bg-background cursor-pointer p-0.5"
                     />
                     <Select
                       value={nuevoEstado.tipo}

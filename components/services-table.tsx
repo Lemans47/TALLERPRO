@@ -75,8 +75,16 @@ interface ServicesTableProps {
 
 export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }: ServicesTableProps) {
   const { toast } = useToast()
-  const { estados: estadosConfig, esCerrado } = useEstados()
+  const { estados: estadosConfig, esCerrado, colorOf } = useEstados()
   const estadosVisibles = estadosConfig.filter((e) => e.visible)
+
+  // Estilo del badge derivado del color hex configurado del estado.
+  // Usamos hex+alpha (1a≈10%, 4d≈30%) para fondo y borde sutiles, y el hex pleno
+  // para el texto, replicando el look "bg-X/10 text-X-400 border-X/30" original.
+  const badgeStyle = (estado: string): React.CSSProperties => {
+    const c = colorOf(estado)
+    return { backgroundColor: `${c}1a`, color: c, borderColor: `${c}4d` }
+  }
   const [filtroEstado, setFiltroEstado] = useState("todos")
   const [sortBy, setSortBy] = useState("fecha_desc")
   const [soloPendientes, setSoloPendientes] = useState(false)
@@ -160,21 +168,6 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
       console.error("Error:", error)
       toast({ title: "Error", description: "No se pudo eliminar", variant: "destructive" })
     }
-  }
-
-  const getEstadoStyles = (estado: string) => {
-    const styles: Record<string, string> = {
-      "En Cola": "bg-slate-500/10 text-slate-400 border-slate-500/30",
-      "En Proceso": "bg-blue-500/10 text-blue-400 border-blue-500/30",
-      "Esperando Repuestos": "bg-yellow-500/10 text-yellow-400 border-yellow-500/30",
-      "En Reparación": "bg-purple-500/10 text-purple-400 border-purple-500/30",
-      "Control de Calidad": "bg-indigo-500/10 text-indigo-400 border-indigo-500/30",
-      "Listo para Entrega": "bg-cyan-500/10 text-cyan-400 border-cyan-500/30",
-      Entregado: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
-      "Por Cobrar": "bg-orange-500/10 text-orange-400 border-orange-500/30",
-      "Cerrado/Pagado": "bg-green-500/10 text-green-400 border-green-500/30",
-    }
-    return styles[estado] || "bg-gray-500/10 text-gray-400 border-gray-500/30"
   }
 
   const ESTADO_ORDER = estadosConfig.map((e) => e.nombre)
@@ -426,7 +419,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                   <div className="flex items-center gap-2 flex-wrap">
                     <Car className="w-4 h-4 text-primary" />
                     <span className="font-bold text-lg">{servicio.patente}</span>
-                    <Badge className={getEstadoStyles(servicio.estado)}>{servicio.estado}</Badge>
+                    <Badge variant="outline" style={badgeStyle(servicio.estado)}>{servicio.estado}</Badge>
                     <span className="text-sm text-muted-foreground">
                       {servicio.marca} {servicio.modelo}
                     </span>
