@@ -171,7 +171,7 @@ export default function ClientesPage() {
             <p className="text-sm text-muted-foreground">{clientes.length} clientes registrados</p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="icon" onClick={cargarDatos} disabled={loading}>
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </Button>

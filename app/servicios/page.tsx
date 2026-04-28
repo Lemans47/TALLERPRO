@@ -59,13 +59,6 @@ export default function ServicesPage() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      // Asignar N° OT a servicios sin uno (idempotente)
-      try {
-        await fetch("/api/migrate-numero-ot", { method: "POST" })
-      } catch (e) {
-        console.error("migrate-numero-ot:", e)
-      }
-
       const [year, month] = selectedMonth.split("-").map(Number)
       // Servicios: del mes + activos historicos (filtrados server-side por estado).
       // Presupuestos: del mes + todos los demas (todos son activos hasta convertirse).
@@ -147,7 +140,7 @@ export default function ServicesPage() {
           </h1>
           <p className="text-muted-foreground mt-2">Gestiona los servicios y presupuestos del taller</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
             onClick={handleNuevoServicio}
             className="bg-primary hover:bg-primary/90 text-primary-foreground"

@@ -280,7 +280,7 @@ export default function ReportsPage() {
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Reportes y Análisis</h1>
           <p className="text-muted-foreground mt-1 capitalize">{monthName}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" onClick={loadData} disabled={loading}>
             <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
             Actualizar
@@ -313,18 +313,20 @@ export default function ReportsPage() {
 
       <Tabs defaultValue="resumen">
 
-        <TabsList className="mb-4">
-          <TabsTrigger value="resumen">Resumen</TabsTrigger>
-          <TabsTrigger value="rentabilidad">Rentabilidad</TabsTrigger>
-          <TabsTrigger value="pintura">Pintura</TabsTrigger>
-          <TabsTrigger value="clientes">Top Clientes</TabsTrigger>
-          <TabsTrigger value="iva">IVA</TabsTrigger>
-          <TabsTrigger value="comparar">Comparar meses</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto -mx-4 px-4 mb-4">
+          <TabsList className="w-max">
+            <TabsTrigger value="resumen">Resumen</TabsTrigger>
+            <TabsTrigger value="rentabilidad">Rentabilidad</TabsTrigger>
+            <TabsTrigger value="pintura">Pintura</TabsTrigger>
+            <TabsTrigger value="clientes">Top Clientes</TabsTrigger>
+            <TabsTrigger value="iva">IVA</TabsTrigger>
+            <TabsTrigger value="comparar">Comparar meses</TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="resumen" className="space-y-6">
       {/* Main KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -520,7 +522,7 @@ export default function ReportsPage() {
         {/* ── PINTURA ── */}
         <TabsContent value="pintura" className="space-y-6">
           {/* KPIs principales */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card>
               <CardContent className="pt-6">
                 <p className="text-sm text-muted-foreground">Unidades pintadas</p>

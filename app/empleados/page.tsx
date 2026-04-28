@@ -157,7 +157,7 @@ export default function EmpleadosPage() {
             <p className="text-sm text-muted-foreground">{MESES[month - 1]} {year} · {activosCount} activos</p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="icon" onClick={cargar} disabled={loading}>
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
@@ -171,7 +171,7 @@ export default function EmpleadosPage() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-card rounded-xl border p-4">
           <p className="text-xs text-muted-foreground mb-1">Total sueldos mes</p>
           <p className="text-xl font-bold">${totalSueldos.toLocaleString("es-CL")}</p>
