@@ -101,7 +101,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
   const handleEstadoChange = async (id: string, nuevoEstado: string) => {
     try {
       const updateData: Record<string, unknown> = { estado: nuevoEstado }
-      if (nuevoEstado === "Cerrado/Pagado") {
+      if (esCerrado(nuevoEstado)) {
         const servicio = servicios.find((s) => s.id === id)
         if (servicio) {
           const montoTotal = Number(servicio.monto_total) || 0
@@ -137,7 +137,10 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
         nuevoSaldo = Math.max(0, total - nuevoAnticipo)
       }
 
-      const nuevoEstado = nuevoSaldo <= 0 ? "Cerrado/Pagado" : servicioSeleccionado.estado
+      const estadoCerrado = estadosConfig
+        .filter((e) => e.tipo === "cerrado" && e.visible)
+        .sort((a, b) => a.orden - b.orden)[0]?.nombre ?? servicioSeleccionado.estado
+      const nuevoEstado = nuevoSaldo <= 0 ? estadoCerrado : servicioSeleccionado.estado
 
       await api.servicios.update(servicioSeleccionado.id, {
         anticipo: nuevoAnticipo,

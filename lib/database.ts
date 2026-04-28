@@ -107,15 +107,6 @@ export interface Gasto {
   updated_at: string
 }
 
-export interface Trabajador {
-  id: string
-  nombre: string
-  sueldo_base: number
-  activo: boolean
-  created_at: string
-  updated_at: string
-}
-
 export interface PrecioPintura {
   id: string
   precio_por_pieza: number
@@ -480,6 +471,19 @@ export async function convertPresupuestoToServicio(presupuestoId: string) {
     const presupuesto = presupuestoData[0] as Presupuesto
     if (!presupuesto) throw new Error("Presupuesto no encontrado")
 
+    // Resolver el estado activo inicial dinámicamente para que el rename de estados desde
+    // configuración no rompa la conversión de presupuestos.
+    const estadoInicialRow = await sql`
+      SELECT nombre FROM estados_servicio
+      WHERE tipo = 'activo' AND visible = true
+      ORDER BY orden ASC
+      LIMIT 1
+    `
+    const estadoInicial = (estadoInicialRow[0] as { nombre?: string } | undefined)?.nombre
+    if (!estadoInicial) {
+      throw new Error("No hay un estado de tipo 'activo' configurado para asignar al servicio nuevo")
+    }
+
     // Create servicio from presupuesto (atomically)
     const newServicio = await sql`
       INSERT INTO servicios (
@@ -493,7 +497,7 @@ export async function convertPresupuestoToServicio(presupuestoId: string) {
         ${presupuesto.cliente}, ${presupuesto.telefono || ""}, ${presupuesto.observaciones || ""},
         ${presupuesto.mano_obra_pintura || 0},
         ${safeJson(presupuesto.cobros)}, ${safeJson(presupuesto.costos)},
-        ${safeJson(presupuesto.piezas_pintura)}, 'En Cola', ${presupuesto.iva || "sin"},
+        ${safeJson(presupuesto.piezas_pintura)}, ${estadoInicial}, ${presupuesto.iva || "sin"},
         0, ${presupuesto.monto_total || 0}, ${presupuesto.monto_total || 0}, ${presupuesto.monto_total_sin_iva || 0},
         ${safeJson(presupuesto.observaciones_checkboxes || [])},
         '[]'::jsonb, '[]'::jsonb, nextval('servicios_numero_ot_seq')::int
@@ -532,16 +536,6 @@ export async function getGastosByMonth(year: number, month: number) {
   return data as Gasto[]
 }
 
-export async function getGastosByCategoria(categoria: string) {
-  const db = getSQL()
-  const data = await db`
-    SELECT * FROM gastos
-    WHERE categoria = ${categoria}
-    ORDER BY fecha DESC
-  `
-  return data as Gasto[]
-}
-
 export async function createGasto(gasto: Omit<Gasto, "id" | "created_at" | "updated_at">) {
   const db = getSQL()
   const pagado = gasto.pagado !== false // default true
@@ -574,45 +568,6 @@ export async function updateGasto(id: string, gasto: Partial<Gasto>) {
 export async function deleteGasto(id: string) {
   const db = getSQL()
   await db`DELETE FROM gastos WHERE id = ${id}`
-}
-
-// Trabajadores
-export async function getTrabajadores() {
-  const db = getSQL()
-  const data = await db`
-    SELECT * FROM trabajadores 
-    ORDER BY nombre ASC
-  `
-  return data as Trabajador[]
-}
-
-export async function createTrabajador(trabajador: Omit<Trabajador, "id" | "created_at" | "updated_at">) {
-  const db = getSQL()
-  const data = await db`
-    INSERT INTO trabajadores (nombre, sueldo_base, activo)
-    VALUES (${trabajador.nombre}, ${trabajador.sueldo_base}, ${trabajador.activo})
-    RETURNING *
-  `
-  return data[0] as Trabajador
-}
-
-export async function updateTrabajador(id: string, trabajador: Partial<Trabajador>) {
-  const db = getSQL()
-  const data = await db`
-    UPDATE trabajadores SET
-      nombre = COALESCE(${trabajador.nombre ?? null}, nombre),
-      sueldo_base = COALESCE(${trabajador.sueldo_base ?? null}, sueldo_base),
-      activo = COALESCE(${trabajador.activo ?? null}, activo),
-      updated_at = NOW()
-    WHERE id = ${id}
-    RETURNING *
-  `
-  return data[0] as Trabajador
-}
-
-export async function deleteTrabajador(id: string) {
-  const db = getSQL()
-  await db`DELETE FROM trabajadores WHERE id = ${id}`
 }
 
 // Empleados
@@ -976,6 +931,33 @@ export async function updateEstadoServicio(
     const [actual] = (await tx`SELECT * FROM estados_servicio WHERE id = ${id}`) as EstadoServicio[]
     if (!actual) throw new Error("Estado no encontrado")
 
+    // Bloquear que el cambio de tipo o de visibilidad deje sin estados visibles a un tipo crítico.
+    // Los tipos "activo" y "cerrado" son requeridos por la lógica de la app: asignar estado inicial
+    // al crear/convertir un servicio y auto-cerrar al pagar. Sin al menos uno visible, esa lógica falla.
+    const tipoNuevo = patch.tipo ?? actual.tipo
+    const visibleNuevo = patch.visible ?? actual.visible
+    const cambioCritico =
+      (patch.tipo !== undefined && patch.tipo !== actual.tipo) ||
+      (patch.visible !== undefined && patch.visible !== actual.visible)
+    if (cambioCritico) {
+      for (const tipo of ["activo", "cerrado"] as EstadoTipo[]) {
+        const eraDeEseTipoYVisible = actual.tipo === tipo && actual.visible
+        const seguiraSiendoDeEseTipoYVisible = tipoNuevo === tipo && visibleNuevo
+        if (eraDeEseTipoYVisible && !seguiraSiendoDeEseTipoYVisible) {
+          const [{ count }] = (await tx`
+            SELECT COUNT(*)::int AS count
+            FROM estados_servicio
+            WHERE tipo = ${tipo} AND visible = true AND id <> ${id}
+          `) as { count: number }[]
+          if (count === 0) {
+            throw new Error(
+              `No se puede modificar: dejaría al sistema sin ningún estado visible de tipo "${tipo}". Crea otro estado de ese tipo antes.`,
+            )
+          }
+        }
+      }
+    }
+
     if (patch.nombre && patch.nombre !== actual.nombre) {
       await tx`UPDATE servicios SET estado = ${patch.nombre} WHERE estado = ${actual.nombre}`
     }
@@ -1011,6 +993,20 @@ export async function deleteEstadoServicio(id: string, migrarA?: string) {
   return await db.begin(async (tx: any) => {
     const [actual] = (await tx`SELECT * FROM estados_servicio WHERE id = ${id}`) as EstadoServicio[]
     if (!actual) throw new Error("Estado no encontrado")
+
+    // Bloquear borrar el último estado visible de un tipo crítico (activo / cerrado).
+    if (actual.tipo === "activo" || actual.tipo === "cerrado") {
+      const [{ count: hermanos }] = (await tx`
+        SELECT COUNT(*)::int AS count
+        FROM estados_servicio
+        WHERE tipo = ${actual.tipo} AND visible = true AND id <> ${id}
+      `) as { count: number }[]
+      if (hermanos === 0) {
+        throw new Error(
+          `No se puede borrar: es el único estado visible de tipo "${actual.tipo}". Crea otro de ese tipo antes.`,
+        )
+      }
+    }
 
     const [{ count }] = (await tx`
       SELECT COUNT(*)::int AS count FROM servicios WHERE estado = ${actual.nombre}

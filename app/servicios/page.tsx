@@ -24,7 +24,7 @@ export default function ServicesPage() {
   const [loading, setLoading] = useState(true)
   const [showFormDialog, setShowFormDialog] = useState(false)
   const { selectedMonth } = useMonth()
-  const { esCerrado } = useEstados()
+  const { esCerrado, esActivo } = useEstados()
   const [serviciosOpen, setServiciosOpen] = useState(true)
   const [presupuestosOpen, setPresupuestosOpen] = useState(true)
   const [backfilling, setBackfilling] = useState(false)
@@ -202,7 +202,7 @@ export default function ServicesPage() {
               <Wrench className="w-4 h-4 text-success" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{servicios.filter((s) => s.estado !== "Cerrado/Pagado").length}</p>
+              <p className="text-2xl font-bold">{servicios.filter((s) => esActivo(s.estado)).length}</p>
               <p className="text-xs text-muted-foreground">En proceso</p>
             </div>
           </div>

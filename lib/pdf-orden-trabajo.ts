@@ -121,7 +121,7 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
   normal()
   doc.text(up(servicio.cliente), ML + 22, y + 4)
   doc.text(up(servicio.telefono || ""), ML + 22, y + RH + 4)
-  doc.text(up(servicio.estado || "En Cola"), MID + 20, y + RH + 4)
+  doc.text(up(servicio.estado || ""), MID + 20, y + RH + 4)
   if (servicio.observaciones) {
     const obs = doc.splitTextToSize(up(servicio.observaciones), CW - 22)
     doc.text(obs[0] || "", ML + 22, y + RH * 2 + 4)

@@ -79,15 +79,16 @@ export function useEstados(): EstadosCtx {
     // Permite usar el hook fuera del provider devolviendo el fallback estático.
     // Evita romper componentes en pruebas o storybooks.
     const fallbackColors = new Map(FALLBACK_ESTADOS.map((e) => [e.nombre, e.color]))
+    const fallbackHas = (tipo: EstadoTipo, nombre: string | null | undefined) =>
+      !!nombre && FALLBACK_ESTADOS.some((e) => e.tipo === tipo && e.nombre === nombre)
     return {
       estados: FALLBACK_ESTADOS,
       loading: false,
       reload: async () => {},
-      esCerrado: (n) => n === "Cerrado/Pagado",
-      esPorCobrar: (n) => n === "Entregado" || n === "Por Cobrar",
-      esFinalizado: (n) => n === "Cerrado/Pagado" || n === "Entregado" || n === "Por Cobrar",
-      esActivo: (n) =>
-        !!n && !(n === "Cerrado/Pagado" || n === "Entregado" || n === "Por Cobrar"),
+      esCerrado: (n) => fallbackHas("cerrado", n),
+      esPorCobrar: (n) => fallbackHas("por_cobrar", n),
+      esFinalizado: (n) => fallbackHas("cerrado", n) || fallbackHas("por_cobrar", n),
+      esActivo: (n) => fallbackHas("activo", n),
       nombresPorTipo: (tipos) => FALLBACK_ESTADOS.filter((e) => tipos.includes(e.tipo)).map((e) => e.nombre),
       colorOf: (n) => (n && fallbackColors.get(n)) || "#6b7280",
     }

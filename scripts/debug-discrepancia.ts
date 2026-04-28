@@ -30,6 +30,10 @@ async function main() {
   const lastDay = new Date(year, month, 0).getDate()
   const endDate = `${year}-${String(month).padStart(2, "0")}-${lastDay}`
 
+  // Resolver nombres de estado tipo "cerrado" dinámicamente.
+  const cerradoRows: any[] = await sql`SELECT nombre FROM estados_servicio WHERE tipo = 'cerrado'`
+  const nombresCerrado = new Set(cerradoRows.map((r) => r.nombre))
+
   const servicios: any[] = await sql`
     SELECT id, numero_ot, patente, cliente, estado,
            monto_total_sin_iva::numeric AS monto,
@@ -54,7 +58,7 @@ async function main() {
     const monto = Number(s.monto)
     const anticipo = Number(s.anticipo)
     const saldo = Number(s.saldo)
-    const esCerrado = s.estado === "Cerrado/Pagado"
+    const esCerrado = nombresCerrado.has(s.estado)
     const esFacturado = monto > 0
 
     if (esFacturado) totalFacturado += monto

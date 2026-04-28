@@ -17,6 +17,7 @@ import { Users, Search, Pencil, Trash2, Plus, Car, Phone, Mail, RefreshCw, X, Gi
 import { api, type Cliente, type Vehiculo } from "@/lib/api-client"
 import { formatFechaDMA } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
+import { useEstados } from "@/lib/estados"
 
 type ServicioHistorial = {
   id: string
@@ -36,6 +37,7 @@ type VehiculoConCliente = Vehiculo & { cliente?: Cliente }
 
 export default function ClientesPage() {
   const { role } = useAuth()
+  const { colorOf } = useEstados()
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [vehiculos, setVehiculos] = useState<VehiculoConCliente[]>([])
   const [loading, setLoading] = useState(true)
@@ -323,12 +325,7 @@ export default function ClientesPage() {
               {historialData.map((s) => {
                 const fecha = formatFechaDMA(s.fecha_ingreso)
                 const expanded = expandedServicio === s.id
-                const estadoColor: Record<string, string> = {
-                  "Pagado": "bg-green-500/20 text-green-400",
-                  "Cerrado": "bg-blue-500/20 text-blue-400",
-                  "En Proceso": "bg-yellow-500/20 text-yellow-400",
-                  "En Cola": "bg-gray-500/20 text-gray-400",
-                }
+                const estadoHex = colorOf(s.estado)
                 return (
                   <div key={s.id} className="border border-border rounded-lg overflow-hidden">
                     <button
@@ -342,7 +339,10 @@ export default function ClientesPage() {
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <span className="text-sm font-semibold">${Number(s.monto_total).toLocaleString("es-CL")}</span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${estadoColor[s.estado] || "bg-muted text-muted-foreground"}`}>
+                        <span
+                          className="text-xs px-2 py-0.5 rounded-full font-medium"
+                          style={{ backgroundColor: `${estadoHex}33`, color: estadoHex }}
+                        >
                           {s.estado}
                         </span>
                         {expanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}

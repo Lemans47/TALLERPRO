@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getSQL } from "@/lib/database"
+import { getSQL, getNombresEstadosPorTipo } from "@/lib/database"
 
 export const dynamic = "force-dynamic"
 
@@ -8,6 +8,9 @@ export const dynamic = "force-dynamic"
 export async function GET() {
   try {
     const db = getSQL()
+    // Resolver nombres de estados "cerrado" dinámicamente para que el rename desde
+    // configuración no haga que el cobrado quede en 0.
+    const nombresCerrado = await getNombresEstadosPorTipo(["cerrado"])
 
     const rows = await db`
       WITH meses AS (
@@ -22,7 +25,7 @@ export async function GET() {
           date_trunc('month', fecha_ingreso::date)::date AS mes,
           COALESCE(SUM(CASE WHEN monto_total_sin_iva > 0 THEN monto_total_sin_iva ELSE 0 END), 0) AS facturado,
           COALESCE(SUM(
-            CASE WHEN estado = 'Cerrado/Pagado' THEN monto_total_sin_iva
+            CASE WHEN estado = ANY(${nombresCerrado}::text[]) THEN monto_total_sin_iva
                  ELSE COALESCE(anticipo, 0) END
           ), 0) AS cobrado,
           COALESCE(SUM(

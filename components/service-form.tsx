@@ -56,10 +56,6 @@ interface ServiceFormProps {
   onSaved: () => void
 }
 
-// La lista canónica vive en la tabla `estados_servicio` (ver `lib/estados.ts`).
-// Aquí solo se conserva un default para el primer render del formulario.
-const ESTADO_DEFAULT = "En Cola"
-
 interface ItemDetalle {
   id: string
   descripcion: string
@@ -97,6 +93,11 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   const { toast } = useToast() // Declare useToast hook
   const { estados: estadosConfig, esCerrado } = useEstados()
   const estadosVisibles = estadosConfig.filter((e) => e.visible)
+  // Primer estado activo visible (por orden). Es el "estado inicial" que asume un servicio nuevo.
+  const estadoDefault =
+    estadosConfig
+      .filter((e) => e.tipo === "activo" && e.visible)
+      .sort((a, b) => a.orden - b.orden)[0]?.nombre ?? ""
   const [loading, setLoading] = useState(false)
   const submittingRef = useRef(false)
   const [pdfFormatDialog, setPdfFormatDialog] = useState(false)
@@ -145,7 +146,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
     cliente: "",
     telefono: "",
     observaciones: "",
-    estado: ESTADO_DEFAULT,
+    estado: estadoDefault,
     iva: "sin",
     anticipo: 0,
     detalle_pendiente: false,
@@ -293,7 +294,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         cliente: servicioAEditar.cliente,
         telefono: servicioAEditar.telefono || "",
         observaciones: servicioAEditar.observaciones || "",
-        estado: servicioAEditar.estado || ESTADO_DEFAULT,
+        estado: servicioAEditar.estado || estadoDefault,
         iva: servicioAEditar.iva || "sin",
         anticipo: Number(servicioAEditar.anticipo) || 0,
         detalle_pendiente: Boolean((servicioAEditar as any).detalle_pendiente) || false,
@@ -438,7 +439,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       cliente: "",
       telefono: "",
       observaciones: "",
-      estado: ESTADO_DEFAULT,
+      estado: estadoDefault,
       iva: "sin",
       anticipo: 0,
       detalle_pendiente: false,
