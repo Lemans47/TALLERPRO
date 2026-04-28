@@ -137,38 +137,6 @@ export default function DashboardPage() {
   const [showFacturasPendientes, setShowFacturasPendientes] = useState(false)
   const { selectedMonth } = useMonth()
 
-  // Migraciones únicas (una sola vez por navegador, gated con localStorage).
-  // Los servicios nuevos ya reciben numero_ot al crearse (via servicios_numero_ot_seq),
-  // así que migrate-numero-ot es solo backfill histórico — no hace falta en cada carga.
-  useEffect(() => {
-    if (!localStorage.getItem("mano_obra_migrated")) {
-      const tarifa = Number(localStorage.getItem("mano_obra_pintura_default") || 0)
-      if (tarifa > 0) {
-        fetch("/api/migrate-mano-obra", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tarifa }),
-        })
-          .then((r) => r.json())
-          .then((data) => {
-            console.log("Migración mano de obra:", data)
-            localStorage.setItem("mano_obra_migrated", "true")
-          })
-          .catch(console.error)
-      }
-    }
-
-    if (!localStorage.getItem("numero_ot_migrated")) {
-      fetch("/api/migrate-numero-ot", { method: "POST" })
-        .then((r) => r.ok ? r.json() : null)
-        .then((data) => {
-          if (data?.backfilled > 0) console.log("N° OT asignados:", data.backfilled)
-          localStorage.setItem("numero_ot_migrated", "true")
-        })
-        .catch((e) => console.error("migrate-numero-ot:", e))
-    }
-  }, [])
-
   useEffect(() => {
     loadData()
   }, [selectedMonth])
@@ -694,7 +662,7 @@ export default function DashboardPage() {
           <VehiclePipeline servicios={serviciosActivos} />
         </div>
         <div className="flex flex-col gap-4">
-          <PendingPaymentsAlert servicios={serviciosActivos} maxItems={3} />
+          <PendingPaymentsAlert servicios={servicios} maxItems={3} />
           <PendingExpensesAlert gastos={gastos} maxItems={3} />
           <div className="rounded-xl border border-border bg-card p-4 space-y-2">
             <p className="text-sm font-semibold text-muted-foreground">Acciones Rápidas</p>
