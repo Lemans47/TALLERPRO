@@ -62,7 +62,7 @@ function computeKpis(
     ),
   ).sort((a, b) => b.monto - a.monto)
 
-  // sueldosComprometidos: sueldo_base proyectado (dashboard) o abonos reales del mes (reportes)
+  // sueldosPagados: abonos reales del mes (cash flow real, no proyeccion)
   const sueldosComprometidos = abonosMes
     ? abonosMes.reduce((s, a) => s + Number(a.monto || 0), 0)
     : (empleados as { activo: boolean; sueldo_base: number }[])
@@ -133,14 +133,12 @@ export async function GET(request: Request) {
     const year = Number.parseInt(searchParams.get("year") || new Date().getFullYear().toString())
     const month = Number.parseInt(searchParams.get("month") || (new Date().getMonth() + 1).toString())
 
-    const useAbonos = searchParams.get("useAbonos") === "true"
-
     const [servicios, gastos, empleados, serviciosActivos, abonosMes, entregadosMes, serviciosFacturadosMes, facturasPendientes, finalizadosNombres] = await Promise.all([
       getServiciosByMonth(year, month),
       getGastosByMonth(year, month),
       getEmpleados(),
       getActiveServicios(),
-      useAbonos ? getAbonosByMonth(year, month) : Promise.resolve(undefined),
+      getAbonosByMonth(year, month),
       getEntregadosByMonth(year, month),
       getServiciosFacturadosByMes(year, month),
       getFacturasPendientesEmitir(),
@@ -148,9 +146,9 @@ export async function GET(request: Request) {
     ])
     const estadosFinalizados = new Set(finalizadosNombres)
 
-    const kpis = computeKpis(servicios, gastos, empleados, estadosFinalizados, abonosMes ?? undefined)
+    const kpis = computeKpis(servicios, gastos, empleados, estadosFinalizados, abonosMes)
 
-    return NextResponse.json({ servicios, gastos, empleados, serviciosActivos, kpis, entregadosMes: entregadosMes.length, serviciosFacturadosMes, facturasPendientes })
+    return NextResponse.json({ servicios, gastos, empleados, serviciosActivos, abonosMes, kpis, entregadosMes: entregadosMes.length, serviciosFacturadosMes, facturasPendientes })
   } catch (error) {
     console.error("Dashboard API error:", error)
     return NextResponse.json({ error: "Error loading dashboard data" }, { status: 500 })

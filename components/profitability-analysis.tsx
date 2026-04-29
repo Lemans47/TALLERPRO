@@ -68,8 +68,8 @@ export function ProfitabilityAnalysis() {
         const [year, month] = selectedMonth.split("-").map(Number)
         const prevDate = new Date(year, month - 2, 1)
         const [current, prev] = await Promise.all([
-          fetchDashboardData(year, month, { useAbonos: true }),
-          fetchDashboardData(prevDate.getFullYear(), prevDate.getMonth() + 1, { useAbonos: true }),
+          fetchDashboardData(year, month),
+          fetchDashboardData(prevDate.getFullYear(), prevDate.getMonth() + 1),
         ])
         setKpis((current as any).kpis ?? null)
         const prevData = (prev as any).kpis ?? null

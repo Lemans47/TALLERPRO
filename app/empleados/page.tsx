@@ -124,7 +124,7 @@ export default function EmpleadosPage() {
       })
       setAbonoDialog(false)
       await cargar()
-      toast({ title: "Abono registrado", description: "Se registró en Gastos > Sueldos" })
+      toast({ title: "Abono registrado" })
     } catch { toast({ title: "Error al registrar abono", variant: "destructive" }) }
     finally { setGuardando(false) }
   }

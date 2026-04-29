@@ -18,7 +18,7 @@ import {
 } from "lucide-react"
 import { useMonth } from "@/lib/month-context"
 import { fetchDashboardData } from "@/lib/api-client"
-import type { Servicio, Gasto, Empleado } from "@/lib/database"
+import type { Servicio, Gasto, Empleado, AbonoEmpleado } from "@/lib/database"
 import { useAuth } from "@/lib/auth-context"
 import { useEstados } from "@/lib/estados"
 import { extraerIvaIncluido } from "@/lib/utils"
@@ -159,12 +159,12 @@ export default function DashboardPage() {
     try {
       const [year, month] = selectedMonth.split("-").map(Number)
       const response = await fetchDashboardData(year, month)
-      const { servicios: serviciosData, gastos: gastosData, empleados: empleadosData, serviciosActivos: activosData, kpis: apiKpis, entregadosMes, serviciosFacturadosMes, facturasPendientes: pendientesData } = response
+      const { servicios: serviciosData, gastos: gastosData, empleados: empleadosData, serviciosActivos: activosData, abonosMes, kpis: apiKpis, entregadosMes, serviciosFacturadosMes, facturasPendientes: pendientesData } = response
       setServicios(serviciosData)
       setServiciosActivos(activosData)
       setGastos(gastosData)
       setFacturasPendientes(pendientesData || [])
-      calculateKPIs(serviciosData, gastosData, empleadosData, activosData, apiKpis, entregadosMes, serviciosFacturadosMes)
+      calculateKPIs(serviciosData, gastosData, empleadosData, activosData, abonosMes, apiKpis, entregadosMes, serviciosFacturadosMes)
     } catch (error) {
       console.error("Error loading dashboard data:", error)
     } finally {
@@ -172,7 +172,7 @@ export default function DashboardPage() {
     }
   }
 
-  const calculateKPIs = (servicios: Servicio[], gastos: Gasto[], empleados: Empleado[], serviciosActivos: Servicio[], apiKpis?: any, entregadosMes?: number, serviciosFacturadosMes?: Servicio[]) => {
+  const calculateKPIs = (servicios: Servicio[], gastos: Gasto[], empleados: Empleado[], serviciosActivos: Servicio[], abonosMes: AbonoEmpleado[] = [], apiKpis?: any, entregadosMes?: number, serviciosFacturadosMes?: Servicio[]) => {
     const parseArr = (v: any): any[] => {
       if (Array.isArray(v)) return v
       if (typeof v === "string" && v) {
@@ -237,8 +237,10 @@ export default function DashboardPage() {
         .reduce((c: number, costo: any) => c + Number(costo.monto || 0), 0)
     }, 0)
 
-    // Sueldos comprometidos (empleados activos)
-    const sueldosComprometidos = empleados
+    // Sueldos pagados: abonos reales del mes (para cash flow / Flujo de Caja)
+    const sueldosPagados = abonosMes.reduce((sum, a) => sum + Number(a.monto || 0), 0)
+    // Sueldos devengados: sueldo_base de empleados activos (para margen contable)
+    const sueldosDevengados = empleados
       .filter((e) => e.activo)
       .reduce((sum, e) => sum + Number(e.sueldo_base || 0), 0)
 
@@ -268,14 +270,14 @@ export default function DashboardPage() {
       .filter((s) => !esCerrado(s.estado))
       .reduce((s, sv) => s + Number(sv.anticipo || 0), 0)
     const flujoEntradas = ingresosCobrado + anticiposNoCerrados
-    const flujoSalidas = gastosOperacionales + costosCerrados + sueldosComprometidos
+    const flujoSalidas = gastosOperacionales + costosCerrados + sueldosPagados
     const flujoCaja = flujoEntradas - flujoSalidas
     // Pagado: dinero efectivamente recibido en el mes. Igual a flujoEntradas
     // para que el dato coincida en card Facturado y card Flujo de Caja.
     const pagadoMes = flujoEntradas
 
-    // ---- KPI 3: Margen de ganancia (consistente con gráfico: ingresos vs todos los gastos) ----
-    const gastosTotalMes = costosFacturados + gastosOperacionales + sueldosComprometidos
+    // ---- KPI 3: Margen de ganancia (criterio devengado: sueldos completos del mes) ----
+    const gastosTotalMes = costosFacturados + gastosOperacionales + sueldosDevengados
     const margenGanancia = ingresosFacturado > 0
       ? ((ingresosFacturado - gastosTotalMes) / ingresosFacturado) * 100
       : 0
@@ -440,6 +442,7 @@ export default function DashboardPage() {
           return (
             <KPICard
               title="Facturado del Mes"
+              tooltip="Margen contable (criterio devengado): incluye TODOS los costos del mes — servicios facturados (cerrados + en proceso), gastos operacionales y sueldos completos por empleados activos, hayan sido pagados o no."
               value={formatCurrency(kpis.ingresosFacturado)}
               icon={isPositive ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
               variant={margenVariant}
@@ -447,7 +450,7 @@ export default function DashboardPage() {
               stats={[
                 { label: "Pagado", value: formatCurrency(kpis.pagadoMes) },
                 { label: "Pendiente", value: formatCurrency(kpis.pendienteMes) },
-                { label: "Gastos", value: formatCurrency(kpis.gastosTotalMes) },
+                { label: "Costos totales", value: formatCurrency(kpis.gastosTotalMes) },
                 { label: "Margen", value: formatCurrency(margenNeto), highlight: true },
               ]}
             />
@@ -455,13 +458,13 @@ export default function DashboardPage() {
         })()}
         <KPICard
           title="Flujo de Caja"
+          tooltip="Cash flow real del mes: solo cuenta dinero efectivamente movido — costos de servicios cerrados, gastos operacionales pagados y sueldos abonados (no proyectados)."
           value={`${kpis.flujoCaja < 0 ? "-" : ""}${formatCurrency(kpis.flujoCaja)}`}
           icon={<ArrowUpDown className="w-5 h-5" />}
           variant={kpis.flujoCaja >= 0 ? "success" : "destructive"}
           stats={[
             { label: "Entradas", value: formatCurrency(kpis.flujoEntradas) },
-            { label: "Salidas", value: formatCurrency(kpis.flujoSalidas) },
-            { label: "Neto", value: `${kpis.flujoCaja < 0 ? "-" : ""}${formatCurrency(kpis.flujoCaja)}`, highlight: true },
+            { label: "Salidas (cerrados)", value: formatCurrency(kpis.flujoSalidas) },
           ]}
         />
         <KPICard

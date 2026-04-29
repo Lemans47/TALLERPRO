@@ -1,6 +1,7 @@
 import type React from "react"
-import { TrendingUp, TrendingDown } from "lucide-react"
+import { TrendingUp, TrendingDown, Info } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 type Variant = "default" | "success" | "warning" | "destructive"
 
@@ -23,6 +24,7 @@ interface KPICardProps {
   variant?: Variant
   badge?: KPIBadge
   stats?: KPIStat[]
+  tooltip?: string
 }
 
 const variantStyles: Record<Variant, string> = {
@@ -53,7 +55,7 @@ const badgeStyles: Record<Variant, string> = {
   destructive: "text-destructive bg-destructive/10",
 }
 
-export function KPICard({ title, value, description, icon, variant = "default", badge, stats }: KPICardProps) {
+export function KPICard({ title, value, description, icon, variant = "default", badge, stats, tooltip }: KPICardProps) {
   return (
     <div
       className={cn(
@@ -62,7 +64,25 @@ export function KPICard({ title, value, description, icon, variant = "default", 
       )}
     >
       <div className="flex items-start justify-between gap-4">
-        <p className="text-sm font-medium text-muted-foreground truncate">{title}</p>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <p className="text-sm font-medium text-muted-foreground truncate">{title}</p>
+          {tooltip && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  aria-label={`Info sobre ${title}`}
+                  className="text-muted-foreground/60 hover:text-muted-foreground transition-colors shrink-0"
+                >
+                  <Info className="w-3.5 h-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed">
+                {tooltip}
+              </TooltipContent>
+            </Tooltip>
+          )}
+        </div>
         {icon && <div className={cn("p-2.5 rounded-xl shrink-0", iconStyles[variant])}>{icon}</div>}
       </div>
 

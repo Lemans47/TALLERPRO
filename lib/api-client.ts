@@ -1,4 +1,4 @@
-import type { Servicio, Presupuesto, Gasto, PrecioPintura, PiezaPintura, FotoServicio, Cliente, Vehiculo, Empleado, EstadoServicio, EstadoTipo } from "./database"
+import type { Servicio, Presupuesto, Gasto, PrecioPintura, PiezaPintura, FotoServicio, Cliente, Vehiculo, Empleado, AbonoEmpleado, EstadoServicio, EstadoTipo } from "./database"
 
 // Patentes Chile — Boostr.cl
 export interface VehiculoLookup {
@@ -23,10 +23,8 @@ export async function lookupPatente(patente: string): Promise<VehiculoLookup | n
 export async function fetchDashboardData(
   year: number,
   month: number,
-  options?: { useAbonos?: boolean },
-): Promise<{ servicios: Servicio[]; gastos: Gasto[]; empleados: Empleado[]; serviciosActivos: Servicio[]; kpis: any; entregadosMes: number; serviciosFacturadosMes: Servicio[]; facturasPendientes: Servicio[] }> {
+): Promise<{ servicios: Servicio[]; gastos: Gasto[]; empleados: Empleado[]; serviciosActivos: Servicio[]; abonosMes: AbonoEmpleado[]; kpis: any; entregadosMes: number; serviciosFacturadosMes: Servicio[]; facturasPendientes: Servicio[] }> {
   const params = new URLSearchParams({ year: String(year), month: String(month) })
-  if (options?.useAbonos) params.set("useAbonos", "true")
   const res = await fetch(`/api/dashboard?${params}`, { cache: "no-store" })
   if (!res.ok) throw new Error("Error fetching dashboard data")
   return res.json()
