@@ -11,7 +11,7 @@ import { useAuth } from "@/lib/auth-context"
 const allNavItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "supervisor", "operador"] },
   { href: "/servicios", label: "Servicios", icon: Wrench, roles: ["admin", "supervisor", "operador"] },
-  { href: "/gastos", label: "Gastos", icon: Receipt, roles: ["admin", "supervisor", "operador"] },
+  { href: "/gastos", label: "Gastos", icon: Receipt, roles: ["admin", "operador"] },
   { href: "/clientes", label: "Clientes", icon: Users, roles: ["admin", "supervisor", "operador"] },
   { href: "/empleados", label: "Empleados", icon: UserCheck, roles: ["admin", "supervisor"] },
   { href: "/reportes", label: "Reportes", icon: BarChart3, roles: ["admin", "supervisor"] },

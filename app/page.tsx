@@ -92,6 +92,8 @@ export default function DashboardPage() {
   const { role } = useAuth()
   const { esCerrado, esPorCobrar, esFinalizado, nombresPorTipo } = useEstados()
   const isOperador = role === "operador"
+  const isSupervisor = role === "supervisor"
+  const isVistaSimple = isOperador || isSupervisor
   const [kpis, setKpis] = useState<KPIs>({
     vehiculosEnTaller: 0,
     vehiculosDesglose: "",
@@ -412,12 +414,14 @@ export default function DashboardPage() {
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
-          <Link href="/servicios">
-            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm">
-              <Plus className="w-4 h-4 mr-2" />
-              Nuevo Servicio
-            </Button>
-          </Link>
+          {!isVistaSimple && (
+            <Link href="/servicios">
+              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm">
+                <Plus className="w-4 h-4 mr-2" />
+                Nuevo Servicio
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
 
@@ -446,8 +450,8 @@ export default function DashboardPage() {
               value={formatCurrency(kpis.ingresosFacturado)}
               icon={isPositive ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
               variant={margenVariant}
-              badge={{ text: `${kpis.margenGanancia.toFixed(1)}%`, trend: isPositive ? "up" : "down" }}
-              stats={[
+              badge={isVistaSimple ? undefined : { text: `${kpis.margenGanancia.toFixed(1)}%`, trend: isPositive ? "up" : "down" }}
+              stats={isVistaSimple ? undefined : [
                 { label: "Pagado", value: formatCurrency(kpis.pagadoMes) },
                 { label: "Pendiente", value: formatCurrency(kpis.pendienteMes) },
                 { label: "Costos totales", value: formatCurrency(kpis.gastosTotalMes) },
@@ -456,17 +460,19 @@ export default function DashboardPage() {
             />
           )
         })()}
-        <KPICard
-          title="Flujo de Caja"
-          tooltip="Cash flow real del mes: solo cuenta dinero efectivamente movido — costos de servicios cerrados, gastos operacionales pagados y sueldos abonados (no proyectados)."
-          value={`${kpis.flujoCaja < 0 ? "-" : ""}${formatCurrency(kpis.flujoCaja)}`}
-          icon={<ArrowUpDown className="w-5 h-5" />}
-          variant={kpis.flujoCaja >= 0 ? "success" : "destructive"}
-          stats={[
-            { label: "Entradas", value: formatCurrency(kpis.flujoEntradas) },
-            { label: "Salidas (cerrados)", value: formatCurrency(kpis.flujoSalidas) },
-          ]}
-        />
+        {!isVistaSimple && (
+          <KPICard
+            title="Flujo de Caja"
+            tooltip="Cash flow real del mes: solo cuenta dinero efectivamente movido — costos de servicios cerrados, gastos operacionales pagados y sueldos abonados (no proyectados)."
+            value={`${kpis.flujoCaja < 0 ? "-" : ""}${formatCurrency(kpis.flujoCaja)}`}
+            icon={<ArrowUpDown className="w-5 h-5" />}
+            variant={kpis.flujoCaja >= 0 ? "success" : "destructive"}
+            stats={[
+              { label: "Entradas", value: formatCurrency(kpis.flujoEntradas) },
+              { label: "Salidas (cerrados)", value: formatCurrency(kpis.flujoSalidas) },
+            ]}
+          />
+        )}
         <KPICard
           title="Entregados este Mes"
           value={kpis.entregadosEsteMes.toString()}
@@ -617,7 +623,7 @@ export default function DashboardPage() {
       })()}
 
       {/* KPIs Pintura */}
-      {!isOperador && kpis.piezasPintadas > 0 && (
+      {!isVistaSimple && kpis.piezasPintadas > 0 && (
         <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center gap-2 mb-4">
             <div className="p-2 rounded-lg bg-purple-500/10">
@@ -688,8 +694,8 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* KPIs secundarios (solo no-operador) */}
-      {!isOperador && (
+      {/* KPIs secundarios (solo no-operador, no-supervisor) */}
+      {!isVistaSimple && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <KPICard
             title="Tasa de Cierre"

@@ -183,7 +183,7 @@ export default function ClientesPage() {
               {deduplicando ? "Limpiando..." : "Limpiar duplicados"}
             </Button>
           )}
-          {(role === "admin" || role === "supervisor") && (
+          {role === "admin" && (
             <Button onClick={abrirNuevo}>
               <Plus className="w-4 h-4 mr-2" />
               Nuevo cliente
@@ -239,7 +239,7 @@ export default function ClientesPage() {
                       >
                         <History className="w-3.5 h-3.5" />
                       </Button>
-                      {(role === "admin" || role === "supervisor") && (
+                      {role === "admin" && (
                         <>
                           <Button
                             variant="ghost"

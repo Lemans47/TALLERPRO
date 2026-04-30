@@ -39,7 +39,7 @@ export default function EmpleadosPage() {
   const [abonoFecha, setAbonoFecha] = useState(new Date().toISOString().split("T")[0])
   const [abonoNota, setAbonoNota] = useState("")
 
-  const canEdit = role === "admin" || role === "supervisor"
+  const canEdit = role === "admin"
 
   const cargar = useCallback(async () => {
     setLoading(true)

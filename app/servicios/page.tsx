@@ -11,6 +11,7 @@ import { SearchBar } from "@/components/search-bar"
 import { useMonth } from "@/lib/month-context"
 import { api, type Servicio, type Presupuesto } from "@/lib/api-client"
 import { useEstados } from "@/lib/estados"
+import { useAuth } from "@/lib/auth-context"
 import { RefreshCw, Wrench, FileText, ClipboardList, Plus, ChevronUp, ChevronDown, Calendar } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -25,6 +26,8 @@ export default function ServicesPage() {
   const [showFormDialog, setShowFormDialog] = useState(false)
   const { selectedMonth } = useMonth()
   const { esCerrado, esActivo } = useEstados()
+  const { role } = useAuth()
+  const canEdit = role !== "supervisor"
   const [serviciosOpen, setServiciosOpen] = useState(true)
   const [presupuestosOpen, setPresupuestosOpen] = useState(true)
   const [backfilling, setBackfilling] = useState(false)
@@ -141,13 +144,15 @@ export default function ServicesPage() {
           <p className="text-muted-foreground mt-2">Gestiona los servicios y presupuestos del taller</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button
-            onClick={handleNuevoServicio}
-            className="bg-primary hover:bg-primary/90 text-primary-foreground"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Nuevo Servicio
-          </Button>
+          {canEdit && (
+            <Button
+              onClick={handleNuevoServicio}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Nuevo Servicio
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -158,17 +163,19 @@ export default function ServicesPage() {
             <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
             Actualizar
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleBackfillRevTecnica}
-            disabled={backfilling}
-            className="border-border hover:bg-secondary bg-transparent"
-            title="Consulta la API para completar el mes de revisión técnica en todos los vehículos existentes"
-          >
-            <Calendar className={`w-4 h-4 mr-2 ${backfilling ? "animate-pulse" : ""}`} />
-            {backfilling ? "Actualizando..." : "Rev. Técnica"}
-          </Button>
+          {canEdit && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleBackfillRevTecnica}
+              disabled={backfilling}
+              className="border-border hover:bg-secondary bg-transparent"
+              title="Consulta la API para completar el mes de revisión técnica en todos los vehículos existentes"
+            >
+              <Calendar className={`w-4 h-4 mr-2 ${backfilling ? "animate-pulse" : ""}`} />
+              {backfilling ? "Actualizando..." : "Rev. Técnica"}
+            </Button>
+          )}
         </div>
       </div>
 

@@ -10,6 +10,7 @@ import { api, type Presupuesto } from "@/lib/api-client"
 import { formatFechaDMA } from "@/lib/utils"
 import { generarPDFPresupuesto } from "@/lib/pdf-presupuesto"
 import { PDFPreviewModal } from "@/components/pdf-preview-modal"
+import { useAuth } from "@/lib/auth-context"
 
 interface PresupuestosTableProps {
   presupuestos: Presupuesto[]
@@ -20,6 +21,8 @@ interface PresupuestosTableProps {
 
 export function PresupuestosTable({ presupuestos, onEditPresupuesto, onConverted, loading }: PresupuestosTableProps) {
   const { toast } = useToast()
+  const { role } = useAuth()
+  const canEdit = role !== "supervisor"
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false)
   const [presupuestoParaPdf, setPresupuestoParaPdf] = useState<Presupuesto | null>(null)
   const [pdfPreview, setPdfPreview] = useState<{ url: string; fileName: string } | null>(null)
@@ -172,22 +175,26 @@ export function PresupuestosTable({ presupuestos, onEditPresupuesto, onConverted
                   </div>
 
                   <div className="flex gap-1.5">
-                    <Button
-                      size="sm"
-                      onClick={() => handleConvertir(presupuesto)}
-                      className="gap-1.5 bg-success hover:bg-success/90 text-success-foreground shadow-lg shadow-success/20"
-                    >
-                      <CheckCircle className="w-4 h-4" />
-                      Ingresar
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-9 w-9 bg-transparent border-border hover:bg-secondary"
-                      onClick={() => onEditPresupuesto(presupuesto)}
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
+                    {canEdit && (
+                      <Button
+                        size="sm"
+                        onClick={() => handleConvertir(presupuesto)}
+                        className="gap-1.5 bg-success hover:bg-success/90 text-success-foreground shadow-lg shadow-success/20"
+                      >
+                        <CheckCircle className="w-4 h-4" />
+                        Ingresar
+                      </Button>
+                    )}
+                    {canEdit && (
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-9 bg-transparent border-border hover:bg-secondary"
+                        onClick={() => onEditPresupuesto(presupuesto)}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       size="icon"
@@ -197,14 +204,16 @@ export function PresupuestosTable({ presupuestos, onEditPresupuesto, onConverted
                     >
                       <FileText className="w-4 h-4" />
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-9 w-9 border-destructive/30 text-destructive bg-destructive/5 hover:bg-destructive/10"
-                      onClick={() => handleDelete(presupuesto)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    {canEdit && (
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-9 border-destructive/30 text-destructive bg-destructive/5 hover:bg-destructive/10"
+                        onClick={() => handleDelete(presupuesto)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>

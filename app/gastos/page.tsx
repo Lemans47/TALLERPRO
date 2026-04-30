@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { ExpenseForm } from "@/components/expense-form"
 import { ExpensesTable } from "@/components/expenses-table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -12,13 +13,17 @@ import { useAuth } from "@/lib/auth-context"
 import { GastosFijosPlantillas } from "@/components/gastos-fijos-plantillas"
 
 const ALL_CATEGORIAS = [
-  { id: "Gastos de Pintura", label: "Pintura", icon: Paintbrush, color: "text-purple-400", roles: ["admin", "supervisor", "operador"] },
-  { id: "Gastos Misceláneos", label: "Misceláneos", icon: Wrench, color: "text-blue-400", roles: ["admin", "supervisor", "operador"] },
-  { id: "Gastos Fijos", label: "Fijos", icon: Home, color: "text-orange-400", roles: ["admin", "supervisor"] },
+  { id: "Gastos de Pintura", label: "Pintura", icon: Paintbrush, color: "text-purple-400", roles: ["admin", "operador"] },
+  { id: "Gastos Misceláneos", label: "Misceláneos", icon: Wrench, color: "text-blue-400", roles: ["admin", "operador"] },
+  { id: "Gastos Fijos", label: "Fijos", icon: Home, color: "text-orange-400", roles: ["admin"] },
 ]
 
 export default function ExpensesPage() {
-  const { role } = useAuth()
+  const { role, loading: authLoading } = useAuth()
+  const router = useRouter()
+  useEffect(() => {
+    if (!authLoading && role === "supervisor") router.replace("/")
+  }, [authLoading, role, router])
   const CATEGORIAS = ALL_CATEGORIAS.filter((c) => role && c.roles.includes(role))
   const [activeCategory, setActiveCategory] = useState("Gastos de Pintura")
   const [gastoAEditar, setGastoAEditar] = useState<Gasto | null>(null)
@@ -64,6 +69,8 @@ export default function ExpensesPage() {
   )
 
   const totalGastos = gastos.reduce((sum, g) => sum + Number(g.monto), 0)
+
+  if (role === "supervisor") return null
 
   return (
     <div className="space-y-8">

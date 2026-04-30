@@ -11,7 +11,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
   const router = useRouter()
 
-  const isPublicRoute = pathname === "/login" || pathname.startsWith("/solicitar-presupuesto")
+  const isPublicRoute = pathname === "/login" || pathname === "/reset-password" || pathname.startsWith("/solicitar-presupuesto")
 
   useEffect(() => {
     if (!loading && !user && !isPublicRoute) {

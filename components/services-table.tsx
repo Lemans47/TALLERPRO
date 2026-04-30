@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast"
 import { api, type Servicio } from "@/lib/api-client"
 import { formatFechaDMA, sumCostosNetos } from "@/lib/utils"
 import { useEstados } from "@/lib/estados"
+import { useAuth } from "@/lib/auth-context"
 import { FileText, Trash2, Edit, Calendar, User, Car, Wrench, ClipboardList, List, AlignJustify, ListChecks, TrendingUp, Receipt, ChevronDown, ChevronRight, AlertTriangle, CheckCircle2 } from "lucide-react"
 
 const parseArr = (v: any): any[] => {
@@ -76,6 +77,8 @@ interface ServicesTableProps {
 export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }: ServicesTableProps) {
   const { toast } = useToast()
   const { estados: estadosConfig, esCerrado, colorOf } = useEstados()
+  const { role } = useAuth()
+  const canEdit = role !== "supervisor"
   const estadosVisibles = estadosConfig.filter((e) => e.visible)
 
   // Estilo del badge derivado del color hex configurado del estado.
@@ -464,14 +467,17 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                         )
                       })()}
                     </div>
-                    <div className="p-2.5 rounded-lg bg-success/5 border border-success/20 cursor-pointer flex flex-col justify-between min-h-[68px]" onClick={() => {
-                      setServicioSeleccionado(servicio)
-                      setDialogOpen(true)
-                    }}>
+                    <div
+                      className={`p-2.5 rounded-lg bg-success/5 border border-success/20 flex flex-col justify-between min-h-[68px] ${canEdit ? "cursor-pointer" : ""}`}
+                      onClick={canEdit ? () => {
+                        setServicioSeleccionado(servicio)
+                        setDialogOpen(true)
+                      } : undefined}
+                    >
                       <p className="text-xs text-muted-foreground">Abono/Anticipo</p>
                       <div>
                         <p className="font-semibold text-success">${Number(servicio.anticipo).toLocaleString("es-CL")}</p>
-                        <p className="text-[10px] text-muted-foreground">Click para agregar</p>
+                        {canEdit && <p className="text-[10px] text-muted-foreground">Click para agregar</p>}
                       </div>
                     </div>
                     <div
@@ -510,29 +516,37 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
 
                 {/* Actions */}
                 <div className="flex flex-row sm:flex-col gap-2 sm:w-[160px] shrink-0">
-                  <Select value={servicio.estado} onValueChange={(v) => handleEstadoChange(servicio.id, v)}>
-                    <SelectTrigger className="h-9 text-xs bg-secondary/50 border-border w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-card border-border">
-                      {estadosVisibles.map((e) => (
-                        <SelectItem key={e.id} value={e.nombre} className="focus:bg-secondary">
-                          {e.nombre}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {canEdit ? (
+                    <Select value={servicio.estado} onValueChange={(v) => handleEstadoChange(servicio.id, v)}>
+                      <SelectTrigger className="h-9 text-xs bg-secondary/50 border-border w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-card border-border">
+                        {estadosVisibles.map((e) => (
+                          <SelectItem key={e.id} value={e.nombre} className="focus:bg-secondary">
+                            {e.nombre}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Badge variant="outline" style={badgeStyle(servicio.estado)} className="h-9 text-xs justify-center w-full">
+                      {servicio.estado}
+                    </Badge>
+                  )}
 
                   <div className="flex gap-1">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-9 w-9 bg-transparent border-border hover:bg-secondary"
-                      onClick={() => onEditServicio(servicio)}
-                      title="Editar"
-                    >
-                      <Edit className="w-3.5 h-3.5" />
-                    </Button>
+                    {canEdit && (
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-9 bg-transparent border-border hover:bg-secondary"
+                        onClick={() => onEditServicio(servicio)}
+                        title="Editar"
+                      >
+                        <Edit className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       size="icon"
@@ -551,15 +565,17 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                     >
                       <FileText className="w-3.5 h-3.5" />
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-9 w-9 border-destructive/30 text-destructive bg-destructive/5 hover:bg-destructive/10"
-                      onClick={() => handleDelete(servicio)}
-                      title="Eliminar"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
+                    {canEdit && (
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-9 border-destructive/30 text-destructive bg-destructive/5 hover:bg-destructive/10"
+                        onClick={() => handleDelete(servicio)}
+                        title="Eliminar"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
                   </div>
                   {esCerrado(servicio.estado) && (
                     <Button
