@@ -29,17 +29,23 @@ export async function GET() {
                  ELSE COALESCE(anticipo, 0) END
           ), 0) AS cobrado,
           COALESCE(SUM(
-            CASE WHEN monto_total_sin_iva > 0 AND jsonb_typeof(costos) = 'array' THEN (
-              SELECT COALESCE(SUM(
+            COALESCE((
+              SELECT SUM(
                 CASE
                   WHEN (item->>'monto') ~ '^-?[0-9]+(\.[0-9]+)?$'
                     THEN (item->>'monto')::numeric
                   ELSE 0
                 END
-              ), 0)
-              FROM jsonb_array_elements(costos) AS item
+              )
+              FROM jsonb_array_elements(
+                CASE
+                  WHEN jsonb_typeof(costos) = 'array' THEN costos
+                  WHEN jsonb_typeof(costos) = 'string' THEN (costos #>> '{}')::jsonb
+                  ELSE '[]'::jsonb
+                END
+              ) AS item
               WHERE LOWER(COALESCE(item->>'descripcion', '')) NOT LIKE '%materiales pintura%'
-            ) ELSE 0 END
+            ), 0)
           ), 0) AS costos_internos,
           COUNT(*) FILTER (WHERE monto_total_sin_iva > 0) AS count_servicios
         FROM servicios

@@ -12,7 +12,7 @@ interface VehiclePipelineProps {
 
 export function VehiclePipeline({ servicios }: VehiclePipelineProps) {
   const hoy = new Date()
-  const { estados, esCerrado, esPorCobrar, esFinalizado } = useEstados()
+  const { estados, esFinalizado } = useEstados()
 
   // Stages del pipeline = estados de tipo activo, en el orden configurado.
   // Cada stage usa el color editable del estado.
@@ -29,11 +29,6 @@ export function VehiclePipeline({ servicios }: VehiclePipelineProps) {
 
   const countValues = Object.values(counts)
   const maxCount = countValues.length > 0 ? Math.max(...countValues) : 0
-
-  // "Entregados" mantiene el sentido del antiguo conteo: servicios con tipo `por_cobrar`
-  // (ya entregados pero pendientes de cobro). "Cerrados" = tipo `cerrado`.
-  const entregados = servicios.filter((s) => esPorCobrar(s.estado)).length
-  const cerrados = servicios.filter((s) => esCerrado(s.estado)).length
 
   const atascados = activos
     .map((s) => ({
@@ -119,13 +114,6 @@ export function VehiclePipeline({ servicios }: VehiclePipelineProps) {
           )
         })}
       </div>
-
-      {/* Footer summary */}
-      <p className="text-xs text-muted-foreground">
-        Entregados este mes: <span className="font-medium text-foreground">{entregados}</span>
-        <span className="mx-2">|</span>
-        Cerrados/Pagados: <span className="font-medium text-foreground">{cerrados}</span>
-      </p>
 
       {/* Atascados */}
       <div className="border-t border-border pt-4">

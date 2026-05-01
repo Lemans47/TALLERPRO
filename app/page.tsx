@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -84,13 +84,14 @@ function parseDesglose(
       return { label, value: m[1] }
     })
     .filter((x): x is { label: string; value: string } => x !== null)
+    .filter((x) => Number(x.value) > 0)
   if (parts.length === 0) return null
   return [...parts, { label: "Total", value: String(total), highlight: true }]
 }
 
 export default function DashboardPage() {
   const { role } = useAuth()
-  const { esCerrado, esPorCobrar, esFinalizado, nombresPorTipo } = useEstados()
+  const { esCerrado, esPorCobrar, esFinalizado } = useEstados()
   const isOperador = role === "operador"
   const isSupervisor = role === "supervisor"
   const isVistaSimple = isOperador || isSupervisor
@@ -138,15 +139,22 @@ export default function DashboardPage() {
   const [showBreakeven, setShowBreakeven] = useState(false)
   const [showFacturasPendientes, setShowFacturasPendientes] = useState(false)
   const { selectedMonth } = useMonth()
+  // Guards contra refetches concurrentes y tormenta de focus events
+  const inFlightRef = useRef(false)
+  const lastLoadAtRef = useRef(0)
 
   useEffect(() => {
     loadData()
   }, [selectedMonth])
 
-  // Refetch cuando la pestaña vuelve a foco (ej. usuario editó un servicio y volvió)
+  // Refetch cuando la pestaña vuelve a foco (ej. usuario editó un servicio y volvió).
+  // Throttle de 30s y skip si ya hay una carga en curso para evitar saturar la DB.
   useEffect(() => {
     const onFocus = () => {
-      if (document.visibilityState === "visible") loadData()
+      if (document.visibilityState !== "visible") return
+      if (inFlightRef.current) return
+      if (Date.now() - lastLoadAtRef.current < 30_000) return
+      loadData()
     }
     window.addEventListener("focus", onFocus)
     document.addEventListener("visibilitychange", onFocus)
@@ -157,6 +165,8 @@ export default function DashboardPage() {
   }, [selectedMonth])
 
   const loadData = async () => {
+    if (inFlightRef.current) return
+    inFlightRef.current = true
     setLoading(true)
     try {
       const [year, month] = selectedMonth.split("-").map(Number)
@@ -171,6 +181,8 @@ export default function DashboardPage() {
       console.error("Error loading dashboard data:", error)
     } finally {
       setLoading(false)
+      inFlightRef.current = false
+      lastLoadAtRef.current = Date.now()
     }
   }
 
@@ -252,16 +264,19 @@ export default function DashboardPage() {
       .reduce((sum, g) => sum + Number(g.monto || 0), 0)
 
     // ---- KPI 1: Vehículos en taller (usa TODOS los activos, no solo los del mes) ----
-    const PIPELINE_STAGES = nombresPorTipo(["activo"])
+    // El conteo y el desglose usan el array completo de serviciosActivos (todo lo que no
+    // sea cerrado ni por_cobrar), así no se pierden vehículos con estados configurados
+    // por el usuario que aún no están marcados como tipo="activo".
     const vehiculosEnTaller = serviciosActivos
-    const vehiculosEnTallerCount = PIPELINE_STAGES.reduce(
-      (sum, estado) => sum + serviciosActivos.filter((s) => s.estado === estado).length, 0
-    )
-    const desgloseParts = PIPELINE_STAGES
-      .map((e) => ({ e, n: serviciosActivos.filter((s) => s.estado === e).length }))
-      .filter((x) => x.n > 0)
-      .slice(0, 3)
-      .map((x) => `${x.n} ${x.e.toLowerCase()}`)
+    const vehiculosEnTallerCount = serviciosActivos.length
+    const desgloseMap = new Map<string, number>()
+    for (const s of serviciosActivos) {
+      const estado = s.estado || "Sin estado"
+      desgloseMap.set(estado, (desgloseMap.get(estado) || 0) + 1)
+    }
+    const desgloseParts = [...desgloseMap.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([estado, n]) => `${n} ${estado.toLowerCase()}`)
     const vehiculosDesglose = desgloseParts.length > 0 ? desgloseParts.join(" · ") : "Sin vehículos activos"
     // Entregados del mes: backend usa por_cobrar+cerrado por updated_at
     const entregadosEsteMes = entregadosMes ?? servicios.filter((s) => esPorCobrar(s.estado)).length
@@ -482,7 +497,7 @@ export default function DashboardPage() {
             { label: "Cerrados", value: kpis.serviciosCerrados.toString() },
             { label: "Activos", value: kpis.serviciosActivos.toString() },
             { label: "Tasa cierre", value: `${kpis.tasaCierre.toFixed(0)}%` },
-            { label: "Tiempo prom.", value: `${kpis.tiempoPromedio} d` },
+            { label: "Tiempo prom.", value: `${Math.round(kpis.tiempoPromedio)} d` },
           ]}
         />
         {(() => {
@@ -665,14 +680,41 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ZONA 2: Operación y Alertas */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        <div className="lg:col-span-2">
+      {/* ZONA 2 + 3: Operación, Alertas y Tendencias */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
           <VehiclePipeline servicios={serviciosActivos} />
+          <RevenueChart />
+          {!isVistaSimple && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <KPICard
+                title="Tasa de Cierre"
+                value={`${kpis.tasaCierre.toFixed(1)}%`}
+                description={`${kpis.serviciosCerrados} de ${kpis.serviciosTotal} cerrados`}
+                icon={<Activity className="w-5 h-5" />}
+                variant={kpis.tasaCierre >= 50 ? "success" : "warning"}
+              />
+              <KPICard
+                title="Tiempo Promedio en Taller"
+                value={`${kpis.tiempoPromedio.toFixed(0)} días`}
+                description="Servicios activos del mes"
+                icon={<Clock className="w-5 h-5" />}
+                variant="default"
+              />
+              <KPICard
+                title="Servicios del Mes"
+                value={kpis.serviciosTotal.toString()}
+                description={`${kpis.serviciosCerrados} cerrados · ${kpis.serviciosActivos} activos`}
+                icon={<Wrench className="w-5 h-5" />}
+                variant="default"
+              />
+            </div>
+          )}
         </div>
         <div className="flex flex-col gap-4">
           <PendingPaymentsAlert servicios={servicios} maxItems={3} />
           <PendingExpensesAlert gastos={gastos} maxItems={3} />
+          <AverageTicketChart />
           <div className="rounded-xl border border-border bg-card p-4 space-y-2">
             <p className="text-sm font-semibold text-muted-foreground">Acciones Rápidas</p>
             <Link href="/servicios">
@@ -684,42 +726,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ZONA 3: Tendencias */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <RevenueChart />
-        </div>
-        <div>
-          <AverageTicketChart />
-        </div>
-      </div>
-
-      {/* KPIs secundarios (solo no-operador, no-supervisor) */}
-      {!isVistaSimple && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <KPICard
-            title="Tasa de Cierre"
-            value={`${kpis.tasaCierre.toFixed(1)}%`}
-            description={`${kpis.serviciosCerrados} de ${kpis.serviciosTotal} cerrados`}
-            icon={<Activity className="w-5 h-5" />}
-            variant={kpis.tasaCierre >= 50 ? "success" : "warning"}
-          />
-          <KPICard
-            title="Tiempo Promedio en Taller"
-            value={`${kpis.tiempoPromedio.toFixed(0)} días`}
-            description="Servicios activos del mes"
-            icon={<Clock className="w-5 h-5" />}
-            variant="default"
-          />
-          <KPICard
-            title="Servicios del Mes"
-            value={kpis.serviciosTotal.toString()}
-            description={`${kpis.serviciosCerrados} cerrados · ${kpis.serviciosActivos} activos`}
-            icon={<Wrench className="w-5 h-5" />}
-            variant="default"
-          />
-        </div>
-      )}
     </div>
   )
 }
