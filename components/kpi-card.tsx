@@ -16,6 +16,11 @@ interface KPIBadge {
   trend?: "up" | "down"
 }
 
+interface KPIInlineMetric {
+  label: string
+  value: string
+}
+
 interface KPICardProps {
   title: string
   value: string
@@ -25,6 +30,7 @@ interface KPICardProps {
   badge?: KPIBadge
   stats?: KPIStat[]
   tooltip?: string
+  inlineMetrics?: KPIInlineMetric[]
 }
 
 const variantStyles: Record<Variant, string> = {
@@ -55,7 +61,7 @@ const badgeStyles: Record<Variant, string> = {
   destructive: "text-destructive bg-destructive/10",
 }
 
-export function KPICard({ title, value, description, icon, variant = "default", badge, stats, tooltip }: KPICardProps) {
+export function KPICard({ title, value, description, icon, variant = "default", badge, stats, tooltip, inlineMetrics }: KPICardProps) {
   return (
     <div
       className={cn(
@@ -104,6 +110,17 @@ export function KPICard({ title, value, description, icon, variant = "default", 
 
       {description && !stats && (
         <p className="text-xs text-muted-foreground mt-2">{description}</p>
+      )}
+
+      {inlineMetrics && inlineMetrics.length > 0 && (
+        <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          {inlineMetrics.map((m, i) => (
+            <div key={i} className="flex items-baseline gap-1 min-w-0">
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{m.label}</span>
+              <span className="text-xs font-semibold text-foreground truncate">{m.value}</span>
+            </div>
+          ))}
+        </div>
       )}
 
       {stats && stats.length > 0 && (

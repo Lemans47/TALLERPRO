@@ -32,6 +32,10 @@ interface KPIs {
   margenGanancia: number
   ingresosCobrado: number
   ingresosFacturado: number
+  ingresosFacturadoConIva: number
+  facturadoNetoConIva: number
+  ivaFacturadoConIva: number
+  porcentajeFacturadoConIva: number
   pagadoMes: number
   pendienteMes: number
   ivaDebitoMes: number
@@ -104,6 +108,10 @@ export default function DashboardPage() {
     margenGanancia: 0,
     ingresosCobrado: 0,
     ingresosFacturado: 0,
+    ingresosFacturadoConIva: 0,
+    facturadoNetoConIva: 0,
+    ivaFacturadoConIva: 0,
+    porcentajeFacturadoConIva: 0,
     pagadoMes: 0,
     pendienteMes: 0,
     ivaDebitoMes: 0,
@@ -202,6 +210,16 @@ export default function DashboardPage() {
     // Ingresos
     const ingresosCobrado = serviciosCerrados.reduce((sum, s) => sum + Number(s.monto_total_sin_iva || 0), 0)
     const ingresosFacturado = serviciosFacturados.reduce((sum, s) => sum + Number(s.monto_total_sin_iva || 0), 0)
+
+    // Subset de Facturado que efectivamente se factura con IVA. ingresosFacturadoConIva = bruto;
+    // facturadoNetoConIva = neto del subset (numerador del %); ivaFacturadoConIva = bruto - neto.
+    const serviciosConIvaSet = serviciosFacturados.filter((s) => s.iva === "con")
+    const ingresosFacturadoConIva = serviciosConIvaSet.reduce((sum, s) => sum + Number(s.monto_total || 0), 0)
+    const facturadoNetoConIva = serviciosConIvaSet.reduce((sum, s) => sum + Number(s.monto_total_sin_iva || 0), 0)
+    const ivaFacturadoConIva = ingresosFacturadoConIva - facturadoNetoConIva
+    const porcentajeFacturadoConIva = ingresosFacturado > 0
+      ? (facturadoNetoConIva / ingresosFacturado) * 100
+      : 0
 
     // Pendiente: derivado de monto sin IVA - anticipo sin IVA para evitar el bug
     // del campo saldo_pendiente, que se guarda con IVA y no es comparable con
@@ -376,6 +394,10 @@ export default function DashboardPage() {
       margenGanancia,
       ingresosCobrado,
       ingresosFacturado,
+      ingresosFacturadoConIva,
+      facturadoNetoConIva,
+      ivaFacturadoConIva,
+      porcentajeFacturadoConIva,
       pagadoMes,
       pendienteMes,
       ivaDebitoMes,
@@ -461,11 +483,16 @@ export default function DashboardPage() {
           return (
             <KPICard
               title="Facturado del Mes"
-              tooltip="Margen contable (criterio devengado): incluye TODOS los costos del mes — servicios facturados (cerrados + en proceso), gastos operacionales y sueldos completos por empleados activos, hayan sido pagados o no."
+              tooltip="Criterio operativo (por fecha de ingreso): suma los servicios que entraron al taller en el mes, hayan sido facturados o no. El bloque 'Neto c/IVA · + IVA · %' considera SOLO servicios marcados con IVA, también por fecha de ingreso — por eso puede no coincidir con la card 'IVA del Mes', que usa el criterio SII (fecha de facturación). El margen es contable/devengado: incluye costos de servicios facturados, gastos operacionales y sueldos completos del mes."
               value={formatCurrency(kpis.ingresosFacturado)}
               icon={isPositive ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
               variant={margenVariant}
               badge={isVistaSimple ? undefined : { text: `${kpis.margenGanancia.toFixed(1)}%`, trend: isPositive ? "up" : "down" }}
+              inlineMetrics={isVistaSimple ? undefined : [
+                { label: "Neto c/IVA", value: formatCurrency(kpis.facturadoNetoConIva) },
+                { label: "+ IVA", value: formatCurrency(kpis.ivaFacturadoConIva) },
+                { label: "%", value: `${kpis.porcentajeFacturadoConIva.toFixed(0)}%` },
+              ]}
               stats={isVistaSimple ? undefined : [
                 { label: "Pagado", value: formatCurrency(kpis.pagadoMes) },
                 { label: "Pendiente", value: formatCurrency(kpis.pendienteMes) },
@@ -508,6 +535,7 @@ export default function DashboardPage() {
           return (
             <KPICard
               title="IVA del Mes"
+              tooltip="Criterio SII (por fecha de facturación): solo cuenta servicios cuya factura se EMITIÓ en el mes, hayan ingresado al taller en cualquier mes. Por eso puede no coincidir con el bloque IVA de la card 'Facturado del Mes', que usa fecha de ingreso. La diferencia entre ambos son las facturas pendientes de emitir (alerta amarilla más abajo). Débito = IVA emitido este mes; Crédito = IVA de gastos y costos con tipo_documento='factura'; Neto = lo que efectivamente pagas al SII."
               value={`${kpis.ivaNetoMes < 0 ? "-" : ""}${formatCurrency(kpis.ivaNetoMes)}`}
               icon={<Receipt className="w-5 h-5" />}
               variant={ivaVariant}
