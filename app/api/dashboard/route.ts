@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getServiciosByMonth, getGastosByMonth, getEmpleados, getActiveServicios, getAbonosByMonth, getEntregadosByMonth, getServiciosFacturadosByMes, getFacturasPendientesEmitir, getNombresEstadosPorTipo } from "@/lib/database"
+import { getServiciosByMonth, getGastosByMonth, getEmpleados, getActiveServicios, getAbonosByMonth, getEntregadosByMonth, getServiciosFacturadosByMes, getFacturasPendientesEmitir, getNombresEstadosPorTipo, getServiciosPendientesCobro, getGastosPendientesPago } from "@/lib/database"
 import { safeDivide, safeCalculateMargin, calculateAbsorptionRate } from "@/lib/utils"
 
 export const dynamic = "force-dynamic"
@@ -133,7 +133,7 @@ export async function GET(request: Request) {
     const year = Number.parseInt(searchParams.get("year") || new Date().getFullYear().toString())
     const month = Number.parseInt(searchParams.get("month") || (new Date().getMonth() + 1).toString())
 
-    const [servicios, gastos, empleados, serviciosActivos, abonosMes, entregadosMes, serviciosFacturadosMes, facturasPendientes, finalizadosNombres] = await Promise.all([
+    const [servicios, gastos, empleados, serviciosActivos, abonosMes, entregadosMes, serviciosFacturadosMes, facturasPendientes, finalizadosNombres, serviciosPendientesCobro, gastosPendientesPago] = await Promise.all([
       getServiciosByMonth(year, month),
       getGastosByMonth(year, month),
       getEmpleados(),
@@ -143,12 +143,14 @@ export async function GET(request: Request) {
       getServiciosFacturadosByMes(year, month),
       getFacturasPendientesEmitir(),
       getNombresEstadosPorTipo(["por_cobrar", "cerrado"]),
+      getServiciosPendientesCobro(),
+      getGastosPendientesPago(),
     ])
     const estadosFinalizados = new Set(finalizadosNombres)
 
     const kpis = computeKpis(servicios, gastos, empleados, estadosFinalizados, abonosMes)
 
-    return NextResponse.json({ servicios, gastos, empleados, serviciosActivos, abonosMes, kpis, entregadosMes: entregadosMes.length, serviciosFacturadosMes, facturasPendientes })
+    return NextResponse.json({ servicios, gastos, empleados, serviciosActivos, abonosMes, kpis, entregadosMes: entregadosMes.length, serviciosFacturadosMes, facturasPendientes, serviciosPendientesCobro, gastosPendientesPago })
   } catch (error) {
     console.error("Dashboard API error:", error)
     return NextResponse.json({ error: "Error loading dashboard data" }, { status: 500 })

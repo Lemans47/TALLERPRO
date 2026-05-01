@@ -23,7 +23,7 @@ export async function lookupPatente(patente: string): Promise<VehiculoLookup | n
 export async function fetchDashboardData(
   year: number,
   month: number,
-): Promise<{ servicios: Servicio[]; gastos: Gasto[]; empleados: Empleado[]; serviciosActivos: Servicio[]; abonosMes: AbonoEmpleado[]; kpis: any; entregadosMes: number; serviciosFacturadosMes: Servicio[]; facturasPendientes: Servicio[] }> {
+): Promise<{ servicios: Servicio[]; gastos: Gasto[]; empleados: Empleado[]; serviciosActivos: Servicio[]; abonosMes: AbonoEmpleado[]; kpis: any; entregadosMes: number; serviciosFacturadosMes: Servicio[]; facturasPendientes: Servicio[]; serviciosPendientesCobro: Servicio[]; gastosPendientesPago: Gasto[] }> {
   const params = new URLSearchParams({ year: String(year), month: String(month) })
   const res = await fetch(`/api/dashboard?${params}`, { cache: "no-store" })
   if (!res.ok) throw new Error("Error fetching dashboard data")

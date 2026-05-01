@@ -143,6 +143,8 @@ export default function DashboardPage() {
   const [serviciosActivos, setServiciosActivos] = useState<Servicio[]>([])
   const [gastos, setGastos] = useState<Gasto[]>([])
   const [facturasPendientes, setFacturasPendientes] = useState<Servicio[]>([])
+  const [serviciosPendientesCobro, setServiciosPendientesCobro] = useState<Servicio[]>([])
+  const [gastosPendientesPago, setGastosPendientesPago] = useState<Gasto[]>([])
   const [loading, setLoading] = useState(true)
   const [showBreakeven, setShowBreakeven] = useState(false)
   const [showFacturasPendientes, setShowFacturasPendientes] = useState(false)
@@ -179,11 +181,13 @@ export default function DashboardPage() {
     try {
       const [year, month] = selectedMonth.split("-").map(Number)
       const response = await fetchDashboardData(year, month)
-      const { servicios: serviciosData, gastos: gastosData, empleados: empleadosData, serviciosActivos: activosData, abonosMes, kpis: apiKpis, entregadosMes, serviciosFacturadosMes, facturasPendientes: pendientesData } = response
+      const { servicios: serviciosData, gastos: gastosData, empleados: empleadosData, serviciosActivos: activosData, abonosMes, kpis: apiKpis, entregadosMes, serviciosFacturadosMes, facturasPendientes: pendientesData, serviciosPendientesCobro: cobrosPendData, gastosPendientesPago: gastosPendData } = response
       setServicios(serviciosData)
       setServiciosActivos(activosData)
       setGastos(gastosData)
       setFacturasPendientes(pendientesData || [])
+      setServiciosPendientesCobro(cobrosPendData || [])
+      setGastosPendientesPago(gastosPendData || [])
       calculateKPIs(serviciosData, gastosData, empleadosData, activosData, abonosMes, apiKpis, entregadosMes, serviciosFacturadosMes)
     } catch (error) {
       console.error("Error loading dashboard data:", error)
@@ -740,8 +744,8 @@ export default function DashboardPage() {
           )}
         </div>
         <div className="flex flex-col gap-4">
-          <PendingPaymentsAlert servicios={servicios} maxItems={3} />
-          <PendingExpensesAlert gastos={gastos} maxItems={3} />
+          <PendingPaymentsAlert servicios={serviciosPendientesCobro} maxItems={3} />
+          <PendingExpensesAlert gastos={gastosPendientesPago} maxItems={3} />
           <AverageTicketChart />
           <div className="rounded-xl border border-border bg-card p-4 space-y-2">
             <p className="text-sm font-semibold text-muted-foreground">Acciones Rápidas</p>

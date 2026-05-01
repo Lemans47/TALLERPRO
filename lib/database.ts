@@ -536,6 +536,32 @@ export async function getGastosByMonth(year: number, month: number) {
   return data as Gasto[]
 }
 
+// Todos los gastos sin pagar, sin filtrar por mes. Usado por la alerta global
+// de "Gastos Pendientes" en el dashboard.
+export async function getGastosPendientesPago() {
+  const db = getSQL()
+  const data = await db`
+    SELECT * FROM gastos
+    WHERE pagado = false
+    ORDER BY fecha ASC
+  `
+  return data as Gasto[]
+}
+
+// Todos los servicios con saldo pendiente y estado por_cobrar, sin filtrar por
+// mes. Usado por la alerta global de "Cobros Pendientes" en el dashboard.
+export async function getServiciosPendientesCobro() {
+  const db = getSQL()
+  const porCobrar = await getNombresEstadosPorTipo(["por_cobrar"])
+  const data = await db`
+    SELECT * FROM servicios
+    WHERE saldo_pendiente > 0
+      AND estado = ANY(${porCobrar.length ? porCobrar : [""]}::text[])
+    ORDER BY fecha_ingreso ASC
+  `
+  return data as Servicio[]
+}
+
 export async function createGasto(gasto: Omit<Gasto, "id" | "created_at" | "updated_at">) {
   const db = getSQL()
   const pagado = gasto.pagado !== false // default true

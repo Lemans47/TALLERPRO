@@ -50,7 +50,7 @@ export function PendingExpensesAlert({ gastos, maxItems = 5 }: PendingExpensesAl
                 {pendientes.length}
               </Badge>
             </h3>
-            <p className="text-sm text-muted-foreground">Gastos por pagar este mes</p>
+            <p className="text-sm text-muted-foreground">Gastos por pagar</p>
           </div>
         </div>
         <div className="text-right">
