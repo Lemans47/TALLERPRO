@@ -73,3 +73,8 @@ CREATE TABLE IF NOT EXISTS plantillas_servicio (
 -- ── Indices nuevos de P2 ─────────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_gastos_categoria_fecha ON gastos(categoria, fecha DESC);
 CREATE INDEX IF NOT EXISTS idx_servicios_estado_fecha ON servicios(estado, fecha_ingreso DESC);
+
+-- Indice para getEntregadosByMonth: filtra servicios por estado + updated_at en
+-- el rango del mes. Sin este indice, cada cambio de mes en el dashboard hace
+-- un seq scan completo de la tabla servicios.
+CREATE INDEX IF NOT EXISTS idx_servicios_estado_updated_at ON servicios(estado, updated_at DESC);

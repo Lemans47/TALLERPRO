@@ -20,14 +20,42 @@ export async function lookupPatente(patente: string): Promise<VehiculoLookup | n
 }
 
 // Dashboard
+export class DashboardTimeoutError extends Error {
+  constructor() {
+    super("La carga del dashboard excedió 20 segundos")
+    this.name = "DashboardTimeoutError"
+  }
+}
+
 export async function fetchDashboardData(
   year: number,
   month: number,
+  signal?: AbortSignal,
 ): Promise<{ servicios: Servicio[]; gastos: Gasto[]; empleados: Empleado[]; serviciosActivos: Servicio[]; abonosMes: AbonoEmpleado[]; kpis: any; entregadosMes: number; serviciosFacturadosMes: Servicio[]; facturasPendientes: Servicio[]; serviciosPendientesCobro: Servicio[]; gastosPendientesPago: Gasto[] }> {
   const params = new URLSearchParams({ year: String(year), month: String(month) })
-  const res = await fetch(`/api/dashboard?${params}`, { cache: "no-store" })
-  if (!res.ok) throw new Error("Error fetching dashboard data")
-  return res.json()
+  // Combina el signal externo con un timeout de 20s. Usa AbortSignal.any si está
+  // disponible (Node 20+/Chrome 116+); de lo contrario, encadena manualmente.
+  const timeoutCtrl = new AbortController()
+  const timeoutId = setTimeout(() => timeoutCtrl.abort(new DashboardTimeoutError()), 20_000)
+  const onExternalAbort = () => timeoutCtrl.abort(signal?.reason)
+  if (signal) {
+    if (signal.aborted) timeoutCtrl.abort(signal.reason)
+    else signal.addEventListener("abort", onExternalAbort, { once: true })
+  }
+  try {
+    const res = await fetch(`/api/dashboard?${params}`, { cache: "no-store", signal: timeoutCtrl.signal })
+    if (!res.ok) throw new Error("Error fetching dashboard data")
+    return await res.json()
+  } catch (err: any) {
+    // Si abortó por timeout interno, lanzar el error tipado para que la UI muestre mensaje específico
+    if (err?.name === "AbortError" && timeoutCtrl.signal.reason instanceof DashboardTimeoutError) {
+      throw timeoutCtrl.signal.reason
+    }
+    throw err
+  } finally {
+    clearTimeout(timeoutId)
+    if (signal) signal.removeEventListener("abort", onExternalAbort)
+  }
 }
 
 // Chart data — agregados por mes (últimos 6 meses) calculados en SQL.

@@ -14,10 +14,10 @@ import { MonthSelector } from "@/components/month-selector"
 import {
   Car, ArrowUpDown, TrendingUp, TrendingDown, CheckCircle2,
   Activity, Clock, Wrench, Plus, RefreshCw, ChevronDown, ChevronUp,
-  Paintbrush, Receipt, FileWarning,
+  Paintbrush, Receipt, FileWarning, AlertCircle,
 } from "lucide-react"
 import { useMonth } from "@/lib/month-context"
-import { fetchDashboardData } from "@/lib/api-client"
+import { fetchDashboardData, DashboardTimeoutError } from "@/lib/api-client"
 import type { Servicio, Gasto, Empleado, AbonoEmpleado } from "@/lib/database"
 import { useAuth } from "@/lib/auth-context"
 import { useEstados } from "@/lib/estados"
@@ -146,15 +146,25 @@ export default function DashboardPage() {
   const [serviciosPendientesCobro, setServiciosPendientesCobro] = useState<Servicio[]>([])
   const [gastosPendientesPago, setGastosPendientesPago] = useState<Gasto[]>([])
   const [loading, setLoading] = useState(true)
+  const [isRefetching, setIsRefetching] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [showBreakeven, setShowBreakeven] = useState(false)
   const [showFacturasPendientes, setShowFacturasPendientes] = useState(false)
   const { selectedMonth } = useMonth()
-  // Guards contra refetches concurrentes y tormenta de focus events
-  const inFlightRef = useRef(false)
+  // Cancelar requests stale cuando el usuario cambia rápido de mes:
+  // sin esto, las 11 queries del fetch anterior siguen ocupando el pool de
+  // Postgres (max:10) mientras llegan las nuevas, y el endpoint se cuelga.
+  const abortRef = useRef<AbortController | null>(null)
+  const hasLoadedOnceRef = useRef(false)
   const lastLoadAtRef = useRef(0)
 
   useEffect(() => {
     loadData()
+    return () => {
+      // Cleanup: si el efecto se re-ejecuta (cambio de mes) o el componente se
+      // desmonta, abortar el fetch en curso.
+      abortRef.current?.abort()
+    }
   }, [selectedMonth])
 
   // Refetch cuando la pestaña vuelve a foco (ej. usuario editó un servicio y volvió).
@@ -162,7 +172,7 @@ export default function DashboardPage() {
   useEffect(() => {
     const onFocus = () => {
       if (document.visibilityState !== "visible") return
-      if (inFlightRef.current) return
+      if (abortRef.current) return
       if (Date.now() - lastLoadAtRef.current < 30_000) return
       loadData()
     }
@@ -175,12 +185,15 @@ export default function DashboardPage() {
   }, [selectedMonth])
 
   const loadData = async () => {
-    if (inFlightRef.current) return
-    inFlightRef.current = true
-    setLoading(true)
+    abortRef.current?.abort()
+    const ctrl = new AbortController()
+    abortRef.current = ctrl
+    if (hasLoadedOnceRef.current) setIsRefetching(true)
+    else setLoading(true)
+    setLoadError(null)
     try {
       const [year, month] = selectedMonth.split("-").map(Number)
-      const response = await fetchDashboardData(year, month)
+      const response = await fetchDashboardData(year, month, ctrl.signal)
       const { servicios: serviciosData, gastos: gastosData, empleados: empleadosData, serviciosActivos: activosData, abonosMes, kpis: apiKpis, entregadosMes, serviciosFacturadosMes, facturasPendientes: pendientesData, serviciosPendientesCobro: cobrosPendData, gastosPendientesPago: gastosPendData } = response
       setServicios(serviciosData)
       setServiciosActivos(activosData)
@@ -189,12 +202,27 @@ export default function DashboardPage() {
       setServiciosPendientesCobro(cobrosPendData || [])
       setGastosPendientesPago(gastosPendData || [])
       calculateKPIs(serviciosData, gastosData, empleadosData, activosData, abonosMes, apiKpis, entregadosMes, serviciosFacturadosMes)
-    } catch (error) {
+      hasLoadedOnceRef.current = true
+    } catch (error: any) {
+      // Aborts (cambio de mes rápido) no son errores para la UI: simplemente otra carga reemplazó esta.
+      if (error?.name === "AbortError" && !(error instanceof DashboardTimeoutError)) {
+        return
+      }
       console.error("Error loading dashboard data:", error)
+      setLoadError(
+        error instanceof DashboardTimeoutError
+          ? "La carga tardó demasiado. Reintentar."
+          : "No se pudo cargar el dashboard. Reintentar.",
+      )
     } finally {
-      setLoading(false)
-      inFlightRef.current = false
-      lastLoadAtRef.current = Date.now()
+      // Solo limpiamos los flags si ESTE controller sigue siendo el activo
+      // (si fue abortado por uno nuevo, el nuevo loadData se encarga).
+      if (abortRef.current === ctrl) {
+        abortRef.current = null
+        setLoading(false)
+        setIsRefetching(false)
+        lastLoadAtRef.current = Date.now()
+      }
     }
   }
 
@@ -436,8 +464,10 @@ export default function DashboardPage() {
   const margenVariant =
     kpis.margenGanancia >= 20 ? "success" : kpis.margenGanancia >= 0 ? "warning" : "destructive"
 
+  const isLoading = loading || isRefetching
+
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 transition-opacity duration-200 ${isRefetching ? "opacity-60" : "opacity-100"}`}>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -450,10 +480,10 @@ export default function DashboardPage() {
             variant="outline"
             size="sm"
             onClick={loadData}
-            disabled={loading}
+            disabled={isLoading}
             className="border-border hover:bg-secondary bg-transparent"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
           </Button>
           {!isVistaSimple && (
             <Link href="/servicios">
@@ -465,6 +495,28 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      {loadError && (
+        <div
+          role="alert"
+          className="flex items-center justify-between gap-3 rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3"
+        >
+          <div className="flex items-center gap-2 text-sm">
+            <AlertCircle className="h-4 w-4 text-destructive" />
+            <span>{loadError}</span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadData}
+            disabled={isLoading}
+            className="border-destructive/50 hover:bg-destructive/20"
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+            Reintentar
+          </Button>
+        </div>
+      )}
 
       {/* ZONA 1: KPIs principales */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">

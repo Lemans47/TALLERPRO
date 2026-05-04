@@ -924,11 +924,38 @@ export async function getEstadosServicio(): Promise<EstadoServicio[]> {
   }
 }
 
+// Cache en memoria del proceso. La carga del dashboard llama a esta función 5
+// veces (una por endpoint, otras dentro de getActiveServicios, getEntregadosByMonth,
+// getFacturasPendientesEmitir, getServiciosPendientesCobro). Sin cache se traducen
+// en 5 queries reales que ocupan conexiones del pool (max:10) y contribuyen a que
+// el dashboard se cuelgue al cambiar rápido de mes. La tabla `estados_servicio`
+// cambia muy poco — TTL de 30s es seguro y se invalida explícitamente al mutar.
+declare global {
+  // eslint-disable-next-line no-var
+  var _estadosCache: Map<string, { value: string[]; expires: number }> | undefined
+}
+
+function getEstadosCache() {
+  if (!global._estadosCache) global._estadosCache = new Map()
+  return global._estadosCache
+}
+
+export function invalidateEstadosCache() {
+  global._estadosCache?.clear()
+}
+
 export async function getNombresEstadosPorTipo(tipos: EstadoTipo[]): Promise<string[]> {
   if (!tipos.length) return []
+  const cache = getEstadosCache()
+  const key = tipos.slice().sort().join(",")
+  const now = Date.now()
+  const hit = cache.get(key)
+  if (hit && hit.expires > now) return hit.value
   const db = getSQL()
   const data = await db`SELECT nombre FROM estados_servicio WHERE tipo = ANY(${tipos}::text[])`
-  return (data as { nombre: string }[]).map((r) => r.nombre)
+  const value = (data as { nombre: string }[]).map((r) => r.nombre)
+  cache.set(key, { value, expires: now + 30_000 })
+  return value
 }
 
 export async function createEstadoServicio(nombre: string, tipo: EstadoTipo, orden?: number, color?: string) {
@@ -943,6 +970,7 @@ export async function createEstadoServicio(nombre: string, tipo: EstadoTipo, ord
     VALUES (${nombre}, ${tipo}, ${ordenFinal}, ${colorFinal})
     RETURNING *
   `
+  invalidateEstadosCache()
   return data[0] as EstadoServicio
 }
 
@@ -999,6 +1027,7 @@ export async function updateEstadoServicio(
       WHERE id = ${id}
       RETURNING *
     `) as EstadoServicio[]
+    invalidateEstadosCache()
     return updated
   })
 }
@@ -1054,6 +1083,7 @@ export async function deleteEstadoServicio(id: string, migrarA?: string) {
     }
 
     await tx`DELETE FROM estados_servicio WHERE id = ${id}`
+    invalidateEstadosCache()
     return { migrated: count, estado: actual.nombre }
   })
 }
