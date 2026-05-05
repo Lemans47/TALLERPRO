@@ -27,7 +27,13 @@ export async function GET() {
           date_trunc('month', s.fecha_ingreso::date)::date AS mes,
           COALESCE(NULLIF(s.mano_obra_pintura, 0), ${TARIFA_DEFAULT}) AS tarifa,
           COALESCE((
-            SELECT SUM(COALESCE((p->>'cantidad')::numeric, 1))
+            SELECT SUM(
+              CASE
+                WHEN (p->>'cantidad') ~ '^-?[0-9]+(\.[0-9]+)?$'
+                  THEN (p->>'cantidad')::numeric
+                ELSE 1
+              END
+            )
             FROM jsonb_array_elements(
               CASE
                 WHEN jsonb_typeof(s.piezas_pintura) = 'array' THEN s.piezas_pintura
@@ -37,7 +43,13 @@ export async function GET() {
             ) p
           ), 0) AS piezas,
           COALESCE((
-            SELECT SUM(COALESCE((c->>'monto')::numeric, 0))
+            SELECT SUM(
+              CASE
+                WHEN (c->>'monto') ~ '^-?[0-9]+(\.[0-9]+)?$'
+                  THEN (c->>'monto')::numeric
+                ELSE 0
+              END
+            )
             FROM jsonb_array_elements(
               CASE
                 WHEN jsonb_typeof(s.costos) = 'array' THEN s.costos
@@ -49,7 +61,13 @@ export async function GET() {
               AND LOWER(COALESCE(c->>'descripcion','')) LIKE '%mano de obra pintura%'
           ), 0) AS mo_real,
           COALESCE((
-            SELECT SUM(COALESCE((c->>'monto')::numeric, 0))
+            SELECT SUM(
+              CASE
+                WHEN (c->>'monto') ~ '^-?[0-9]+(\.[0-9]+)?$'
+                  THEN (c->>'monto')::numeric
+                ELSE 0
+              END
+            )
             FROM jsonb_array_elements(
               CASE
                 WHEN jsonb_typeof(s.costos) = 'array' THEN s.costos
