@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { LayoutDashboard, Wrench, Receipt, BarChart3, Settings, Menu, X, LogOut, Users, UserCheck, ExternalLink } from "lucide-react"
 import Image from "next/image"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { MonthSelector } from "@/components/month-selector"
 import { useAuth } from "@/lib/auth-context"
 
@@ -28,6 +28,36 @@ export function SidebarNav() {
   const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
   const { user, role, loading, signOut } = useAuth()
+
+  useEffect(() => {
+    if (isOpen) {
+      const scrollY = window.scrollY
+      const body = document.body
+      const prev = {
+        position: body.style.position,
+        top: body.style.top,
+        left: body.style.left,
+        right: body.style.right,
+        width: body.style.width,
+        overflow: body.style.overflow,
+      }
+      body.style.position = "fixed"
+      body.style.top = `-${scrollY}px`
+      body.style.left = "0"
+      body.style.right = "0"
+      body.style.width = "100%"
+      body.style.overflow = "hidden"
+      return () => {
+        body.style.position = prev.position
+        body.style.top = prev.top
+        body.style.left = prev.left
+        body.style.right = prev.right
+        body.style.width = prev.width
+        body.style.overflow = prev.overflow
+        window.scrollTo(0, scrollY)
+      }
+    }
+  }, [isOpen])
 
   const navItems = loading
     ? allNavItems // mientras carga, mostrar todos (no se puede actuar igual)
@@ -78,8 +108,8 @@ export function SidebarNav() {
 
       {/* Mobile Sidebar Overlay */}
       {isOpen && (
-        <div className="md:hidden fixed inset-0 top-16 bg-background/98 backdrop-blur-sm z-40">
-          <div className="flex flex-col h-full">
+        <div className="md:hidden fixed inset-0 top-16 bg-background/98 backdrop-blur-sm z-40 overflow-y-auto">
+          <div className="flex flex-col min-h-full">
             <div className="p-4 border-b border-border">
               <MonthSelector />
             </div>

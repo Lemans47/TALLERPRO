@@ -2090,7 +2090,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                                 const utilidad = cobro - costo
                                 return (
                                   <tr key={itemCobro.id} className="border-b border-border hover:bg-secondary/20 transition-colors">
-                                    <td className="p-3 min-w-[300px]">
+                                    <td className="p-3 min-w-[160px] sm:min-w-[300px]">
                                       <Textarea
                                         value={itemCobro.descripcion}
                                         onChange={(e) => updateItemCobro(categoria as keyof ItemsPorCategoria, itemCobro.id, "descripcion", e.target.value)}

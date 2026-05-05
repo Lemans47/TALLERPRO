@@ -348,7 +348,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
             {serviciosFiltrados.length}
           </Badge>
         </button>
-        {!collapsed && <div className="flex gap-2 w-full sm:w-auto">
+        {!collapsed && <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           <Select value={sortBy} onValueChange={setSortBy}>
             <SelectTrigger className="w-full sm:w-[170px] bg-secondary/50 border-border">
               <SelectValue />
@@ -515,7 +515,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                 </div>
 
                 {/* Actions */}
-                <div className="flex flex-row sm:flex-col gap-2 sm:w-[160px] shrink-0">
+                <div className="flex flex-col gap-2 w-full sm:w-[160px] shrink-0">
                   {canEdit ? (
                     <Select value={servicio.estado} onValueChange={(v) => handleEstadoChange(servicio.id, v)}>
                       <SelectTrigger className="h-9 text-xs bg-secondary/50 border-border w-full">

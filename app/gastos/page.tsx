@@ -104,7 +104,7 @@ export default function ExpensesPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {CATEGORIAS.map((cat) => {
           const Icon = cat.icon
           const isActive = activeCategory === cat.id

@@ -253,7 +253,7 @@ export default function ServicesPage() {
 
       {/* Dialog with Service Form */}
       <Dialog open={showFormDialog} onOpenChange={setShowFormDialog}>
-        <DialogContent className="max-w-[98vw] sm:max-w-[95vw] md:max-w-[90vw] lg:max-w-[85vw] xl:max-w-7xl w-full h-[98vh] sm:h-[95vh] flex flex-col bg-card border-border p-0">
+        <DialogContent className="max-w-[98vw] sm:max-w-[95vw] md:max-w-[90vw] lg:max-w-[85vw] xl:max-w-7xl w-full h-[100dvh] sm:h-[95vh] max-h-[100dvh] flex flex-col bg-card border-border p-0">
           <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-2 border-b border-border">
             <DialogTitle className="text-lg sm:text-xl">
               {servicioAEditar ? `Editar ${servicioAEditar.isPresupuesto ? "Presupuesto" : "Servicio"}` : "Nuevo Servicio"}
