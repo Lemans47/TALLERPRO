@@ -559,7 +559,7 @@ export default function DashboardPage() {
                 { label: "Pagado", value: formatCurrency(kpis.pagadoMes) },
                 { label: "Pendiente", value: formatCurrency(kpis.pendienteMes) },
                 { label: "Costos totales", value: formatCurrency(kpis.gastosTotalMes) },
-                { label: "Margen", value: formatCurrency(margenNeto), highlight: true },
+                { label: "Margen", value: `${margenNeto < 0 ? "-" : ""}${formatCurrency(margenNeto)}`, highlight: true },
               ]}
             />
           )
