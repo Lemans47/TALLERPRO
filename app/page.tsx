@@ -22,6 +22,7 @@ import type { Servicio, Gasto, Empleado, AbonoEmpleado } from "@/lib/database"
 import { useAuth } from "@/lib/auth-context"
 import { useEstados } from "@/lib/estados"
 import { extraerIvaIncluido } from "@/lib/utils"
+import { sumarCostosReales } from "@/lib/reportes/kpis"
 
 interface KPIs {
   vehiculosEnTaller: number
@@ -256,14 +257,17 @@ export default function DashboardPage() {
     // Pendiente: derivado de monto sin IVA - anticipo sin IVA para evitar el bug
     // del campo saldo_pendiente, que se guarda con IVA y no es comparable con
     // monto_total_sin_iva. Solo no-cerrados (cerrados tienen saldo=0 por definicion).
-    const pendienteMes = serviciosFacturados
-      .filter((s) => !esCerrado(s.estado))
-      .reduce((sum, s) => {
-        const factor = s.iva === "con" ? 1.19 : 1
-        const anticipoSinIva = Number(s.anticipo || 0) / factor
-        const monto = Number(s.monto_total_sin_iva || 0)
-        return sum + Math.max(0, monto - anticipoSinIva)
-      }, 0)
+    // Math.round evita decimales raros cuando anticipo no es múltiplo exacto de 1.19.
+    const pendienteMes = Math.round(
+      serviciosFacturados
+        .filter((s) => !esCerrado(s.estado))
+        .reduce((sum, s) => {
+          const factor = s.iva === "con" ? 1.19 : 1
+          const anticipoSinIva = Number(s.anticipo || 0) / factor
+          const monto = Number(s.monto_total_sin_iva || 0)
+          return sum + Math.max(0, monto - anticipoSinIva)
+        }, 0)
+    )
 
     // ---- IVA del mes ----
     // Criterio SII: debito por fecha_facturacion (emision real), no por fecha_ingreso.
@@ -289,17 +293,11 @@ export default function DashboardPage() {
     const ivaCreditoMes = ivaCreditoGastos + ivaCreditoCostos
     const ivaNetoMes = ivaDebitoMes - ivaCreditoMes
 
-    // Costos (excluye "materiales pintura" para evitar doble conteo con gastos de pintura)
-    const costosCerrados = serviciosCerrados.reduce((sum, s) => {
-      return sum + parseArr(s.costos)
-        .filter((c: any) => !String(c.descripcion || "").toLowerCase().includes("materiales pintura"))
-        .reduce((c: number, costo: any) => c + Number(costo.monto || 0), 0)
-    }, 0)
-    const costosFacturados = serviciosFacturados.reduce((sum, s) => {
-      return sum + parseArr(s.costos)
-        .filter((c: any) => !String(c.descripcion || "").toLowerCase().includes("materiales pintura"))
-        .reduce((c: number, costo: any) => c + Number(costo.monto || 0), 0)
-    }, 0)
+    // Costos directos: usa el helper canónico de lib/reportes/kpis.ts (excluye items
+    // isAuto + fallback "materiales pintura"). Antes este filtro divergía del usado en
+    // /reportes y producía discrepancias de hasta $1.4M en el margen.
+    const costosCerrados = serviciosCerrados.reduce((sum, s) => sum + sumarCostosReales(s.costos), 0)
+    const costosFacturados = serviciosFacturados.reduce((sum, s) => sum + sumarCostosReales(s.costos), 0)
 
     // Sueldos pagados: abonos reales del mes (para cash flow / Flujo de Caja)
     const sueldosPagados = abonosMes.reduce((sum, a) => sum + Number(a.monto || 0), 0)
@@ -412,7 +410,8 @@ export default function DashboardPage() {
     const tasaCierre = serviciosTotal > 0 ? (serviciosCompletadosCount / serviciosTotal) * 100 : 0
 
     // ---- Punto de equilibrio (desde API para consistencia) ----
-    const puntoEquilibrio = apiKpis?.puntoEquilibrio ?? 0
+    // null = no alcanzable (margen ≤ 0). Compatibilidad con int legacy: 0 también significa no alcanzable.
+    const puntoEquilibrio = apiKpis?.puntoEquilibrio == null ? 0 : Number(apiKpis.puntoEquilibrio)
     const countConMonto = apiKpis?.serviciosCount ?? serviciosFacturados.length
     const gastosOperativosApi = apiKpis?.gastosOperativos ?? 0
     const margenContribucionApi = apiKpis?.margenContribucion ?? 0
@@ -459,7 +458,9 @@ export default function DashboardPage() {
     })
   }
 
-  const formatCurrency = (value: number) => `$${Math.abs(value).toLocaleString("es-CL")}`
+  // Pesos chilenos no usan decimales; redondeamos para evitar "$42.219,813" donde
+  // el cálculo introduce decimales por divisiones (e.g. anticipo / 1.19, costoPorPieza).
+  const formatCurrency = (value: number) => `$${Math.round(Math.abs(value)).toLocaleString("es-CL")}`
 
   const margenVariant =
     kpis.margenGanancia >= 20 ? "success" : kpis.margenGanancia >= 0 ? "warning" : "destructive"

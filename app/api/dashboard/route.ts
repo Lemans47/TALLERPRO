@@ -1,129 +1,91 @@
 import { NextResponse } from "next/server"
-import { getServiciosByMonth, getGastosByMonth, getEmpleados, getActiveServicios, getAbonosByMonth, getEntregadosByMonth, getServiciosFacturadosByMes, getFacturasPendientesEmitir, getNombresEstadosPorTipo, getServiciosPendientesCobro, getGastosPendientesPago } from "@/lib/database"
-import { safeDivide, safeCalculateMargin, calculateAbsorptionRate } from "@/lib/utils"
+import {
+  getServiciosByMonth,
+  getGastosByMonth,
+  getEmpleados,
+  getActiveServicios,
+  getAbonosByMonth,
+  getEntregadosByMonth,
+  getServiciosFacturadosByMes,
+  getFacturasPendientesEmitir,
+  getNombresEstadosByTipoMap,
+  getServiciosPendientesCobro,
+  getGastosPendientesPago,
+} from "@/lib/database"
+import { computeKpisMes } from "@/lib/reportes/kpis"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
 
-function computeKpis(
-  servicios: Awaited<ReturnType<typeof getServiciosByMonth>>,
-  gastos: Awaited<ReturnType<typeof getGastosByMonth>>,
-  empleados: Awaited<ReturnType<typeof getEmpleados>>,
-  estadosFinalizados: Set<string>,
-  abonosMes?: Awaited<ReturnType<typeof getAbonosByMonth>>,
-) {
-  // Helper: parsea campo JSONB que puede llegar como string o array ya parseado
-  function parseJsonbArray<T>(raw: unknown): T[] {
-    if (Array.isArray(raw)) return raw as T[]
-    if (typeof raw === "string" && raw) {
-      try {
-        const parsed = JSON.parse(raw)
-        return Array.isArray(parsed) ? parsed : []
-      } catch {
-        return []
-      }
-    }
-    return []
-  }
+// ── Cache en memoria del proceso ────────────────────────────────────────────
+// Las queries del dashboard son pesadas (latencia Chile→Supabase + 11 queries
+// paralelas). Recargas repetidas en 30s devuelven la misma respuesta sin pegar
+// a la DB. Si el usuario edita un servicio y vuelve, espera ≤30s para refrescar.
+// Cache es global para sobrevivir hot-reload de Next en dev.
+declare global {
+  // eslint-disable-next-line no-var
+  var _dashboardCache: Map<string, { value: unknown; expires: number; inFlight?: Promise<unknown> }> | undefined
+}
+function getCache() {
+  if (!global._dashboardCache) global._dashboardCache = new Map()
+  return global._dashboardCache
+}
+const TTL_MS = 30_000
 
-  // Base: todos los servicios del mes con monto asignado (igual que "Facturado del Mes" en el dashboard)
-  const serviciosConMonto = servicios.filter((s) => Number(s.monto_total_sin_iva || 0) > 0)
-  const serviciosFinalizadosCount = servicios.filter((s) => estadosFinalizados.has(s.estado)).length
+async function loadDashboardData(year: number, month: number) {
+  // 11 queries paralelas; el pool de Postgres es max:20. Una sola query a
+  // estados_servicio devuelve cerrado + por_cobrar agrupados por tipo, así
+  // evitamos sumar una 12ª.
+  const [
+    servicios,
+    gastos,
+    empleados,
+    serviciosActivos,
+    abonosMes,
+    entregadosMes,
+    serviciosFacturadosMes,
+    facturasPendientes,
+    estadosMap,
+    serviciosPendientesCobro,
+    gastosPendientesPago,
+  ] = await Promise.all([
+    getServiciosByMonth(year, month),
+    getGastosByMonth(year, month),
+    getEmpleados(),
+    getActiveServicios(),
+    getAbonosByMonth(year, month),
+    getEntregadosByMonth(year, month),
+    getServiciosFacturadosByMes(year, month),
+    getFacturasPendientesEmitir(),
+    getNombresEstadosByTipoMap(["por_cobrar", "cerrado"]),
+    getServiciosPendientesCobro(),
+    getGastosPendientesPago(),
+  ])
+  const nombresCerrado = estadosMap.cerrado || []
+  const nombresFinalizado = [...(estadosMap.cerrado || []), ...(estadosMap.por_cobrar || [])]
 
-  // Ingresos netos (sin IVA)
-  const ingresoNeto = serviciosConMonto.reduce((sum, sv) => sum + Number(sv.monto_total_sin_iva || 0), 0)
-
-  // Costos directos desde JSONB costos[], excluyendo items auto-calculados de pintura (evita doble conteo)
-  const costosDirectos = serviciosConMonto.reduce((sum, sv) => {
-    const costos = parseJsonbArray<{ descripcion?: string; monto?: number; isAuto?: boolean }>(sv.costos)
-    return (
-      sum +
-      costos
-        .filter((c) => !c.isAuto)
-        .reduce((s, c) => s + Number(c.monto || 0), 0)
-    )
-  }, 0)
-
-  // Gastos operativos: excluir "Sueldos" de tabla gastos y usar sueldo_base de empleados activos
-  const gastosNoSueldos = gastos.filter((g) => g.categoria !== "Sueldos")
-  const gastosTabla = gastosNoSueldos.reduce((s, g) => s + Number(g.monto || 0), 0)
-
-  // Desglose por categoría
-  const gastosDesglose = Object.values(
-    gastosNoSueldos.reduce<Record<string, { categoria: string; monto: number; items: { descripcion: string; monto: number }[] }>>(
-      (acc, g) => {
-        const cat = g.categoria || "Sin categoría"
-        if (!acc[cat]) acc[cat] = { categoria: cat, monto: 0, items: [] }
-        acc[cat].monto += Number(g.monto || 0)
-        acc[cat].items.push({ descripcion: g.descripcion, monto: Number(g.monto || 0) })
-        return acc
-      },
-      {},
-    ),
-  ).sort((a, b) => b.monto - a.monto)
-
-  // sueldosPagados: abonos reales del mes (cash flow real, no proyeccion)
-  const sueldosComprometidos = abonosMes
-    ? abonosMes.reduce((s, a) => s + Number(a.monto || 0), 0)
-    : (empleados as { activo: boolean; sueldo_base: number }[])
-        .filter((e) => e.activo)
-        .reduce((s, e) => s + Number(e.sueldo_base || 0), 0)
-
-  const gastosOperativos = gastosTabla + sueldosComprometidos
-
-  // Ingresos de mano de obra: cobros excl. "repuestos" + piezas_pintura
-  const ingresosManoObra = serviciosConMonto.reduce((sum, sv) => {
-    const cobros = parseJsonbArray<{ categoria?: string; monto?: number }>(sv.cobros)
-    const laborCobros = cobros
-      .filter((c) => c.categoria !== "repuestos")
-      .reduce((s, c) => s + Number(c.monto || 0), 0)
-
-    const piezas = parseJsonbArray<{ precio?: number }>(sv.piezas_pintura)
-    const laborPiezas = piezas.reduce((s, p) => s + Number(p.precio || 0), 0)
-
-    return sum + laborCobros + laborPiezas
-  }, 0)
-
-  const count = serviciosConMonto.length
-
-  // Margen de contribución (ingresos - costos variables directos)
-  const margenContribucion = ingresoNeto - costosDirectos
-  const margenContribucionPct = safeCalculateMargin(ingresoNeto, costosDirectos)
-
-  // Resultado neto (margen de contribución - gastos fijos)
-  const utilidadNeta = margenContribucion - gastosOperativos
-
-  // Punto de equilibrio en número de servicios
-  const margenContribucionPorServicio = safeDivide(margenContribucion, count)
-  const puntoEquilibrio = margenContribucionPorServicio > 0
-    ? Math.ceil(safeDivide(gastosOperativos, margenContribucionPorServicio))
-    : 0
-
-  const margenPct = safeCalculateMargin(ingresoNeto, costosDirectos + gastosOperativos)
-  const roi = safeDivide(utilidadNeta, gastosOperativos) * 100
-  const ingresoPromedio = safeDivide(ingresoNeto, count)
-  const costoDirectoPromedio = safeDivide(costosDirectos, count)
-  const tasaAbsorcion = calculateAbsorptionRate(ingresosManoObra, gastosOperativos)
+  const kpis = computeKpisMes({
+    servicios,
+    gastos,
+    empleados,
+    abonosMes,
+    serviciosFacturadosMes,
+    estadosCerrado: new Set(nombresCerrado),
+    estadosFinalizados: new Set(nombresFinalizado),
+  })
 
   return {
-    ingresoNeto,
-    costosDirectos,
-    gastosOperativos,
-    gastosTabla,
-    gastosDesglose,
-    sueldosComprometidos,
-    margenContribucion,
-    margenContribucionPct,
-    utilidadNeta,
-    margenPct,
-    ingresoPromedio,
-    costoDirectoPromedio,
-    puntoEquilibrio,
-    serviciosCount: count,
-    roi,
-    serviciosFinalizados: serviciosFinalizadosCount,
-    tasaAbsorcion,
-    ingresosManoObra,
+    servicios,
+    gastos,
+    empleados,
+    serviciosActivos,
+    abonosMes,
+    kpis,
+    entregadosMes: entregadosMes.length,
+    serviciosFacturadosMes,
+    facturasPendientes,
+    serviciosPendientesCobro,
+    gastosPendientesPago,
   }
 }
 
@@ -132,25 +94,39 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const year = Number.parseInt(searchParams.get("year") || new Date().getFullYear().toString())
     const month = Number.parseInt(searchParams.get("month") || (new Date().getMonth() + 1).toString())
+    const skipCache = searchParams.get("nocache") === "1"
 
-    const [servicios, gastos, empleados, serviciosActivos, abonosMes, entregadosMes, serviciosFacturadosMes, facturasPendientes, finalizadosNombres, serviciosPendientesCobro, gastosPendientesPago] = await Promise.all([
-      getServiciosByMonth(year, month),
-      getGastosByMonth(year, month),
-      getEmpleados(),
-      getActiveServicios(),
-      getAbonosByMonth(year, month),
-      getEntregadosByMonth(year, month),
-      getServiciosFacturadosByMes(year, month),
-      getFacturasPendientesEmitir(),
-      getNombresEstadosPorTipo(["por_cobrar", "cerrado"]),
-      getServiciosPendientesCobro(),
-      getGastosPendientesPago(),
-    ])
-    const estadosFinalizados = new Set(finalizadosNombres)
+    const cache = getCache()
+    const key = `${year}-${month}`
+    const now = Date.now()
+    const hit = cache.get(key)
 
-    const kpis = computeKpis(servicios, gastos, empleados, estadosFinalizados, abonosMes)
+    // Cache hit válido y no se pidió nocache → devolver inmediato
+    if (!skipCache && hit && hit.expires > now && !hit.inFlight) {
+      return NextResponse.json(hit.value)
+    }
 
-    return NextResponse.json({ servicios, gastos, empleados, serviciosActivos, abonosMes, kpis, entregadosMes: entregadosMes.length, serviciosFacturadosMes, facturasPendientes, serviciosPendientesCobro, gastosPendientesPago })
+    // Si ya hay un fetch en vuelo para este mes, compartir la promesa para
+    // no disparar fetches duplicados cuando varios componentes piden a la vez.
+    if (!skipCache && hit?.inFlight) {
+      const value = await hit.inFlight
+      return NextResponse.json(value)
+    }
+
+    // Lanzar fetch fresco. Guardar la promesa en cache para deduplicar requests concurrentes.
+    const inFlight = loadDashboardData(year, month)
+    cache.set(key, { value: null, expires: 0, inFlight })
+
+    try {
+      const value = await inFlight
+      cache.set(key, { value, expires: now + TTL_MS })
+      return NextResponse.json(value)
+    } catch (err) {
+      // CRÍTICO: si la promesa falla, INVALIDAR el cache para que el próximo
+      // intento dispare un fetch nuevo en vez de esperar una promesa rechazada.
+      cache.delete(key)
+      throw err
+    }
   } catch (error) {
     console.error("Dashboard API error:", error)
     return NextResponse.json({ error: "Error loading dashboard data" }, { status: 500 })

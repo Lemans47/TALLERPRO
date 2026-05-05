@@ -26,9 +26,23 @@ export function getSQL() {
     throw new Error("Database connection string not found")
   }
 
-  // max:10 con el pooler de Supabase (puerto 6543, PgBouncer transaction mode).
-  // prepare:false es OBLIGATORIO en transaction mode (cambiar a true rompe queries).
-  global._pgSql = postgres(connectionString, { ssl: "require", max: 10, prepare: false })
+  // Configuración para pooler de Supabase (puerto 6543, PgBouncer transaction mode):
+  //  - prepare:false es OBLIGATORIO en transaction mode (cambiar a true rompe queries).
+  //  - max:20 para soportar páginas que disparan varios fetches en paralelo (dashboard
+  //    + chart + estados + reportes). Con max:10 se saturaba al navegar.
+  //  - idle_timeout:20 recicla conexiones inactivas para evitar zombies del pooler.
+  //  - statement_timeout:15s aborta queries que se quedan colgadas (e.g. lock contention
+  //    o plans malos), liberando la conexión para que otras requests no queden esperando.
+  global._pgSql = postgres(connectionString, {
+    ssl: "require",
+    max: 20,
+    prepare: false,
+    idle_timeout: 20,
+    // postgres.js requiere pasar statement_timeout vía options string ("-c key=val"),
+    // no como propiedad directa. Si una query supera 30s se aborta y la conexión se libera.
+    // 30s es generoso para latencia Chile→Supabase US + LATERAL joins que pueden ser lentos.
+    connection: { options: "-c statement_timeout=30000" },
+  })
   return global._pgSql as any
 }
 
@@ -956,6 +970,32 @@ export async function getNombresEstadosPorTipo(tipos: EstadoTipo[]): Promise<str
   const value = (data as { nombre: string }[]).map((r) => r.nombre)
   cache.set(key, { value, expires: now + 30_000 })
   return value
+}
+
+// Devuelve todos los nombres agrupados por tipo en UNA sola query.
+// Se usa cuando un endpoint necesita varios subconjuntos (e.g. cerrado y por_cobrar)
+// para evitar saturar el pool de conexiones (max:10) con queries separadas.
+export async function getNombresEstadosByTipoMap(tipos: EstadoTipo[]): Promise<Record<string, string[]>> {
+  const result: Record<string, string[]> = {}
+  for (const t of tipos) result[t] = []
+  if (!tipos.length) return result
+
+  const cache = getEstadosCache()
+  const key = "map:" + tipos.slice().sort().join(",")
+  const now = Date.now()
+  const hit = cache.get(key)
+  if (hit && hit.expires > now) {
+    return JSON.parse(hit.value[0]) as Record<string, string[]>
+  }
+
+  const db = getSQL()
+  const rows = await db`SELECT nombre, tipo FROM estados_servicio WHERE tipo = ANY(${tipos}::text[])`
+  for (const r of rows as { nombre: string; tipo: string }[]) {
+    if (!result[r.tipo]) result[r.tipo] = []
+    result[r.tipo].push(r.nombre)
+  }
+  cache.set(key, { value: [JSON.stringify(result)], expires: now + 30_000 })
+  return result
 }
 
 export async function createEstadoServicio(nombre: string, tipo: EstadoTipo, orden?: number, color?: string) {

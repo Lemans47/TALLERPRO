@@ -20,9 +20,10 @@ export async function lookupPatente(patente: string): Promise<VehiculoLookup | n
 }
 
 // Dashboard
+const DASHBOARD_TIMEOUT_MS = 60_000
 export class DashboardTimeoutError extends Error {
   constructor() {
-    super("La carga del dashboard excedió 20 segundos")
+    super(`La carga del dashboard excedió ${DASHBOARD_TIMEOUT_MS / 1000} segundos`)
     this.name = "DashboardTimeoutError"
   }
 }
@@ -33,10 +34,11 @@ export async function fetchDashboardData(
   signal?: AbortSignal,
 ): Promise<{ servicios: Servicio[]; gastos: Gasto[]; empleados: Empleado[]; serviciosActivos: Servicio[]; abonosMes: AbonoEmpleado[]; kpis: any; entregadosMes: number; serviciosFacturadosMes: Servicio[]; facturasPendientes: Servicio[]; serviciosPendientesCobro: Servicio[]; gastosPendientesPago: Gasto[] }> {
   const params = new URLSearchParams({ year: String(year), month: String(month) })
-  // Combina el signal externo con un timeout de 20s. Usa AbortSignal.any si está
-  // disponible (Node 20+/Chrome 116+); de lo contrario, encadena manualmente.
+  // Timeout cliente. Las queries con LATERAL jsonb_array_elements pueden ser
+  // lentas y la latencia Chile→Supabase agrega 200-500ms por roundtrip. 60s
+  // es suficientemente generoso para el primer load (cache frío).
   const timeoutCtrl = new AbortController()
-  const timeoutId = setTimeout(() => timeoutCtrl.abort(new DashboardTimeoutError()), 20_000)
+  const timeoutId = setTimeout(() => timeoutCtrl.abort(new DashboardTimeoutError()), DASHBOARD_TIMEOUT_MS)
   const onExternalAbort = () => timeoutCtrl.abort(signal?.reason)
   if (signal) {
     if (signal.aborted) timeoutCtrl.abort(signal.reason)

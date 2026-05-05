@@ -44,6 +44,9 @@ export async function GET() {
                   ELSE '[]'::jsonb
                 END
               ) AS item
+              -- Mismo filtro que isCostoRealItem en lib/reportes/kpis.ts:
+              -- excluye SOLO "materiales pintura" (ya está en Gastos de Pintura).
+              -- La MO de pintura SÍ cuenta porque el pintor es a trato (no empleado).
               WHERE LOWER(COALESCE(item->>'descripcion', '')) NOT LIKE '%materiales pintura%'
             ), 0)
           ), 0) AS costos_internos,

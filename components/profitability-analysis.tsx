@@ -7,32 +7,9 @@ import { TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp } from "lucide-
 import { fetchDashboardData } from "@/lib/api-client"
 import { useMonth } from "@/lib/month-context"
 
-interface GastoCategoria {
-  categoria: string
-  monto: number
-  items: { descripcion: string; monto: number }[]
-}
+import type { KpisMes } from "@/lib/reportes/kpis"
 
-interface Kpis {
-  ingresoNeto: number
-  costosDirectos: number
-  gastosOperativos: number
-  gastosTabla: number
-  gastosDesglose: GastoCategoria[]
-  sueldosComprometidos: number
-  margenContribucion: number
-  margenContribucionPct: number
-  utilidadNeta: number
-  margenPct: number
-  ingresoPromedio: number
-  costoDirectoPromedio: number
-  puntoEquilibrio: number
-  serviciosCount: number
-  roi: number
-  serviciosFinalizados: number
-  tasaAbsorcion: number
-  ingresosManoObra: number
-}
+type Kpis = KpisMes
 
 function calcDelta(current: number, prev: number | null): { label: string; positive: boolean; neutral: boolean } {
   if (prev === null) return { label: "Sin datos ant.", positive: true, neutral: true }
@@ -54,14 +31,23 @@ function DeltaBadge({ delta, isPositive }: { delta: ReturnType<typeof calcDelta>
   )
 }
 
-export function ProfitabilityAnalysis() {
-  const [kpis, setKpis] = useState<Kpis | null>(null)
+interface ProfitabilityAnalysisProps {
+  // Si se pasan, evita el fetch interno (caso /reportes que ya tiene los datos
+  // cargados). Si no, hace fetch propio (caso uso aislado).
+  kpis?: Kpis | null
+  prevKpis?: Kpis | null
+}
+
+export function ProfitabilityAnalysis({ kpis: kpisProp, prevKpis: prevKpisProp }: ProfitabilityAnalysisProps = {}) {
+  const externalKpis = kpisProp !== undefined
+  const [kpisInternal, setKpisInternal] = useState<Kpis | null>(null)
+  const [prevKpisInternal, setPrevKpisInternal] = useState<Kpis | null>(null)
   const { selectedMonth } = useMonth()
-  const [prevKpis, setPrevKpis] = useState<Kpis | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!externalKpis)
   const [showGastosDesglose, setShowGastosDesglose] = useState(false)
 
   useEffect(() => {
+    if (externalKpis) return
     async function load() {
       setLoading(true)
       try {
@@ -71,9 +57,9 @@ export function ProfitabilityAnalysis() {
           fetchDashboardData(year, month),
           fetchDashboardData(prevDate.getFullYear(), prevDate.getMonth() + 1),
         ])
-        setKpis((current as any).kpis ?? null)
+        setKpisInternal((current as any).kpis ?? null)
         const prevData = (prev as any).kpis ?? null
-        setPrevKpis(prevData?.serviciosCount > 0 ? prevData : null)
+        setPrevKpisInternal(prevData?.serviciosCount > 0 ? prevData : null)
       } catch (e) {
         console.error("ProfitabilityAnalysis error:", e)
       } finally {
@@ -81,7 +67,10 @@ export function ProfitabilityAnalysis() {
       }
     }
     load()
-  }, [selectedMonth])
+  }, [selectedMonth, externalKpis])
+
+  const kpis = externalKpis ? (kpisProp ?? null) : kpisInternal
+  const prevKpis = externalKpis ? (prevKpisProp ?? null) : prevKpisInternal
 
   if (loading) {
     return (
@@ -105,7 +94,7 @@ export function ProfitabilityAnalysis() {
   )
 
   const fmt = (n: number) => `$${Math.round(n).toLocaleString("es-CL")}`
-  const fmtPct = (n: number) => `${n.toFixed(1)}%`
+  const fmtPct = (n: number | null) => (n === null || !isFinite(n) ? "—" : `${n.toFixed(1)}%`)
 
   return (
     <div className="space-y-4">
@@ -149,8 +138,8 @@ export function ProfitabilityAnalysis() {
 
             {/* Sueldos */}
             <div className="flex items-center justify-between py-2 border-t border-border">
-              <span className="text-sm text-muted-foreground">− Sueldos pagados (abonos del mes)</span>
-              <span className="text-base font-semibold text-red-400">{fmt(kpis.sueldosComprometidos)}</span>
+              <span className="text-sm text-muted-foreground">− Sueldos devengados del mes</span>
+              <span className="text-base font-semibold text-red-400">{fmt(kpis.sueldosDevengados)}</span>
             </div>
 
             {/* Gastos operacionales */}
@@ -207,10 +196,10 @@ export function ProfitabilityAnalysis() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {[
           {
-            label: "ROI",
-            value: fmtPct(kpis.roi),
-            delta: calcDelta(kpis.roi, prevKpis?.roi ?? null),
-            isPositive: kpis.roi >= 0,
+            label: "Cobertura de gastos",
+            value: fmtPct(kpis.coberturaGastos),
+            delta: calcDelta(kpis.coberturaGastos, prevKpis?.coberturaGastos ?? null),
+            isPositive: kpis.coberturaGastos >= 0,
           },
           {
             label: "Tasa de Absorción",
