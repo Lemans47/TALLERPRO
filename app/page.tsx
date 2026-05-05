@@ -146,11 +146,14 @@ export default function DashboardPage() {
   const [facturasPendientes, setFacturasPendientes] = useState<Servicio[]>([])
   const [serviciosPendientesCobro, setServiciosPendientesCobro] = useState<Servicio[]>([])
   const [gastosPendientesPago, setGastosPendientesPago] = useState<Gasto[]>([])
+  const [empleadosState, setEmpleadosState] = useState<Empleado[]>([])
+  const [abonosMesState, setAbonosMesState] = useState<AbonoEmpleado[]>([])
   const [loading, setLoading] = useState(true)
   const [isRefetching, setIsRefetching] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [showBreakeven, setShowBreakeven] = useState(false)
   const [showFacturasPendientes, setShowFacturasPendientes] = useState(false)
+  const [showSueldosAtrasados, setShowSueldosAtrasados] = useState(false)
   const { selectedMonth } = useMonth()
   // Cancelar requests stale cuando el usuario cambia rápido de mes:
   // sin esto, las 11 queries del fetch anterior siguen ocupando el pool de
@@ -202,6 +205,8 @@ export default function DashboardPage() {
       setFacturasPendientes(pendientesData || [])
       setServiciosPendientesCobro(cobrosPendData || [])
       setGastosPendientesPago(gastosPendData || [])
+      setEmpleadosState(empleadosData || [])
+      setAbonosMesState(abonosMes || [])
       calculateKPIs(serviciosData, gastosData, empleadosData, activosData, abonosMes, apiKpis, entregadosMes, serviciosFacturadosMes)
       hasLoadedOnceRef.current = true
     } catch (error: any) {
@@ -655,6 +660,80 @@ export default function DashboardPage() {
                         <p className="text-[10px] text-muted-foreground">IVA {formatCurrency(iva)}</p>
                       </div>
                     </Link>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )
+      })()}
+
+      {/* Sueldos atrasados: empleados con sueldo_base > abonos del mes.
+          Solo aparece para meses ya cerrados (anteriores al mes en curso),
+          porque durante el mes vigente los sueldos no son deuda atrasada
+          sino salarios corrientes pendientes de pago al fin de mes. */}
+      {!isVistaSimple && (() => {
+        const [selY, selM] = selectedMonth.split("-").map(Number)
+        const hoy = new Date()
+        const mesActualY = hoy.getFullYear()
+        const mesActualM = hoy.getMonth() + 1
+        const mesEsPasado = selY < mesActualY || (selY === mesActualY && selM < mesActualM)
+        if (!mesEsPasado) return null
+
+        const detalle = empleadosState
+          .filter((e) => e.activo)
+          .map((e) => {
+            const abonado = abonosMesState
+              .filter((a) => a.empleado_id === e.id)
+              .reduce((s, a) => s + Number(a.monto || 0), 0)
+            const pendiente = Math.max(0, Number(e.sueldo_base || 0) - abonado)
+            return { ...e, abonado, pendiente }
+          })
+          .filter((e) => e.pendiente > 0)
+        if (detalle.length === 0) return null
+        const totalPendiente = detalle.reduce((s, e) => s + e.pendiente, 0)
+        return (
+          <div className="rounded-xl border border-warning/40 bg-warning/5 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowSueldosAtrasados((v) => !v)}
+              className="w-full flex items-center justify-between gap-3 p-4 hover:bg-warning/10 transition-colors"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="p-2 rounded-lg bg-warning/15 text-warning shrink-0">
+                  <AlertCircle className="w-5 h-5" />
+                </div>
+                <div className="text-left min-w-0">
+                  <p className="text-sm font-semibold text-warning">
+                    Deuda con {detalle.length} empleado{detalle.length !== 1 ? "s" : ""}: {formatCurrency(totalPendiente)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Sueldos devengados aún no pagados en su totalidad este mes
+                  </p>
+                </div>
+              </div>
+              {showSueldosAtrasados ? <ChevronUp className="w-4 h-4 text-warning shrink-0" /> : <ChevronDown className="w-4 h-4 text-warning shrink-0" />}
+            </button>
+            {showSueldosAtrasados && (
+              <div className="border-t border-warning/20 divide-y divide-warning/10">
+                {detalle.map((e) => {
+                  const pct = Number(e.sueldo_base) > 0 ? Math.round((e.abonado / Number(e.sueldo_base)) * 100) : 0
+                  return (
+                    <div
+                      key={e.id}
+                      className="flex items-center justify-between gap-3 px-4 py-2.5"
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <span className="font-semibold text-sm shrink-0">{e.nombre}</span>
+                        {e.cargo && <span className="text-xs text-muted-foreground truncate">· {e.cargo}</span>}
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-semibold text-warning">{formatCurrency(e.pendiente)}</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {formatCurrency(e.abonado)} de {formatCurrency(Number(e.sueldo_base))} ({pct}%)
+                        </p>
+                      </div>
+                    </div>
                   )
                 })}
               </div>

@@ -20,7 +20,7 @@ import {
 } from "lucide-react"
 import { ProfitabilityAnalysis } from "@/components/profitability-analysis"
 import { useMonth } from "@/lib/month-context"
-import { fetchDashboardData, type Servicio, type Gasto } from "@/lib/api-client"
+import { fetchDashboardData, fetchPinturaHistorico, type Servicio, type Gasto, type PinturaHistoricoRow } from "@/lib/api-client"
 import type { AbonoEmpleado, Empleado } from "@/lib/database"
 import { formatFechaDMA, extraerIvaIncluido } from "@/lib/utils"
 import { useEstados } from "@/lib/estados"
@@ -217,6 +217,14 @@ export default function ReportsPage() {
   const desviacionMO = moPinturaReal - moPinturaEstimada
   const desviacionMat = totalMaterialesPintura - materialesEstimado
   const [showMoDetalle, setShowMoDetalle] = useState(false)
+
+  // ── Histórico de pintura (6 meses) ───────────────────────────────────────────
+  const [pinturaHistorico, setPinturaHistorico] = useState<PinturaHistoricoRow[]>([])
+  useEffect(() => {
+    fetchPinturaHistorico()
+      .then((r) => setPinturaHistorico(r.historico))
+      .catch(() => setPinturaHistorico([]))
+  }, [])
 
   // ── Datos para gráficos del Resumen ─────────────────────────────────────────
   const gastosFijos = gastos.filter((g) => g.categoria === "Gastos Fijos").reduce((s, g) => s + Number(g.monto), 0)
@@ -497,45 +505,147 @@ export default function ReportsPage() {
         ]),
         theme: "striped",
         styles: { fontSize: 8 },
+        headStyles: { fillColor: [15, 23, 42] },
       })
     }
 
-    // ── Anexo: servicios del mes ──────────────────────────────────────────────
+    // ── Anexo: servicios del mes (agrupados por estado) ──────────────────────
     doc.addPage()
     doc.setFontSize(14)
     doc.text("Anexo A: Servicios del Mes", 14, 20)
+    doc.setFontSize(8)
+    doc.setTextColor(100)
+    doc.text("Agrupados por estado, ordenados por fecha", 14, 26)
+    doc.setTextColor(0)
+
+    // Agrupar por estado y ordenar grupos por monto total descendente
+    const grupos = new Map<string, Servicio[]>()
+    for (const s of servicios) {
+      const k = s.estado || "Sin estado"
+      if (!grupos.has(k)) grupos.set(k, [])
+      grupos.get(k)!.push(s)
+    }
+    const gruposOrdenados = [...grupos.entries()]
+      .map(([estado, items]) => ({
+        estado,
+        items: [...items].sort((a, b) => new Date(a.fecha_ingreso).getTime() - new Date(b.fecha_ingreso).getTime()),
+        subtotal: items.reduce((s, sv) => s + Number(sv.monto_total_sin_iva || 0), 0),
+      }))
+      .sort((a, b) => b.subtotal - a.subtotal)
+
+    // Construir filas: header de grupo + servicios + subtotal
+    const bodyServicios: any[] = []
+    for (const g of gruposOrdenados) {
+      // Fila de título de grupo (todas las celdas en una)
+      bodyServicios.push([
+        {
+          content: `${g.estado.toUpperCase()} — ${g.items.length} servicio${g.items.length !== 1 ? "s" : ""}`,
+          colSpan: 6,
+          styles: { fillColor: [37, 99, 235], textColor: 255, fontStyle: "bold", fontSize: 8 },
+        },
+      ])
+      for (const s of g.items) {
+        bodyServicios.push([
+          formatFechaDMA(s.fecha_ingreso),
+          s.patente,
+          s.cliente,
+          `${s.marca} ${s.modelo}`,
+          s.estado,
+          fmtCLP(Number(s.monto_total_sin_iva)),
+        ])
+      }
+      // Subtotal del grupo
+      bodyServicios.push([
+        { content: "Subtotal", colSpan: 5, styles: { halign: "right", fontStyle: "bold", fillColor: [241, 245, 249] } },
+        { content: fmtCLP(g.subtotal), styles: { halign: "right", fontStyle: "bold", fillColor: [241, 245, 249] } },
+      ])
+    }
+    // Fila de total general
+    const totalGeneral = gruposOrdenados.reduce((s, g) => s + g.subtotal, 0)
+    bodyServicios.push([
+      {
+        content: `TOTAL ${servicios.length} servicios`,
+        colSpan: 5,
+        styles: { halign: "right", fontStyle: "bold", fillColor: [15, 23, 42], textColor: 255 },
+      },
+      { content: fmtCLP(totalGeneral), styles: { halign: "right", fontStyle: "bold", fillColor: [15, 23, 42], textColor: 255 } },
+    ])
+
     autoTable(doc, {
-      startY: 26,
+      startY: 32,
       head: [["Fecha", "Patente", "Cliente", "Marca/Modelo", "Estado", "Monto"]],
-      body: servicios.map((s) => [
-        formatFechaDMA(s.fecha_ingreso),
-        s.patente,
-        s.cliente,
-        `${s.marca} ${s.modelo}`,
-        s.estado,
-        fmtCLP(Number(s.monto_total_sin_iva)),
-      ]),
+      body: bodyServicios,
       theme: "striped",
       styles: { fontSize: 7 },
+      headStyles: { fillColor: [15, 23, 42] },
+      columnStyles: { 5: { halign: "right" } },
     })
 
-    // ── Anexo: gastos del mes ─────────────────────────────────────────────────
+    // ── Anexo: gastos del mes (agrupados por categoría) ──────────────────────
     if (gastos.length > 0) {
       doc.addPage()
       doc.setFontSize(14)
       doc.text("Anexo B: Gastos del Mes", 14, 20)
+      doc.setFontSize(8)
+      doc.setTextColor(100)
+      doc.text("Agrupados por categoría, ordenados por fecha", 14, 26)
+      doc.setTextColor(0)
+
+      const cats = new Map<string, Gasto[]>()
+      for (const g of gastos) {
+        const k = g.categoria || "Sin categoría"
+        if (!cats.has(k)) cats.set(k, [])
+        cats.get(k)!.push(g)
+      }
+      const categoriasOrdenadas = [...cats.entries()]
+        .map(([categoria, items]) => ({
+          categoria,
+          items: [...items].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime()),
+          subtotal: items.reduce((s, g) => s + Number(g.monto || 0), 0),
+        }))
+        .sort((a, b) => b.subtotal - a.subtotal)
+
+      const bodyGastos: any[] = []
+      for (const c of categoriasOrdenadas) {
+        bodyGastos.push([
+          {
+            content: `${c.categoria.toUpperCase()} — ${c.items.length} ítem${c.items.length !== 1 ? "s" : ""}`,
+            colSpan: 5,
+            styles: { fillColor: [245, 158, 11], textColor: 255, fontStyle: "bold", fontSize: 8 },
+          },
+        ])
+        for (const g of c.items) {
+          bodyGastos.push([
+            formatFechaDMA(g.fecha),
+            g.categoria,
+            g.descripcion,
+            g.tipo_documento || "boleta",
+            fmtCLP(Number(g.monto)),
+          ])
+        }
+        bodyGastos.push([
+          { content: "Subtotal", colSpan: 4, styles: { halign: "right", fontStyle: "bold", fillColor: [241, 245, 249] } },
+          { content: fmtCLP(c.subtotal), styles: { halign: "right", fontStyle: "bold", fillColor: [241, 245, 249] } },
+        ])
+      }
+      const totalGastos = categoriasOrdenadas.reduce((s, c) => s + c.subtotal, 0)
+      bodyGastos.push([
+        {
+          content: `TOTAL ${gastos.length} gastos`,
+          colSpan: 4,
+          styles: { halign: "right", fontStyle: "bold", fillColor: [15, 23, 42], textColor: 255 },
+        },
+        { content: fmtCLP(totalGastos), styles: { halign: "right", fontStyle: "bold", fillColor: [15, 23, 42], textColor: 255 } },
+      ])
+
       autoTable(doc, {
-        startY: 26,
+        startY: 32,
         head: [["Fecha", "Categoría", "Descripción", "Doc.", "Monto"]],
-        body: gastos.map((g) => [
-          formatFechaDMA(g.fecha),
-          g.categoria,
-          g.descripcion,
-          g.tipo_documento || "boleta",
-          fmtCLP(Number(g.monto)),
-        ]),
+        body: bodyGastos,
         theme: "striped",
         styles: { fontSize: 7 },
+        headStyles: { fillColor: [15, 23, 42] },
+        columnStyles: { 4: { halign: "right" } },
       })
     }
 
@@ -1226,6 +1336,69 @@ export default function ReportsPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Histórico Pintura — últimos 6 meses */}
+          {pinturaHistorico.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  Histórico Pintura — últimos 6 meses
+                  <InfoTip>
+                    Para detectar tendencias del pintor (a trato) y proveedores de materiales.
+                    Si la desviación es consistentemente positiva en MO, podrías estar pagando más de la tarifa.
+                    Si lo es en materiales, los precios subieron o estás comprando de más.
+                  </InfoTip>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="border-b border-border">
+                      <tr className="text-left text-xs text-muted-foreground">
+                        <th className="py-2 pr-3 font-medium">Mes</th>
+                        <th className="py-2 pr-3 font-medium text-right">Piezas</th>
+                        <th className="py-2 pr-3 font-medium text-right">MO estimada</th>
+                        <th className="py-2 pr-3 font-medium text-right">MO real</th>
+                        <th className="py-2 pr-3 font-medium text-right">Δ MO</th>
+                        <th className="py-2 pr-3 font-medium text-right">Mat. estimado</th>
+                        <th className="py-2 pr-3 font-medium text-right">Mat. real</th>
+                        <th className="py-2 pr-3 font-medium text-right">Δ Mat.</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pinturaHistorico.map((r) => {
+                        const dMO = r.mo_real - r.mo_estimada
+                        const dMat = r.mat_real - r.mat_estimado
+                        const [y, m] = r.mes.split("-").map(Number)
+                        const label = new Date(y, m - 1, 1).toLocaleDateString("es-CL", { month: "short", year: "2-digit" })
+                        return (
+                          <tr key={r.mes} className="border-b border-border/50">
+                            <td className="py-2 pr-3 font-medium capitalize">{label}</td>
+                            <td className="py-2 pr-3 text-right">{r.piezas % 1 === 0 ? r.piezas : r.piezas.toFixed(1)}</td>
+                            <td className="py-2 pr-3 text-right text-muted-foreground">{fmtCLP(r.mo_estimada)}</td>
+                            <td className="py-2 pr-3 text-right">{fmtCLP(r.mo_real)}</td>
+                            <td className={`py-2 pr-3 text-right font-medium ${dMO === 0 ? "text-muted-foreground" : dMO > 0 ? "text-red-600" : "text-green-600"}`}>
+                              {r.mo_estimada === 0 ? "—" : `${dMO >= 0 ? "+" : ""}${fmtCLP(dMO)}`}
+                            </td>
+                            <td className="py-2 pr-3 text-right text-muted-foreground">{fmtCLP(r.mat_estimado)}</td>
+                            <td className="py-2 pr-3 text-right">{fmtCLP(r.mat_real)}</td>
+                            <td className={`py-2 pr-3 text-right font-medium ${dMat === 0 ? "text-muted-foreground" : dMat > 0 ? "text-red-600" : "text-green-600"}`}>
+                              {r.mat_estimado === 0 && r.mat_real === 0 ? "—" : `${dMat >= 0 ? "+" : ""}${fmtCLP(dMat)}`}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-xs text-muted-foreground mt-3">
+                  <span className="text-red-600">Rojo</span> = pagaste/gastaste más de lo estimado en ese mes.
+                  <span className="text-green-600 ml-2">Verde</span> = menos. Compara la columna Δ entre meses para
+                  detectar tendencias (ej. desviación creciente puede indicar precios subiendo o ajustes recurrentes).
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* ── TOP CLIENTES (DOBLE RANKING) ─────────────────────────────────── */}

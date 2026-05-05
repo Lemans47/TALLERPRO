@@ -60,6 +60,22 @@ export async function fetchDashboardData(
   }
 }
 
+// Histórico de pintura — 6 meses de estimado vs real (MO + materiales).
+export interface PinturaHistoricoRow {
+  mes: string // YYYY-MM
+  piezas: number
+  mo_estimada: number
+  mo_real: number
+  mat_estimado: number
+  mat_real: number
+}
+
+export async function fetchPinturaHistorico(): Promise<{ historico: PinturaHistoricoRow[] }> {
+  const res = await fetch("/api/pintura-historico", { cache: "no-store" })
+  if (!res.ok) throw new Error("Error fetching pintura histórico")
+  return res.json()
+}
+
 // Chart data — agregados por mes (últimos 6 meses) calculados en SQL.
 export interface ChartMonthlyRow {
   mes: string // YYYY-MM
