@@ -21,7 +21,7 @@ import { fetchDashboardData, DashboardTimeoutError } from "@/lib/api-client"
 import type { Servicio, Gasto, Empleado, AbonoEmpleado } from "@/lib/database"
 import { useAuth } from "@/lib/auth-context"
 import { useEstados } from "@/lib/estados"
-import { extraerIvaIncluido } from "@/lib/utils"
+import { extraerIvaIncluido, safeLocalStorage } from "@/lib/utils"
 import { sumarCostosReales } from "@/lib/reportes/kpis"
 
 interface KPIs {
@@ -384,7 +384,7 @@ export default function DashboardPage() {
       .reduce((sum, g) => sum + Number(g.monto || 0), 0)
     // Mano de obra pintura: prioriza costo real del item auto en costos (puede estar editado
     // manualmente por servicio), fallback a tarifa × piezas si el servicio no tiene el item.
-    const tarifaFallback = Number(localStorage.getItem("mano_obra_pintura_default") || 0)
+    const tarifaFallback = Number(safeLocalStorage.get("mano_obra_pintura_default") || 0)
     const manoObraPintura = servicios.reduce((sum, s) => {
       const manoObraItem = parseArr(s.costos).find(
         (c: any) => c.isAuto && String(c.descripcion || "").toLowerCase().includes("mano de obra pintura")

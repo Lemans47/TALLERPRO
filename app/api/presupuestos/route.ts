@@ -7,19 +7,16 @@ import {
   deletePresupuesto,
   convertPresupuestoToServicio,
 } from "@/lib/database"
+import { parseYearMonth } from "@/lib/utils"
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
-    const year = searchParams.get("year")
-    const month = searchParams.get("month")
+    const ym = parseYearMonth(searchParams)
 
-    let presupuestos
-    if (year && month) {
-      presupuestos = await getPresupuestosByMonth(Number.parseInt(year), Number.parseInt(month))
-    } else {
-      presupuestos = await getPresupuestos()
-    }
+    const presupuestos = ym
+      ? await getPresupuestosByMonth(ym.year, ym.month)
+      : await getPresupuestos()
 
     return NextResponse.json(presupuestos)
   } catch (error) {

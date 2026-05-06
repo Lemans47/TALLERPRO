@@ -47,7 +47,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { generarPDFPresupuesto } from "@/lib/pdf-presupuesto"
 import { PDFPreviewModal } from "@/components/pdf-preview-modal"
-import { roundMoney, costoNetoItem, sumCostosNetos } from "@/lib/utils"
+import { roundMoney, costoNetoItem, sumCostosNetos, safeLocalStorage } from "@/lib/utils"
 import { useEstados } from "@/lib/estados"
 
 interface ServiceFormProps {
@@ -178,7 +178,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
     loadPreciosYPiezasPintura()
     loadManoObraConfig()
     loadMaterialesConfig()
-    api.plantillasServicio.getAll().then(setPlantillas).catch(() => {})
+    api.plantillasServicio.getAll().then(setPlantillas).catch((e) => console.error("plantillasServicio.getAll:", e))
   }, [])
 
   const loadPreciosYPiezasPintura = async () => {
@@ -194,7 +194,12 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       if (servicioAEditar) return
 
       if (Array.isArray(piezas) && piezas.length > 0) {
-        const piezasConPrecio = piezas.map((p) => ({
+        // Dedup defensivo por nombre (la BD permite duplicados hoy; ver
+        // scripts/05-piezas-pintura-unique.sql para arreglarlo en BD).
+        const piezasUnicas = Array.from(
+          new Map(piezas.map((p) => [String(p.nombre || "").trim().toUpperCase(), p])).values()
+        )
+        const piezasConPrecio = piezasUnicas.map((p) => ({
           nombre: p.nombre,
           precio: precioGlobal,
           cantidad_piezas: Number(p.cantidad_piezas) || 1,
@@ -211,29 +216,27 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   }
 
   const loadManoObraConfig = () => {
-    // Cargar valor guardado de mano de obra (localStorage como config simple)
-    const saved = localStorage.getItem("mano_obra_pintura_default")
+    const saved = safeLocalStorage.get("mano_obra_pintura_default")
     if (saved) {
       setManoObraConfig(Number(saved))
     }
   }
 
   const saveManoObraConfig = () => {
-    localStorage.setItem("mano_obra_pintura_default", manoObraConfig.toString())
+    safeLocalStorage.set("mano_obra_pintura_default", manoObraConfig.toString())
     toast({ title: "Valor de mano de obra guardado" })
     setShowManoObraModal(false)
   }
 
   const loadMaterialesConfig = () => {
-    // Cargar valor guardado de materiales (localStorage como config simple)
-    const saved = localStorage.getItem("materiales_pintura_default")
+    const saved = safeLocalStorage.get("materiales_pintura_default")
     if (saved) {
       setMaterialesConfig(Number(saved))
     }
   }
 
   const saveMaterialesConfig = () => {
-    localStorage.setItem("materiales_pintura_default", materialesConfig.toString())
+    safeLocalStorage.set("materiales_pintura_default", materialesConfig.toString())
     toast({ title: "Valor de materiales guardado" })
     setShowMaterialesModal(false)
   }
@@ -326,7 +329,6 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         return []
       }
       const cobrosData = parseToFlatArray(servicioAEditar.cobros)
-      console.log("[v0] cobrosData from servicio:", cobrosData)
       const newCobros: ItemsPorCategoria = {
         desmontar: [],
         desabolladura: [],
@@ -354,12 +356,10 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         const cat = normalizeCat(c.categoria)
         newCobros[cat].push({ id: crypto.randomUUID(), descripcion: c.descripcion, monto: c.monto })
       })
-      console.log("[v0] newCobros after mapping:", newCobros)
       setCobros(newCobros)
 
       // Cargar costos por categoría
       const costosData = parseToFlatArray(servicioAEditar.costos)
-      console.log("[v0] costosData from servicio:", costosData)
       // Extraer costo real del pintor antes de filtrar auto-items
       const autoManoObra = costosData.find(
         (c: any) => isAutoItem(c.descripcion) && c.descripcion?.toLowerCase().includes("mano de obra")
@@ -387,7 +387,6 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
           tipo_documento: c.tipo_documento === "factura" ? "factura" : "boleta",
         })
       })
-      console.log("[v0] newCostos after mapping:", newCostos)
       setCostos(newCostos)
 
       // Cargar piezas de pintura seleccionadas
@@ -398,7 +397,11 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
           const piezasData = Array.isArray(servicioAEditar.piezas_pintura) ? servicioAEditar.piezas_pintura : (typeof servicioAEditar.piezas_pintura === "string" ? JSON.parse(servicioAEditar.piezas_pintura) : [])
           
           if (Array.isArray(piezas) && piezas.length > 0) {
-            const piezasConPrecio = piezas.map((p) => {
+            // Dedup defensivo por nombre (ver loadPreciosYPiezasPintura).
+            const piezasUnicas = Array.from(
+              new Map(piezas.map((p) => [String(p.nombre || "").trim().toUpperCase(), p])).values()
+            )
+            const piezasConPrecio = piezasUnicas.map((p) => {
               const saved = piezasData.find((pd: { nombre: string; cantidad: number }) => pd.nombre === p.nombre)
               return {
                 nombre: p.nombre,
@@ -738,14 +741,12 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   }
 
   const handleSubmit = async () => {
-    console.log("[v0] handleSubmit called")
     if (submittingRef.current) return
     if (!validateRequiredFields()) return
     submittingRef.current = true
 
     setLoading(true)
     try {
-      console.log("[v0] Starting handleSubmit with formData:", formData)
       // Convertir cobros por categoría a array con descripción
       const cobrosArray: { categoria: string; descripcion: string; monto: number }[] = []
       Object.entries(cobros).forEach(([categoria, items]) => {
@@ -839,27 +840,20 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         fecha_facturacion: formData.iva === "con" ? (formData.fecha_facturacion || null) : null,
       }
 
-      console.log("[v0] servicioData prepared:", servicioData)
-
       if (servicioAEditar && !servicioAEditar.isPresupuesto && servicioAEditar.id) {
-        console.log("[v0] Updating existing servicio:", servicioAEditar.id)
         await api.servicios.update(servicioAEditar.id, servicioData)
         toast({ title: "Servicio actualizado" })
       } else {
-        console.log("[v0] Creating new servicio")
-        const newServicio = await api.servicios.create(
+        await api.servicios.create(
           servicioData as Omit<Servicio, "id" | "created_at" | "updated_at">,
         )
-        console.log("[v0] Servicio created:", newServicio)
 
         if (servicioAEditar?.isPresupuesto && servicioAEditar.id) {
-          console.log("[v0] Deleting presupuesto after conversion:", servicioAEditar.id)
           await api.presupuestos.delete(servicioAEditar.id)
         }
 
         toast({ title: "Servicio guardado" })
       }
-      console.log("[v0] Calling onSaved")
       onSaved()
       resetForm()
     } catch (error) {
@@ -872,14 +866,12 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   }
 
   const handlePresupuesto = async () => {
-    console.log("[v0] handlePresupuesto called")
     if (submittingRef.current) return
     if (!validateRequiredFields()) return
     submittingRef.current = true
 
     setLoading(true)
     try {
-      console.log("[v0] Starting handlePresupuesto with formData:", formData)
       // Convertir cobros por categoría a array con descripción
       const cobrosArray: { categoria: string; descripcion: string; monto: number }[] = []
       Object.entries(cobros).forEach(([categoria, items]) => {
@@ -960,8 +952,6 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         observaciones_checkboxes: [],
       }
 
-      console.log("[v0] presupuestoData prepared:", presupuestoData)
-
       let newPresupuesto: Presupuesto
       if (servicioAEditar?.isPresupuesto && servicioAEditar.id) {
         newPresupuesto = await api.presupuestos.update(servicioAEditar.id, presupuestoData)
@@ -972,12 +962,10 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         )
         toast({ title: "Presupuesto creado" })
       }
-      console.log("[v0] Presupuesto saved:", newPresupuesto)
       if (newPresupuesto) {
         setSavedPresupuesto(newPresupuesto)
         setPdfFormatDialog(true)
       }
-      console.log("[v0] Calling onSaved")
       onSaved()
       resetForm()
     } catch (error) {

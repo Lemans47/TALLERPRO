@@ -13,6 +13,7 @@ import {
   getGastosPendientesPago,
 } from "@/lib/database"
 import { computeKpisMes } from "@/lib/reportes/kpis"
+import { parseYearMonth } from "@/lib/utils"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
@@ -92,17 +93,19 @@ async function loadDashboardData(year: number, month: number) {
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
-    const year = Number.parseInt(searchParams.get("year") || new Date().getFullYear().toString())
-    const month = Number.parseInt(searchParams.get("month") || (new Date().getMonth() + 1).toString())
+    const ym = parseYearMonth(searchParams)
+    const now = new Date()
+    const year = ym?.year ?? now.getFullYear()
+    const month = ym?.month ?? now.getMonth() + 1
     const skipCache = searchParams.get("nocache") === "1"
 
     const cache = getCache()
     const key = `${year}-${month}`
-    const now = Date.now()
+    const tNow = Date.now()
     const hit = cache.get(key)
 
     // Cache hit válido y no se pidió nocache → devolver inmediato
-    if (!skipCache && hit && hit.expires > now && !hit.inFlight) {
+    if (!skipCache && hit && hit.expires > tNow && !hit.inFlight) {
       return NextResponse.json(hit.value)
     }
 
@@ -119,7 +122,7 @@ export async function GET(request: Request) {
 
     try {
       const value = await inFlight
-      cache.set(key, { value, expires: now + TTL_MS })
+      cache.set(key, { value, expires: tNow + TTL_MS })
       return NextResponse.json(value)
     } catch (err) {
       // CRÍTICO: si la promesa falla, INVALIDAR el cache para que el próximo

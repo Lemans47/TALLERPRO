@@ -45,7 +45,7 @@ export async function POST(request: Request) {
     if (error?.code === "23505") {
       return NextResponse.json({ error: "Ya existe un estado con ese nombre" }, { status: 409 })
     }
-    return NextResponse.json({ error: error.message || "Error al crear el estado" }, { status: 500 })
+    return NextResponse.json({ error: "Error al crear el estado" }, { status: 500 })
   }
 }
 
@@ -73,7 +73,7 @@ export async function PUT(request: Request) {
     if (error?.code === "23505") {
       return NextResponse.json({ error: "Ya existe un estado con ese nombre" }, { status: 409 })
     }
-    return NextResponse.json({ error: error.message || "Error al actualizar el estado" }, { status: 500 })
+    return NextResponse.json({ error: "Error al actualizar el estado" }, { status: 500 })
   }
 }
 
@@ -102,6 +102,6 @@ export async function DELETE(request: Request) {
       )
     }
     console.error("Error deleting estado_servicio:", error)
-    return NextResponse.json({ error: error.message || "Error al borrar el estado" }, { status: 500 })
+    return NextResponse.json({ error: "Error al borrar el estado" }, { status: 500 })
   }
 }

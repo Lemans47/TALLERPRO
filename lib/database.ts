@@ -81,6 +81,10 @@ export interface Servicio {
   mes_revision_tecnica?: string
   detalle_pendiente: boolean
   fecha_facturacion?: string | null
+  /** Fecha en que el servicio cambió a un estado tipo `por_cobrar` o `cerrado`.
+   *  Se setea automáticamente la primera vez que el estado pasa a ser finalizado.
+   *  Usar para medir antigüedad real de cuentas por cobrar (no fecha_ingreso). */
+  fecha_entregado?: string | null
   created_at: string
   updated_at: string
 }
@@ -329,7 +333,8 @@ export async function createServicio(servicio: Omit<Servicio, "id" | "created_at
       fecha_ingreso, patente, marca, modelo, color, kilometraje, año, cliente, telefono, observaciones,
       mano_obra_pintura, cobros, costos, piezas_pintura, estado, iva,
       anticipo, saldo_pendiente, monto_total, monto_total_sin_iva, observaciones_checkboxes,
-      fotos_ingreso, fotos_entrega, numero_ot, detalle_pendiente, fecha_facturacion
+      fotos_ingreso, fotos_entrega, numero_ot, detalle_pendiente, fecha_facturacion,
+      fecha_entregado
     ) VALUES (
       ${servicio.fecha_ingreso}, ${servicio.patente}, ${servicio.marca}, ${servicio.modelo},
       ${servicio.color || null}, ${servicio.kilometraje || null}, ${servicio.año || null},
@@ -340,7 +345,12 @@ export async function createServicio(servicio: Omit<Servicio, "id" | "created_at
       ${servicio.monto_total_sin_iva}, ${safeJson(servicio.observaciones_checkboxes)},
       ${safeJson(servicio.fotos_ingreso || [])}, ${safeJson(servicio.fotos_entrega || [])},
       nextval('servicios_numero_ot_seq')::int, ${servicio.detalle_pendiente ?? false},
-      ${servicio.fecha_facturacion || null}
+      ${servicio.fecha_facturacion || null},
+      CASE
+        WHEN ${servicio.estado}::text IN (SELECT nombre FROM estados_servicio WHERE tipo IN ('por_cobrar', 'cerrado'))
+        THEN CURRENT_DATE
+        ELSE NULL
+      END
     ) RETURNING *
   `
   return data[0] as Servicio
@@ -378,6 +388,13 @@ export async function updateServicio(id: string, servicio: Partial<Servicio>) {
       fotos_entrega = COALESCE(${servicio.fotos_entrega != null ? safeJson(servicio.fotos_entrega) : null}::jsonb, fotos_entrega),
       detalle_pendiente = COALESCE(${servicio.detalle_pendiente ?? null}, detalle_pendiente),
       fecha_facturacion = CASE WHEN ${fechaFacSet}::boolean THEN ${fechaFacVal}::date ELSE fecha_facturacion END,
+      fecha_entregado = CASE
+        WHEN ${servicio.estado ?? null}::text IS NOT NULL
+         AND fecha_entregado IS NULL
+         AND ${servicio.estado ?? null}::text IN (SELECT nombre FROM estados_servicio WHERE tipo IN ('por_cobrar', 'cerrado'))
+        THEN CURRENT_DATE
+        ELSE fecha_entregado
+      END,
       updated_at = NOW()
     WHERE id = ${id}
     RETURNING *
@@ -783,25 +800,7 @@ export async function getVehicleHistory(patente: string) {
   }
 }
 
-// Delete all data
-export async function deleteAllData() {
-  const db = getSQL()
-  await db`DELETE FROM servicios`
-  await db`DELETE FROM presupuestos`
-  await db`DELETE FROM gastos`
-  await db`DELETE FROM trabajadores`
-}
-
 // Precio Pintura
-export async function getPreciosPintura() {
-  const db = getSQL()
-  const data = await db`
-    SELECT * FROM precios_pintura 
-    ORDER BY nombre ASC
-  `
-  return data as PrecioPintura[]
-}
-
 // Precios Pintura - Solo precio global
 export async function getPrecioPintura(): Promise<PrecioPintura | null> {
   try {
@@ -1311,11 +1310,6 @@ export async function deduplicarClientes(): Promise<number> {
     }
   }
   return deleted
-}
-
-export async function deletePrecioPintura(id: string) {
-  const db = getSQL()
-  await db`DELETE FROM precios_pintura WHERE id = ${id}`
 }
 
 export async function batchUpdatePreciosPintura(updates: { id: string; precio: number }[]) {

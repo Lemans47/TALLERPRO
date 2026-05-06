@@ -226,7 +226,11 @@ SELECT
      FROM servicios
      WHERE fecha_ingreso >= '2026-04-01' AND fecha_ingreso <= '2026-04-30'
        AND monto_total_sin_iva > 0) AS ingreso_facturado,
-  -- Costos directos (isAuto excluido)
+  -- Costos directos (criterio canónico de isCostoRealItem en lib/reportes/kpis.ts):
+  --   - Excluye SIEMPRE "materiales pintura" (los reales se contabilizan en gastos
+  --     categoría "Gastos de Pintura"; los isAuto son solo referenciales).
+  --   - INCLUYE mano de obra pintura aunque sea isAuto (es lo que se paga al
+  --     pintor a trato — costo real no cubierto por sueldos devengados).
   (SELECT COALESCE(SUM(COALESCE((item->>'monto')::numeric, 0)), 0)
      FROM servicios s,
           LATERAL jsonb_array_elements(
@@ -238,7 +242,6 @@ SELECT
           ) AS item
      WHERE s.fecha_ingreso >= '2026-04-01' AND s.fecha_ingreso <= '2026-04-30'
        AND s.monto_total_sin_iva > 0
-       AND COALESCE(item->>'isAuto', 'false') <> 'true'
        AND LOWER(COALESCE(item->>'descripcion', '')) NOT LIKE '%materiales pintura%'
   ) AS costos_directos,
   -- Gastos sin sueldos

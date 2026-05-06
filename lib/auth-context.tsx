@@ -26,6 +26,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
   // Track which userId already has its role loaded to avoid wiping it on token refresh
   const roleLoadedForRef = useRef<string | null>(null)
+  // Track which userId tiene un fetch in-flight para descartar resultados
+  // que llegan después de un cambio de sesión.
+  const inFlightUserRef = useRef<string | null>(null)
+  const mountedRef = useRef(true)
 
   const supabase = createClient()
 
@@ -47,7 +51,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const loadRoleInBackground = (userId: string) => {
+    inFlightUserRef.current = userId
     fetchRole(userId).then((r) => {
+      // Descartar si el componente se desmontó o si la sesión cambió mientras
+      // el fetch estaba en vuelo (otro login pisó este userId).
+      if (!mountedRef.current) return
+      if (inFlightUserRef.current !== userId) return
       if (r) {
         roleLoadedForRef.current = userId
         setRole(r)
@@ -56,9 +65,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
+    mountedRef.current = true
+
     const initAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
+        if (!mountedRef.current) return
         if (session?.user) {
           setUser(session.user)
           // Don't block loading on role fetch — load role in background
@@ -68,26 +80,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error("Auth init error:", e)
       } finally {
         // Release loading immediately after session check, not after role fetch
-        setLoading(false)
+        if (mountedRef.current) setLoading(false)
       }
     }
 
     initAuth()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!mountedRef.current) return
       if (session?.user) {
         setUser(session.user)
         if (roleLoadedForRef.current !== session.user.id) {
           loadRoleInBackground(session.user.id)
         }
       } else {
+        inFlightUserRef.current = null
         setUser(null)
         setRole(null)
         roleLoadedForRef.current = null
       }
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      mountedRef.current = false
+      subscription.unsubscribe()
+    }
   }, [])
 
   const signOut = async () => {

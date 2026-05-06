@@ -14,7 +14,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
 import {
-  Download, FileSpreadsheet, TrendingUp, TrendingDown, DollarSign, Wrench,
+  Download, FileSpreadsheet, TrendingUp, TrendingDown, DollarSign,
   RefreshCw, Users, ArrowUpRight, ArrowDownRight, Minus, Receipt, Info,
   AlertCircle, Banknote,
 } from "lucide-react"
@@ -276,61 +276,15 @@ export default function ReportsPage() {
     return Object.values(map).sort((a, b) => b.total - a.total).slice(0, 10)
   }, [servicios])
 
-  // ── Rentabilidad por tipo de servicio (NUEVO) ───────────────────────────────
-  // Cruza ingresos (monto_total_sin_iva) y costos directos por categoría de checkbox.
-  // Si un servicio tiene varias categorías, se prorratea proporcionalmente.
-  const rentabilidadPorTipo = useMemo(() => {
-    const tipos = ["pintura", "desabolladura", "mecanica", "otros"] as const
-    const acc: Record<string, { tipo: string; ingresos: number; costos: number; servicios: number }> = {}
-    for (const t of tipos) acc[t] = { tipo: t, ingresos: 0, costos: 0, servicios: 0 }
-
-    for (const s of servicios) {
-      if (Number(s.monto_total_sin_iva || 0) <= 0) continue
-      // observaciones_checkboxes puede venir como array o como string JSONB doble-encoded
-      const checksAll = parseJsonbArray<string>(s.observaciones_checkboxes)
-      const checks = checksAll.filter((c) => (tipos as readonly string[]).includes(c))
-      if (checks.length === 0) {
-        acc.otros.ingresos += Number(s.monto_total_sin_iva || 0)
-        acc.otros.costos += sumarCostosReales(s.costos)
-        acc.otros.servicios += 1
-        continue
-      }
-      const share = 1 / checks.length
-      const ingreso = Number(s.monto_total_sin_iva || 0)
-      const costo = sumarCostosReales(s.costos)
-      for (const c of checks) {
-        acc[c].ingresos += ingreso * share
-        acc[c].costos += costo * share
-        acc[c].servicios += share
-      }
-    }
-
-    const labelMap: Record<string, string> = {
-      pintura: "Pintura",
-      desabolladura: "Desabolladura",
-      mecanica: "Mecánica",
-      otros: "Otros",
-    }
-    return tipos.map((t) => {
-      const r = acc[t]
-      const margen = r.ingresos - r.costos
-      const margenPct = r.ingresos > 0 ? (margen / r.ingresos) * 100 : null
-      return {
-        tipo: labelMap[t],
-        ingresos: r.ingresos,
-        costos: r.costos,
-        margen,
-        margenPct,
-        servicios: Math.round(r.servicios * 10) / 10,
-      }
-    }).filter((r) => r.ingresos > 0 || r.servicios > 0)
-  }, [servicios])
-
   // ── Cuentas por Cobrar (NUEVO) ──────────────────────────────────────────────
+  // Días = antigüedad de la deuda, medida desde fecha_entregado (cuando el
+  // servicio cambió a por_cobrar/cerrado). Si la columna está NULL en servicios
+  // viejos previos a la migración, cae a fecha_ingreso como mejor estimación.
   const cuentasPorCobrar = useMemo(() => {
     const hoy = new Date()
     const rows = serviciosPendientesCobro.map((s) => {
-      const dias = Math.floor((hoy.getTime() - new Date(s.fecha_ingreso).getTime()) / 86400000)
+      const fechaBase = s.fecha_entregado || s.fecha_ingreso
+      const dias = Math.floor((hoy.getTime() - new Date(fechaBase).getTime()) / 86400000)
       return { ...s, dias }
     })
     const total = rows.reduce((s, r) => s + Number(r.saldo_pendiente || 0), 0)
@@ -767,7 +721,6 @@ export default function ReportsPage() {
           <TabsList className="w-max">
             <TabsTrigger value="resumen">Resumen</TabsTrigger>
             <TabsTrigger value="rentabilidad">Rentabilidad</TabsTrigger>
-            <TabsTrigger value="por-tipo">Por Tipo</TabsTrigger>
             <TabsTrigger value="por-cobrar">Por Cobrar</TabsTrigger>
             <TabsTrigger value="pintura">Pintura</TabsTrigger>
             <TabsTrigger value="clientes">Top Clientes</TabsTrigger>
@@ -985,59 +938,6 @@ export default function ReportsPage() {
         {/* ── RENTABILIDAD ──────────────────────────────────────────────────── */}
         <TabsContent value="rentabilidad">
           <ProfitabilityAnalysis kpis={kpis} prevKpis={prevMonthKpis} />
-        </TabsContent>
-
-        {/* ── POR TIPO DE SERVICIO (NUEVO) ─────────────────────────────────── */}
-        <TabsContent value="por-tipo" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Wrench className="w-4 h-4" /> Rentabilidad por tipo de servicio
-                <InfoTip>Cruza ingresos y costos directos por categoría de checkbox. Si un servicio tiene múltiples categorías, se prorratea.</InfoTip>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {rentabilidadPorTipo.length === 0 ? (
-                <p className="text-muted-foreground text-sm">Sin datos este mes</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="border-b border-border">
-                      <tr className="text-left text-xs text-muted-foreground">
-                        <th className="py-2 pr-3 font-medium">Tipo</th>
-                        <th className="py-2 pr-3 font-medium text-right">Servicios</th>
-                        <th className="py-2 pr-3 font-medium text-right">Ingresos</th>
-                        <th className="py-2 pr-3 font-medium text-right">Costos directos</th>
-                        <th className="py-2 pr-3 font-medium text-right">Margen</th>
-                        <th className="py-2 pr-3 font-medium text-right">Margen %</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rentabilidadPorTipo.map((r) => (
-                        <tr key={r.tipo} className="border-b border-border/50">
-                          <td className="py-2 pr-3 font-medium">{r.tipo}</td>
-                          <td className="py-2 pr-3 text-right">{r.servicios}</td>
-                          <td className="py-2 pr-3 text-right">{fmtCLP(r.ingresos)}</td>
-                          <td className="py-2 pr-3 text-right text-red-500">{fmtCLP(r.costos)}</td>
-                          <td className={`py-2 pr-3 text-right font-semibold ${r.margen >= 0 ? "text-green-600" : "text-red-600"}`}>
-                            {fmtCLP(r.margen)}
-                          </td>
-                          <td className={`py-2 pr-3 text-right font-medium ${
-                            r.margenPct === null ? "text-muted-foreground"
-                              : r.margenPct >= 40 ? "text-green-600"
-                              : r.margenPct >= 0 ? "text-orange-600"
-                              : "text-red-600"
-                          }`}>
-                            {fmtPct(r.margenPct)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
         </TabsContent>
 
         {/* ── CUENTAS POR COBRAR (NUEVO) ───────────────────────────────────── */}

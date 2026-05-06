@@ -79,7 +79,7 @@ export async function GET() {
               AND LOWER(COALESCE(c->>'descripcion','')) LIKE '%materiales pintura%'
           ), 0) AS mat_estimado
         FROM servicios s
-        WHERE s.fecha_ingreso >= (date_trunc('month', CURRENT_DATE) - INTERVAL '5 months')::date
+        WHERE s.fecha_ingreso::date >= (date_trunc('month', CURRENT_DATE) - INTERVAL '5 months')::date
       ),
       servicios_mes AS (
         SELECT
@@ -97,7 +97,7 @@ export async function GET() {
           SUM(monto) AS mat_real
         FROM gastos
         WHERE categoria = 'Gastos de Pintura'
-          AND fecha >= (date_trunc('month', CURRENT_DATE) - INTERVAL '5 months')::date
+          AND fecha::date >= (date_trunc('month', CURRENT_DATE) - INTERVAL '5 months')::date
         GROUP BY 1
       )
       SELECT

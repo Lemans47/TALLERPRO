@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { getServicios, getServiciosByMonth, getServiciosActivosParaLista, createServicio, updateServicio, deleteServicio, getServicioById, upsertClienteYVehiculo } from "@/lib/database"
+import { parseYearMonth } from "@/lib/utils"
 import crypto from "crypto"
 
 const CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME
@@ -21,18 +22,15 @@ async function deleteCloudinaryImage(publicId: string) {
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
-    const year = searchParams.get("year")
-    const month = searchParams.get("month")
     const activos = searchParams.get("activos")
+    const ym = parseYearMonth(searchParams)
 
-    let servicios
-    if (activos === "1") {
-      servicios = await getServiciosActivosParaLista()
-    } else if (year && month) {
-      servicios = await getServiciosByMonth(Number.parseInt(year), Number.parseInt(month))
-    } else {
-      servicios = await getServicios()
-    }
+    const servicios =
+      activos === "1"
+        ? await getServiciosActivosParaLista()
+        : ym
+          ? await getServiciosByMonth(ym.year, ym.month)
+          : await getServicios()
 
     return NextResponse.json(servicios)
   } catch (error) {
@@ -49,7 +47,7 @@ export async function POST(request: Request) {
     if (servicio.cliente && servicio.patente) {
       await upsertClienteYVehiculo(servicio.cliente, servicio.telefono || "", servicio.patente, {
         marca: servicio.marca, modelo: servicio.modelo, color: servicio.color, año: servicio.año ? Number(servicio.año) : undefined,
-      }).catch(() => {}) // no bloquear si falla
+      }).catch((e) => console.error("upsertClienteYVehiculo (POST):", e))
     }
     return NextResponse.json(servicio)
   } catch (error) {
@@ -67,7 +65,7 @@ export async function PUT(request: Request) {
     if (servicio.cliente && servicio.patente) {
       await upsertClienteYVehiculo(servicio.cliente, servicio.telefono || "", servicio.patente, {
         marca: servicio.marca, modelo: servicio.modelo, color: servicio.color, año: servicio.año ? Number(servicio.año) : undefined,
-      }).catch(() => {})
+      }).catch((e) => console.error("upsertClienteYVehiculo (PUT):", e))
     }
     return NextResponse.json(servicio)
   } catch (error) {

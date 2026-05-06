@@ -1,18 +1,15 @@
 import { NextResponse } from "next/server"
 import { getGastos, getGastosByMonth, createGasto, updateGasto, deleteGasto } from "@/lib/database"
+import { parseYearMonth } from "@/lib/utils"
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
-    const year = searchParams.get("year")
-    const month = searchParams.get("month")
+    const ym = parseYearMonth(searchParams)
 
-    let gastos
-    if (year && month) {
-      gastos = await getGastosByMonth(Number.parseInt(year), Number.parseInt(month))
-    } else {
-      gastos = await getGastos()
-    }
+    const gastos = ym
+      ? await getGastosByMonth(ym.year, ym.month)
+      : await getGastos()
 
     return NextResponse.json(gastos)
   } catch (error) {

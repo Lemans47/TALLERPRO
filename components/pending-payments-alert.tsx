@@ -19,8 +19,10 @@ export function PendingPaymentsAlert({ servicios, maxItems = 5 }: PendingPayment
   const pendingPayments = servicios
     .filter((s) => Number(s.saldo_pendiente) > 0 && esPorCobrar(s.estado))
     .map((servicio) => {
-      const fechaIngreso = new Date(servicio.fecha_ingreso)
-      const diasTranscurridos = Math.floor((ahora.getTime() - fechaIngreso.getTime()) / (1000 * 60 * 60 * 24))
+      // Antigüedad de la deuda desde que pasó a por_cobrar/cerrado.
+      // Fallback a fecha_ingreso para servicios anteriores a la migración.
+      const fechaBase = new Date(servicio.fecha_entregado || servicio.fecha_ingreso)
+      const diasTranscurridos = Math.floor((ahora.getTime() - fechaBase.getTime()) / (1000 * 60 * 60 * 24))
 
       let urgencia: "alta" | "media" | "baja" = "baja"
       if (diasTranscurridos > 30) urgencia = "alta"

@@ -80,6 +80,51 @@ export function calculateAbsorptionRate(laborRevenue: number, fixedExpenses: num
   return safeDivide(laborRevenue, fixedExpenses) * 100
 }
 
+// ─── Request Parsing ──────────────────────────────────────────────────────────
+
+/**
+ * Parsea year/month de query params devolviendo `null` si alguno es inválido.
+ * Las rutas que llaman pasan el `null` a su rama de "sin filtro" en lugar de
+ * pegarle a la DB con NaN.
+ */
+export function parseYearMonth(
+  searchParams: URLSearchParams,
+): { year: number; month: number } | null {
+  const yRaw = searchParams.get("year")
+  const mRaw = searchParams.get("month")
+  if (!yRaw || !mRaw) return null
+  const year = Number.parseInt(yRaw, 10)
+  const month = Number.parseInt(mRaw, 10)
+  if (!Number.isFinite(year) || !Number.isFinite(month)) return null
+  if (month < 1 || month > 12) return null
+  return { year, month }
+}
+
+// ─── localStorage seguro ──────────────────────────────────────────────────────
+
+/**
+ * Wrapper sobre localStorage que tolera SSR, Safari privado y bloqueos de
+ * cookies/storage del navegador. Si falla, devuelve `null` o no hace nada.
+ */
+export const safeLocalStorage = {
+  get(key: string): string | null {
+    try {
+      if (typeof window === "undefined") return null
+      return window.localStorage.getItem(key)
+    } catch {
+      return null
+    }
+  },
+  set(key: string, value: string): void {
+    try {
+      if (typeof window === "undefined") return
+      window.localStorage.setItem(key, value)
+    } catch {
+      // ignorar
+    }
+  },
+}
+
 // ─── Date Utilities ───────────────────────────────────────────────────────────
 
 /** Formatea una fecha a d/m/a (DD/MM/YYYY). Acepta Date, string ISO o "YYYY-MM-DD". */
