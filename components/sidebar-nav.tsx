@@ -108,9 +108,9 @@ export function SidebarNav() {
 
       {/* Mobile Sidebar Overlay */}
       {isOpen && (
-        <div className="md:hidden fixed inset-0 top-16 bg-background/98 backdrop-blur-sm z-40 overflow-y-auto">
+        <div className="md:hidden fixed inset-0 top-16 bg-sidebar z-40 overflow-y-auto">
           <div className="flex flex-col min-h-full">
-            <div className="p-4 border-b border-border">
+            <div className="p-4 border-b border-sidebar-border">
               <MonthSelector variant="sidebar" />
             </div>
             <nav className="flex-1 p-4 space-y-1">
@@ -118,7 +118,7 @@ export function SidebarNav() {
                 <NavItem key={item.href} item={item} onClick={() => setIsOpen(false)} />
               ))}
             </nav>
-            <div className="p-4 border-t border-border">
+            <div className="p-4 border-t border-sidebar-border">
               <button
                 onClick={signOut}
                 className="flex items-center gap-3 px-4 py-2.5 w-full rounded-xl text-sm font-medium text-destructive hover:bg-destructive/10 transition-all"
