@@ -111,7 +111,7 @@ export function SidebarNav() {
         <div className="md:hidden fixed inset-0 top-16 bg-background/98 backdrop-blur-sm z-40 overflow-y-auto">
           <div className="flex flex-col min-h-full">
             <div className="p-4 border-b border-border">
-              <MonthSelector />
+              <MonthSelector variant="sidebar" />
             </div>
             <nav className="flex-1 p-4 space-y-1">
               {navItems.map((item) => (
@@ -152,7 +152,7 @@ export function SidebarNav() {
 
         {/* Month Selector */}
         <div className="p-4 border-b border-sidebar-border">
-          <MonthSelector />
+          <MonthSelector variant="sidebar" />
         </div>
 
         {/* Navigation */}

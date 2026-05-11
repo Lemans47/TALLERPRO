@@ -3,8 +3,13 @@
 import { useMonth } from "@/lib/month-context"
 import { Calendar } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { cn } from "@/lib/utils"
 
-export function MonthSelector() {
+interface MonthSelectorProps {
+  variant?: "default" | "sidebar"
+}
+
+export function MonthSelector({ variant = "default" }: MonthSelectorProps) {
   const { selectedMonth, setSelectedMonth } = useMonth()
 
   // Generate months from April 2026 up to current month
@@ -25,11 +30,25 @@ export function MonthSelector() {
     }
   }
 
+  const isSidebar = variant === "sidebar"
+
   return (
-    <div className="flex items-center gap-3 bg-secondary/50 border border-border rounded-xl px-3 py-2.5 hover:bg-secondary transition-colors">
-      <Calendar className="w-4 h-4 text-primary" />
+    <div
+      className={cn(
+        "flex items-center gap-3 border rounded-xl px-3 py-2.5 transition-colors",
+        isSidebar
+          ? "bg-white/5 border-white/10 hover:bg-white/10"
+          : "bg-secondary/50 border-border hover:bg-secondary",
+      )}
+    >
+      <Calendar className={cn("w-4 h-4", isSidebar ? "text-sidebar-foreground/70" : "text-primary")} />
       <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-        <SelectTrigger className="border-0 shadow-none h-auto p-0 focus:ring-0 font-medium text-sm bg-transparent">
+        <SelectTrigger
+          className={cn(
+            "border-0 shadow-none h-auto p-0 focus:ring-0 font-medium text-sm bg-transparent",
+            isSidebar && "text-sidebar-foreground",
+          )}
+        >
           <SelectValue />
         </SelectTrigger>
         <SelectContent className="bg-card border-border">

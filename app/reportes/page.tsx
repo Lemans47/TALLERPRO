@@ -233,11 +233,11 @@ export default function ReportsPage() {
   const sueldosPagados = abonos.reduce((sum, a) => sum + Number(a.monto || 0), 0)
 
   const gastosChartData = [
-    { name: "Fijos", value: gastosFijos, color: "#3b82f6" },
+    { name: "Fijos", value: gastosFijos, color: "#1a4ed8" },
     { name: "Pintura", value: gastosPinturaCat, color: "#f59e0b" },
-    { name: "Misceláneos", value: gastosMiscelaneos, color: "#8b5cf6" },
-    { name: "Sueldos pagados", value: sueldosPagados, color: "#10b981" },
-    { name: "Costos servicios", value: kpis?.costosDirectos ?? 0, color: "#ef4444" },
+    { name: "Misceláneos", value: gastosMiscelaneos, color: "#8e9fc0" },
+    { name: "Sueldos pagados", value: sueldosPagados, color: "#16a34a" },
+    { name: "Costos servicios", value: kpis?.costosDirectos ?? 0, color: "#dc2626" },
   ].filter((d) => d.value > 0)
 
   // observaciones_checkboxes puede venir como string JSONB doble-encoded; normaliza con parseJsonbArray
