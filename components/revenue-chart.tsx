@@ -75,15 +75,15 @@ export function RevenueChart() {
         </div>
         <div className="flex items-center gap-4 text-sm">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-[#10b981]" />
+            <div className="w-3 h-3 rounded-full bg-primary" />
             <span className="text-muted-foreground">Ingresos</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-[#dc2626]" />
+            <div className="w-3 h-3 rounded-full bg-destructive" />
             <span className="text-muted-foreground">Gastos</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-[#22c55e]" />
+            <div className="w-3 h-3 rounded-full bg-success" />
             <span className="text-muted-foreground">Margen %</span>
           </div>
         </div>
@@ -99,16 +99,16 @@ export function RevenueChart() {
       ) : (
         <ResponsiveContainer width="100%" height={280}>
           <ComposedChart data={chartData} margin={{ top: 10, right: 30, left: -10, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#dee2e7" vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#e1e8f4" vertical={false} />
             <XAxis
               dataKey="mes"
-              tick={{ fontSize: 12, fill: "#6b7280" }}
-              axisLine={{ stroke: "#dee2e7" }}
+              tick={{ fontSize: 12, fill: "#4a5878" }}
+              axisLine={{ stroke: "#e1e8f4" }}
               tickLine={false}
             />
             <YAxis
               yAxisId="left"
-              tick={{ fontSize: 12, fill: "#6b7280" }}
+              tick={{ fontSize: 12, fill: "#4a5878" }}
               tickFormatter={(v: number) => {
                 if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(v % 1_000_000 === 0 ? 0 : 1)}M`
                 if (v >= 1_000) return `$${(v / 1_000).toFixed(0)}k`
@@ -120,7 +120,7 @@ export function RevenueChart() {
             <YAxis
               yAxisId="right"
               orientation="right"
-              tick={{ fontSize: 12, fill: "#6b7280" }}
+              tick={{ fontSize: 12, fill: "#4a5878" }}
               tickFormatter={(v) => `${v}%`}
               domain={[0, 100]}
               axisLine={false}
@@ -134,22 +134,22 @@ export function RevenueChart() {
                 return [`$${v.toLocaleString("es-CL")}`, "Gastos"]
               }}
               contentStyle={{
-                backgroundColor: "#1e2a3c",
-                border: "1px solid #334155",
+                backgroundColor: "#ffffff",
+                border: "1px solid #e1e8f4",
                 borderRadius: "12px",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
+                boxShadow: "0 4px 12px rgb(13 27 62 / 0.08)",
               }}
-              labelStyle={{ color: "#e2e8f0", fontWeight: 600 }}
-              cursor={{ fill: "#334155", opacity: 0.5 }}
+              labelStyle={{ color: "#0d1b3e", fontWeight: 600 }}
+              cursor={{ fill: "#e1e8f4", opacity: 0.5 }}
             />
-            <Bar yAxisId="left" dataKey="ingresos" fill="#10b981" radius={[6, 6, 0, 0]} />
+            <Bar yAxisId="left" dataKey="ingresos" fill="#1a4ed8" radius={[6, 6, 0, 0]} />
             <Bar yAxisId="left" dataKey="gastos" fill="#dc2626" radius={[6, 6, 0, 0]} />
             <Line
               yAxisId="right"
               dataKey="margen"
-              stroke="#22c55e"
+              stroke="#16a34a"
               strokeWidth={2}
-              dot={{ r: 3, fill: "#22c55e", strokeWidth: 0 }}
+              dot={{ r: 3, fill: "#16a34a", strokeWidth: 0 }}
               activeDot={{ r: 5 }}
               type="monotone"
             />

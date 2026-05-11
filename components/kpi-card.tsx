@@ -93,7 +93,7 @@ export function KPICard({ title, value, description, icon, variant = "default", 
       </div>
 
       <div className="mt-2 flex items-baseline gap-2 flex-wrap">
-        <p className={cn("text-2xl font-bold tracking-tight", valueStyles[variant])}>{value}</p>
+        <p className={cn("font-display text-2xl font-bold tracking-tight", valueStyles[variant])}>{value}</p>
         {badge && (
           <span
             className={cn(

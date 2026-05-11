@@ -68,15 +68,15 @@ export function AverageTicketChart() {
       ) : (
         <ResponsiveContainer width="100%" height={280}>
           <LineChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#dee2e7" vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#e1e8f4" vertical={false} />
             <XAxis
               dataKey="mes"
-              tick={{ fontSize: 12, fill: "#6b7280" }}
-              axisLine={{ stroke: "#dee2e7" }}
+              tick={{ fontSize: 12, fill: "#4a5878" }}
+              axisLine={{ stroke: "#e1e8f4" }}
               tickLine={false}
             />
             <YAxis
-              tick={{ fontSize: 12, fill: "#6b7280" }}
+              tick={{ fontSize: 12, fill: "#4a5878" }}
               tickFormatter={(v) => (v >= 1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v}`)}
               axisLine={false}
               tickLine={false}
@@ -84,19 +84,19 @@ export function AverageTicketChart() {
             <Tooltip
               formatter={(value) => [`$${Number(value).toLocaleString("es-CL")}`, "Ticket promedio"]}
               contentStyle={{
-                backgroundColor: "#1e2a3c",
-                border: "1px solid #334155",
+                backgroundColor: "#ffffff",
+                border: "1px solid #e1e8f4",
                 borderRadius: "12px",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
+                boxShadow: "0 4px 12px rgb(13 27 62 / 0.08)",
               }}
-              labelStyle={{ color: "#e2e8f0", fontWeight: 600 }}
-              cursor={{ stroke: "#334155", strokeWidth: 1 }}
+              labelStyle={{ color: "#0d1b3e", fontWeight: 600 }}
+              cursor={{ stroke: "#8e9fc0", strokeWidth: 1 }}
             />
             <Line
               dataKey="ticket"
-              stroke="var(--primary, #f59e0b)"
+              stroke="#1a4ed8"
               strokeWidth={2}
-              dot={{ r: 4, fill: "var(--primary, #f59e0b)", strokeWidth: 0 }}
+              dot={{ r: 4, fill: "#1a4ed8", strokeWidth: 0 }}
               activeDot={{ r: 6 }}
               type="monotone"
             />

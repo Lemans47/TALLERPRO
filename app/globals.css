@@ -3,72 +3,77 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-sans: "Inter", "system-ui", "sans-serif";
-  --font-mono: "JetBrains Mono", "monospace";
+  --font-sans: var(--font-sans), "system-ui", "sans-serif";
+  --font-display: var(--font-display), "system-ui", "sans-serif";
+  --font-mono: var(--font-mono), "monospace";
 
-  /* Automotive Workshop - Mid-dark theme */
-  --color-background: #2d3748;
-  --color-foreground: #e2e8f0;
+  /* Base */
+  --color-background: #f2f5fa;
+  --color-foreground: #0d1b3e;
 
-  --color-card: #1e2a3c;
-  --color-card-foreground: #e2e8f0;
+  /* Panel / card */
+  --color-card: #ffffff;
+  --color-card-foreground: #0d1b3e;
 
-  --color-popover: #1e2a3c;
-  --color-popover-foreground: #e2e8f0;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #0d1b3e;
 
-  /* Amber/Orange - color automotriz */
-  --color-primary: #f59e0b;
-  --color-primary-foreground: #1a1a2e;
+  /* Azul corporativo */
+  --color-primary: #1a4ed8;
+  --color-primary-foreground: #ffffff;
 
-  --color-secondary: #253040;
-  --color-secondary-foreground: #cbd5e1;
+  --color-secondary: #e1e8f4;
+  --color-secondary-foreground: #0d1b3e;
 
-  --color-muted: #253040;
-  --color-muted-foreground: #94a3b8;
+  --color-muted: #f2f5fa;
+  --color-muted-foreground: #4a5878;
 
-  --color-accent: #2d3f55;
-  --color-accent-foreground: #e2e8f0;
+  --color-accent: #e1e8f4;
+  --color-accent-foreground: #0d1b3e;
 
-  --color-destructive: #ef4444;
+  /* Texto auxiliar */
+  --color-text-dim: #4a5878;
+  --color-text-muted: #8e9fc0;
+
+  /* Estados */
+  --color-destructive: #dc2626;
   --color-destructive-foreground: #ffffff;
 
-  /* Success - Green */
-  --color-success: #22c55e;
+  --color-success: #16a34a;
   --color-success-foreground: #ffffff;
 
-  /* Warning - Amber */
   --color-warning: #f59e0b;
-  --color-warning-foreground: #1a1a2e;
+  --color-warning-foreground: #0d1b3e;
 
-  /* Info - Blue */
-  --color-info: #3b82f6;
+  --color-info: #1a4ed8;
   --color-info-foreground: #ffffff;
 
-  --color-border: #334155;
-  --color-input: #253040;
-  --color-ring: #f59e0b;
+  /* Borders / inputs */
+  --color-border: #e1e8f4;
+  --color-input: #e1e8f4;
+  --color-ring: #1a4ed8;
 
-  /* Chart colors */
-  --color-chart-1: #f59e0b;
+  /* Charts */
+  --color-chart-1: #1a4ed8;
   --color-chart-2: #16a34a;
-  --color-chart-3: #2563eb;
+  --color-chart-3: #0e255c;
   --color-chart-4: #dc2626;
-  --color-chart-5: #7c3aed;
+  --color-chart-5: #8e9fc0;
 
   --radius-sm: 0.5rem;
   --radius-md: 0.625rem;
   --radius-lg: 0.75rem;
   --radius-xl: 1rem;
 
-  /* Sidebar - Carbon dark */
-  --color-sidebar: #1e2530;
-  --color-sidebar-foreground: #f8fafc;
-  --color-sidebar-primary: #f59e0b;
-  --color-sidebar-primary-foreground: #1e2530;
-  --color-sidebar-accent: #2d3748;
-  --color-sidebar-accent-foreground: #f8fafc;
-  --color-sidebar-border: #2d3748;
-  --color-sidebar-ring: #f59e0b;
+  /* Sidebar navy */
+  --color-sidebar: #0e255c;
+  --color-sidebar-foreground: #f2f5fa;
+  --color-sidebar-primary: #1a4ed8;
+  --color-sidebar-primary-foreground: #ffffff;
+  --color-sidebar-accent: #1a4ed8;
+  --color-sidebar-accent-foreground: #ffffff;
+  --color-sidebar-border: #1a4ed8;
+  --color-sidebar-ring: #1a4ed8;
 
   /* Animation utilities */
   --animate-accordion-down: accordion-down 0.2s ease-out;
@@ -89,6 +94,12 @@
   }
 }
 
+/* Utilidades tipográficas */
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
@@ -96,21 +107,21 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: #253040;
+  background: #e1e8f4;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #4a5568;
+  background: #8e9fc0;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
+  background: #4a5878;
 }
 
-/* Card shadow */
+/* Card shadow (sutil para fondo claro) */
 .card, [class*="rounded"][class*="border"] {
-  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.04);
+  box-shadow: 0 1px 2px rgb(13 27 62 / 0.04), 0 1px 3px rgb(13 27 62 / 0.06);
 }
 
 /* Smooth transitions */
@@ -118,7 +129,7 @@
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Animation keyframes (replacing tw-animate-css) */
+/* Animation keyframes */
 @keyframes accordion-down {
   from { height: 0; opacity: 0; }
   to { height: var(--radix-accordion-content-height); opacity: 1; }
