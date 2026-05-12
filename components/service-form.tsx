@@ -478,30 +478,56 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   }
 
   // Funciones para fotos
-  const handleUploadFoto = async (file: File, tipo: "ingreso" | "entrega") => {
-    const MAX = tipo === "ingreso" ? 5 : 2
+  const handleUploadFotos = async (files: File[], tipo: "ingreso" | "entrega") => {
+    const MAX = tipo === "ingreso" ? 15 : 8
     const current = tipo === "ingreso" ? fotosIngreso : fotosEntrega
-    if (current.length >= MAX) {
+    const restantes = MAX - current.length
+    if (restantes <= 0) {
       toast({ title: "Límite alcanzado", description: `Máximo ${MAX} fotos de ${tipo}`, variant: "destructive" })
       return
     }
+    const aSubir = files.slice(0, restantes)
+    const descartadas = files.length - aSubir.length
+    if (descartadas > 0) {
+      toast({
+        title: "Algunas fotos no se subirán",
+        description: `${descartadas} foto${descartadas === 1 ? "" : "s"} excede el límite de ${MAX} fotos de ${tipo}`,
+        variant: "destructive",
+      })
+    }
     setUploadingFoto(true)
     try {
-      const form = new FormData()
-      form.append("file", file)
-      form.append("upload_preset", "tallerpro")
-      form.append("folder", `tallerpro/${tipo}`)
-      // Upload directo a Cloudinary desde el navegador (unsigned preset)
-      const res = await fetch("https://api.cloudinary.com/v1_1/dzjtujwor/image/upload", {
-        method: "POST",
-        body: form,
-      })
-      const data = await res.json()
-      if (!res.ok || data.error) throw new Error(data.error?.message || "Upload failed")
-      const setter = tipo === "ingreso" ? setFotosIngreso : setFotosEntrega
-      setter((prev) => [...prev, { url: data.secure_url, publicId: data.public_id }])
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message || "No se pudo subir la foto", variant: "destructive" })
+      const uploadOne = async (file: File) => {
+        try {
+          const form = new FormData()
+          form.append("file", file)
+          form.append("upload_preset", "tallerpro")
+          form.append("folder", `tallerpro/${tipo}`)
+          const res = await fetch("https://api.cloudinary.com/v1_1/dzjtujwor/image/upload", {
+            method: "POST",
+            body: form,
+          })
+          const data = await res.json()
+          if (!res.ok || data.error) throw new Error(data.error?.message || "Upload failed")
+          return { url: data.secure_url as string, publicId: data.public_id as string }
+        } catch {
+          return null
+        }
+      }
+      const resultados = await Promise.all(aSubir.map(uploadOne))
+      const exitosas = resultados.filter((r): r is { url: string; publicId: string } => r !== null)
+      const fallidas = resultados.length - exitosas.length
+      if (exitosas.length > 0) {
+        const setter = tipo === "ingreso" ? setFotosIngreso : setFotosEntrega
+        setter((prev) => [...prev, ...exitosas])
+      }
+      if (fallidas > 0) {
+        toast({
+          title: "Error",
+          description: `${fallidas} foto${fallidas === 1 ? "" : "s"} no se pudo subir`,
+          variant: "destructive",
+        })
+      }
     } finally {
       setUploadingFoto(false)
     }
@@ -1585,32 +1611,48 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
               <TabsContent value="fotos" className="space-y-6 pt-2">
                 {/* Fotos de Ingreso */}
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <ImageIcon className="w-4 h-4 text-primary" />
-                      <h4 className="text-sm font-medium">Fotos de Ingreso</h4>
-                      <span className="text-xs text-muted-foreground">({fotosIngreso.length}/5)</span>
-                    </div>
-                    {fotosIngreso.length < 5 && (
-                      <label className={`cursor-pointer flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-primary/50 text-primary hover:bg-primary/10 transition-colors ${uploadingFoto ? "opacity-50 pointer-events-none" : ""}`}>
-                        <Upload className="w-3.5 h-3.5" />
-                        {uploadingFoto ? "Subiendo..." : "Agregar foto"}
+                  <div className="flex items-center gap-2">
+                    <ImageIcon className="w-4 h-4 text-primary shrink-0" />
+                    <h4 className="text-sm font-medium">Fotos de Ingreso</h4>
+                    <span className="text-xs text-muted-foreground">({fotosIngreso.length}/15)</span>
+                  </div>
+                  {fotosIngreso.length < 15 && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className={`cursor-pointer flex items-center justify-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-primary/50 text-primary hover:bg-primary/10 transition-colors ${uploadingFoto ? "opacity-50 pointer-events-none" : ""}`}>
+                        <Upload className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">{uploadingFoto ? "Subiendo..." : "Agregar fotos"}</span>
                         <input
                           type="file"
                           accept="image/*"
+                          multiple
                           className="hidden"
                           onChange={(e) => {
-                            const file = e.target.files?.[0]
-                            if (file) handleUploadFoto(file, "ingreso")
+                            const files = Array.from(e.target.files ?? [])
+                            if (files.length) handleUploadFotos(files, "ingreso")
                             e.target.value = ""
                           }}
                         />
                       </label>
-                    )}
-                  </div>
+                      <label className={`cursor-pointer flex items-center justify-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-primary/50 text-primary hover:bg-primary/10 transition-colors ${uploadingFoto ? "opacity-50 pointer-events-none" : ""}`}>
+                        <Camera className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">Tomar foto</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) handleUploadFotos([file], "ingreso")
+                            e.target.value = ""
+                          }}
+                        />
+                      </label>
+                    </div>
+                  )}
                   {fotosIngreso.length === 0 ? (
                     <div className="text-center py-6 text-muted-foreground text-xs border border-dashed border-border rounded-lg bg-secondary/20">
-                      Sin fotos de ingreso. Máximo 5.
+                      Sin fotos de ingreso. Máximo 15.
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
@@ -1620,7 +1662,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                           <button
                             type="button"
                             onClick={() => handleDeleteFoto(foto.publicId, "ingreso")}
-                            className="absolute top-1 right-1 w-6 h-6 bg-destructive/90 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="absolute top-1 right-1 w-7 h-7 bg-destructive/90 hover:bg-destructive text-white rounded-full flex items-center justify-center shadow-md"
                           >
                             <X className="w-3.5 h-3.5" />
                           </button>
@@ -1632,42 +1674,58 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
 
                 {/* Fotos de Entrega */}
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <ImageIcon className="w-4 h-4 text-success" />
-                      <h4 className="text-sm font-medium">Fotos de Entrega</h4>
-                      <span className="text-xs text-muted-foreground">({fotosEntrega.length}/2)</span>
-                    </div>
-                    {fotosEntrega.length < 2 && (
-                      <label className={`cursor-pointer flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-success/50 text-success hover:bg-success/10 transition-colors ${uploadingFoto ? "opacity-50 pointer-events-none" : ""}`}>
-                        <Upload className="w-3.5 h-3.5" />
-                        {uploadingFoto ? "Subiendo..." : "Agregar foto"}
+                  <div className="flex items-center gap-2">
+                    <ImageIcon className="w-4 h-4 text-success shrink-0" />
+                    <h4 className="text-sm font-medium">Fotos de Entrega</h4>
+                    <span className="text-xs text-muted-foreground">({fotosEntrega.length}/8)</span>
+                  </div>
+                  {fotosEntrega.length < 8 && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className={`cursor-pointer flex items-center justify-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-success/50 text-success hover:bg-success/10 transition-colors ${uploadingFoto ? "opacity-50 pointer-events-none" : ""}`}>
+                        <Upload className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">{uploadingFoto ? "Subiendo..." : "Agregar fotos"}</span>
                         <input
                           type="file"
                           accept="image/*"
+                          multiple
                           className="hidden"
                           onChange={(e) => {
-                            const file = e.target.files?.[0]
-                            if (file) handleUploadFoto(file, "entrega")
+                            const files = Array.from(e.target.files ?? [])
+                            if (files.length) handleUploadFotos(files, "entrega")
                             e.target.value = ""
                           }}
                         />
                       </label>
-                    )}
-                  </div>
+                      <label className={`cursor-pointer flex items-center justify-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-success/50 text-success hover:bg-success/10 transition-colors ${uploadingFoto ? "opacity-50 pointer-events-none" : ""}`}>
+                        <Camera className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">Tomar foto</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) handleUploadFotos([file], "entrega")
+                            e.target.value = ""
+                          }}
+                        />
+                      </label>
+                    </div>
+                  )}
                   {fotosEntrega.length === 0 ? (
                     <div className="text-center py-6 text-muted-foreground text-xs border border-dashed border-border rounded-lg bg-secondary/20">
-                      Sin fotos de entrega. Máximo 2.
+                      Sin fotos de entrega. Máximo 8.
                     </div>
                   ) : (
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                       {fotosEntrega.map((foto) => (
                         <div key={foto.publicId} className="relative group rounded-lg overflow-hidden border border-border aspect-square">
                           <img src={foto.url} alt="Foto entrega" className="w-full h-full object-cover" />
                           <button
                             type="button"
                             onClick={() => handleDeleteFoto(foto.publicId, "entrega")}
-                            className="absolute top-1 right-1 w-6 h-6 bg-destructive/90 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="absolute top-1 right-1 w-7 h-7 bg-destructive/90 hover:bg-destructive text-white rounded-full flex items-center justify-center shadow-md"
                           >
                             <X className="w-3.5 h-3.5" />
                           </button>
