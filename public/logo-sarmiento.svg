@@ -1,0 +1,32 @@
+<svg viewBox="0 0 560 200" xmlns="http://www.w3.org/2000/svg" width="560" height="200" role="img">
+  <title>Logo Sarmiento Automotriz</title>
+  <desc>Logo tipográfico limpio Sarmiento Automotriz</desc>
+
+  <rect width="560" height="200" fill="#FFFFFF"/>
+
+  <!-- SARMIENTO -->
+  <text x="40" y="95"
+        font-family="Arial Black, Arial, sans-serif"
+        font-size="62"
+        font-weight="900"
+        fill="#0F3872"
+        letter-spacing="1">SARMIENTO</text>
+
+  <!-- Línea dorada bajo SARMIENTO -->
+  <rect x="40" y="105" width="480" height="3" fill="#C8A84B" rx="1"/>
+
+  <!-- AUTOMOTRIZ -->
+  <text x="43" y="145"
+        font-family="Arial, sans-serif"
+        font-size="28"
+        font-weight="400"
+        fill="#1A56A8"
+        letter-spacing="11">AUTOMOTRIZ</text>
+
+  <!-- Tagline -->
+  <text x="44" y="172"
+        font-family="Arial, sans-serif"
+        font-size="11.5"
+        fill="#8AAAC8"
+        letter-spacing="2.5">DESABOLLADURA · PINTURA · MECÁNICA · SANTIAGO</text>
+</svg>

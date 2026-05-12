@@ -19,11 +19,9 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
   function drawLogo(logoBase64: string) {
     const lx = ML, ly = 6, lw = CW, lh = 34
 
-    doc.setFillColor(235, 235, 235)
-    doc.roundedRect(lx, ly, lw, lh, 2, 2, "F")
-
     if (logoBase64) {
-      doc.addImage(logoBase64, "PNG", lx + 2, ly + 2, 30, 30)
+      // Wide logo (560x200 aspect ≈ 2.8:1)
+      doc.addImage(logoBase64, "PNG", lx + 2, ly + 4, 75, 27)
     }
 
     const rx = lx + lw - 2
@@ -44,14 +42,17 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
     const img = new window.Image()
     img.crossOrigin = "anonymous"
     img.onload = () => {
+      const scale = 3
+      const w = (img.width || 560) * scale
+      const h = (img.height || 200) * scale
       const canvas = document.createElement("canvas")
-      canvas.width = img.width
-      canvas.height = img.height
-      canvas.getContext("2d")!.drawImage(img, 0, 0)
+      canvas.width = w
+      canvas.height = h
+      canvas.getContext("2d")!.drawImage(img, 0, 0, w, h)
       resolve(canvas.toDataURL("image/png"))
     }
     img.onerror = () => resolve("")
-    img.src = "https://res.cloudinary.com/dzjtujwor/image/upload/v1775100136/LOGO_AUTOMOTORA_RS_narpoz.png"
+    img.src = "/logo-sarmiento.svg"
   })
 
   // ── Page counter and Y tracker ──────────────────────────────────
@@ -71,6 +72,13 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
   // ── Header ──────────────────────────────────────────────────────
   function drawHeader(pg: number, logo: string): number {
     drawLogo(logo)
+
+    // Blue separator line below logo + thin gray line below with small gap
+    doc.setDrawColor(15, 56, 114); doc.setLineWidth(1.2)
+    doc.line(ML, 42, MR, 42)
+    doc.setDrawColor(190, 190, 190); doc.setLineWidth(0.3)
+    doc.line(ML, 44.5, MR, 44.5)
+    doc.setLineWidth(0.3); doc.setDrawColor(0, 0, 0)
 
     black(); bold(); doc.setFontSize(16)
     if (pg === 1) {

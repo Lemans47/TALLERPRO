@@ -2,17 +2,20 @@ import jsPDF from "jspdf"
 import type { Servicio } from "./database"
 import { formatFechaDMA } from "./utils"
 
-const LOGO_URL = "https://res.cloudinary.com/dzjtujwor/image/upload/v1775100136/LOGO_AUTOMOTORA_RS_narpoz.png"
+const LOGO_URL = "/logo-sarmiento.svg"
 
 async function loadLogo(): Promise<string> {
   return new Promise((resolve) => {
     const img = new window.Image()
     img.crossOrigin = "anonymous"
     img.onload = () => {
+      const scale = 3
+      const w = (img.width || 560) * scale
+      const h = (img.height || 200) * scale
       const canvas = document.createElement("canvas")
-      canvas.width = img.width
-      canvas.height = img.height
-      canvas.getContext("2d")!.drawImage(img, 0, 0)
+      canvas.width = w
+      canvas.height = h
+      canvas.getContext("2d")!.drawImage(img, 0, 0, w, h)
       resolve(canvas.toDataURL("image/png"))
     }
     img.onerror = () => resolve("")
@@ -35,26 +38,31 @@ export async function generarReciboPDF(servicio: Servicio): Promise<{ blobUrl: s
   const logoBase64 = await loadLogo()
 
   // ── Header ──────────────────────────────────────────
-  if (logoBase64) doc.addImage(logoBase64, "PNG", 15, 8, 22, 22)
+  // Wide logo on the left (560x200 aspect ≈ 2.8:1)
+  if (logoBase64) doc.addImage(logoBase64, "PNG", 15, 10, 75, 27)
 
-  doc.setFontSize(16)
-  doc.setFont("helvetica", "bold")
-  doc.text("AUTOMOTORA RS", 105, 15, { align: "center" })
+  // Contact info on the right
+  doc.setTextColor(80, 80, 80)
+  doc.setFont("helvetica", "bold"); doc.setFontSize(8)
+  doc.text("automotora.rs@gmail.com", 195, 16, { align: "right" })
+  doc.setFont("helvetica", "normal"); doc.setFontSize(7.5)
+  doc.text("FRANKLIN 605", 195, 22, { align: "right" })
+  doc.text("FONO +569 91390267", 195, 27, { align: "right" })
+  doc.setTextColor(20, 20, 20); doc.setFontSize(7)
+  doc.text("RUT 76.858.081-2", 195, 33, { align: "right" })
+  doc.setTextColor(0, 0, 0)
 
-  doc.setFontSize(9)
-  doc.setFont("helvetica", "normal")
-  doc.text("RUT 76.858.081-2", 105, 21, { align: "center" })
-  doc.text("FRANKLIN 605 - FONO +569 91390267", 105, 26, { align: "center" })
-  doc.text("automotora.rs@gmail.com", 105, 31, { align: "center" })
+  // Blue separator + thin gray line
+  doc.setDrawColor(15, 56, 114); doc.setLineWidth(1.2)
+  doc.line(15, 42, 195, 42)
+  doc.setDrawColor(190, 190, 190); doc.setLineWidth(0.3)
+  doc.line(15, 44.5, 195, 44.5)
+  doc.setDrawColor(0, 0, 0)
 
   // ── Título ──────────────────────────────────────────
   doc.setFontSize(20)
   doc.setFont("helvetica", "bold")
-  doc.text("RECIBO DE PAGO", 105, 45, { align: "center" })
-
-  // Línea separadora
-  doc.setLineWidth(0.5)
-  doc.line(15, 49, 195, 49)
+  doc.text("RECIBO DE PAGO", 105, 53, { align: "center" })
 
   // ── Metadatos ────────────────────────────────────────
   const fechaHoy = formatFechaDMA(new Date())
@@ -63,12 +71,12 @@ export async function generarReciboPDF(servicio: Servicio): Promise<{ blobUrl: s
   doc.setFontSize(9)
   doc.setFont("helvetica", "normal")
   if (otNum) {
-    doc.text(`N° ${otNum}`, 15, 56)
+    doc.text(`N° ${otNum}`, 15, 62)
   }
-  doc.text(`Fecha: ${fechaHoy}`, 195, 56, { align: "right" })
+  doc.text(`Fecha: ${fechaHoy}`, 195, 62, { align: "right" })
 
   // ── Datos del cliente ────────────────────────────────
-  let y = 66
+  let y = 72
   doc.setFontSize(9)
   doc.setFont("helvetica", "bold")
   doc.text("CLIENTE:", 15, y)
