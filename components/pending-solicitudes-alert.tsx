@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Inbox, Phone, Car, Check, ChevronRight } from "lucide-react"
@@ -14,6 +15,7 @@ interface PendingSolicitudesAlertProps {
 }
 
 export function PendingSolicitudesAlert({ solicitudes, onUpdated, maxItems = 5 }: PendingSolicitudesAlertProps) {
+  const router = useRouter()
   const [hidden, setHidden] = useState<Set<string>>(new Set())
   const visibles = solicitudes.filter((s) => !hidden.has(s.id))
 
@@ -27,6 +29,13 @@ export function PendingSolicitudesAlert({ solicitudes, onUpdated, maxItems = 5 }
     } catch {
       // si falla, vuelve a aparecer en el próximo refresh
     }
+  }
+
+  const verYMarcar = (id: string) => {
+    // fire-and-forget: navega de inmediato y marca como leída en paralelo
+    fetch(`/api/presupuestos/${id}/leer`, { method: "POST" }).catch(() => {})
+    setHidden((h) => new Set(h).add(id))
+    router.push("/servicios")
   }
 
   return (
@@ -81,9 +90,7 @@ export function PendingSolicitudesAlert({ solicitudes, onUpdated, maxItems = 5 }
               )}
             </div>
             <div className="flex gap-2 shrink-0">
-              <Link href="/servicios">
-                <Button size="sm" variant="default">Ver</Button>
-              </Link>
+              <Button size="sm" variant="default" onClick={() => verYMarcar(s.id)}>Ver</Button>
               <Button size="sm" variant="ghost" onClick={() => marcarLeida(s.id)} title="Marcar como leída">
                 <Check className="w-4 h-4" />
               </Button>
