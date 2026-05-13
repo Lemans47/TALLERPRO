@@ -156,6 +156,17 @@ export async function fetchPresupuestos(year?: number, month?: number): Promise<
   return res.json()
 }
 
+export async function fetchPresupuestosNoLeidos(): Promise<Presupuesto[]> {
+  const res = await fetch(`/api/presupuestos?no_leidas=1`, { cache: "no-store" })
+  if (!res.ok) throw new Error("Error fetching presupuestos no leidos")
+  return res.json()
+}
+
+export async function marcarPresupuestoLeido(id: string): Promise<void> {
+  const res = await fetch(`/api/presupuestos/${id}/leer`, { method: "POST" })
+  if (!res.ok) throw new Error("Error marking presupuesto as read")
+}
+
 export async function createPresupuestoApi(data: Partial<Presupuesto>): Promise<Presupuesto> {
   const res = await fetch("/api/presupuestos", {
     method: "POST",
@@ -438,6 +449,8 @@ export const api = {
   presupuestos: {
     getAll: fetchPresupuestos,
     getByMonth: fetchPresupuestos,
+    getNoLeidos: fetchPresupuestosNoLeidos,
+    marcarLeido: marcarPresupuestoLeido,
     create: createPresupuestoApi,
     update: updatePresupuestoApi,
     delete: deletePresupuestoApi,

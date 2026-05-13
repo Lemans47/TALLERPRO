@@ -109,6 +109,9 @@ export interface Presupuesto {
   monto_total: number
   monto_total_sin_iva: number
   observaciones_checkboxes: string[]
+  fotos_ingreso?: FotoServicio[]
+  source?: "manual" | "public"
+  leida?: boolean
   created_at: string
   updated_at: string
 }
@@ -447,14 +450,16 @@ export async function createPresupuesto(presupuesto: Omit<Presupuesto, "id" | "c
     INSERT INTO presupuestos (
       fecha_ingreso, patente, marca, modelo, color, kilometraje, año, cliente, telefono, observaciones,
       mano_obra_pintura, cobros, costos, piezas_pintura, iva,
-      monto_total, monto_total_sin_iva, observaciones_checkboxes
+      monto_total, monto_total_sin_iva, observaciones_checkboxes, fotos_ingreso, source, leida
     ) VALUES (
       ${presupuesto.fecha_ingreso}, ${presupuesto.patente}, ${presupuesto.marca}, ${presupuesto.modelo},
       ${presupuesto.color || null}, ${presupuesto.kilometraje || null}, ${presupuesto.año || null},
       ${presupuesto.cliente}, ${presupuesto.telefono}, ${presupuesto.observaciones},
       ${presupuesto.mano_obra_pintura}, ${safeJson(presupuesto.cobros)}, ${safeJson(presupuesto.costos)},
       ${safeJson(presupuesto.piezas_pintura)}, ${presupuesto.iva},
-      ${presupuesto.monto_total}, ${presupuesto.monto_total_sin_iva}, ${safeJson(presupuesto.observaciones_checkboxes)}
+      ${presupuesto.monto_total}, ${presupuesto.monto_total_sin_iva}, ${safeJson(presupuesto.observaciones_checkboxes)},
+      ${safeJson(presupuesto.fotos_ingreso || [])},
+      ${presupuesto.source ?? "manual"}, ${presupuesto.leida ?? true}
     ) RETURNING *
   `
   return data[0] as Presupuesto
@@ -494,6 +499,26 @@ export async function deletePresupuesto(id: string) {
   await db`DELETE FROM presupuestos WHERE id = ${id}`
 }
 
+export async function getPresupuestosNoLeidos() {
+  const db = getSQL()
+  const data = await db`
+    SELECT * FROM presupuestos
+    WHERE source = 'public' AND leida = FALSE
+    ORDER BY created_at DESC
+  `
+  return data as Presupuesto[]
+}
+
+export async function markPresupuestoLeido(id: string) {
+  const db = getSQL()
+  const data = await db`
+    UPDATE presupuestos SET leida = TRUE, updated_at = NOW()
+    WHERE id = ${id}
+    RETURNING *
+  `
+  return data[0] as Presupuesto
+}
+
 export async function convertPresupuestoToServicio(presupuestoId: string) {
   const db = getSQL()
   return await db.begin(async (sql: any) => {
@@ -531,7 +556,7 @@ export async function convertPresupuestoToServicio(presupuestoId: string) {
         ${safeJson(presupuesto.piezas_pintura)}, ${estadoInicial}, ${presupuesto.iva || "sin"},
         0, ${presupuesto.monto_total || 0}, ${presupuesto.monto_total || 0}, ${presupuesto.monto_total_sin_iva || 0},
         ${safeJson(presupuesto.observaciones_checkboxes || [])},
-        '[]'::jsonb, '[]'::jsonb, nextval('servicios_numero_ot_seq')::int
+        ${safeJson(presupuesto.fotos_ingreso || [])}, '[]'::jsonb, nextval('servicios_numero_ot_seq')::int
       ) RETURNING *
     `
 

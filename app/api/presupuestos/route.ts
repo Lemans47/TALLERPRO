@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import {
   getPresupuestos,
   getPresupuestosByMonth,
+  getPresupuestosNoLeidos,
   createPresupuesto,
   updatePresupuesto,
   deletePresupuesto,
@@ -12,8 +13,13 @@ import { parseYearMonth } from "@/lib/utils"
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
-    const ym = parseYearMonth(searchParams)
 
+    if (searchParams.get("no_leidas") === "1") {
+      const data = await getPresupuestosNoLeidos()
+      return NextResponse.json(data)
+    }
+
+    const ym = parseYearMonth(searchParams)
     const presupuestos = ym
       ? await getPresupuestosByMonth(ym.year, ym.month)
       : await getPresupuestos()

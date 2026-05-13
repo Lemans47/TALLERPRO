@@ -8,6 +8,7 @@ import { KPICard } from "@/components/kpi-card"
 import { RevenueChart } from "@/components/revenue-chart"
 import { PendingPaymentsAlert } from "@/components/pending-payments-alert"
 import { PendingExpensesAlert } from "@/components/pending-expenses-alert"
+import { PendingSolicitudesAlert } from "@/components/pending-solicitudes-alert"
 import { VehiclePipeline } from "@/components/vehicle-pipeline"
 import { AverageTicketChart } from "@/components/average-ticket-chart"
 import { MonthSelector } from "@/components/month-selector"
@@ -17,8 +18,8 @@ import {
   Paintbrush, Receipt, FileWarning, AlertCircle,
 } from "lucide-react"
 import { useMonth } from "@/lib/month-context"
-import { fetchDashboardData, DashboardTimeoutError } from "@/lib/api-client"
-import type { Servicio, Gasto, Empleado, AbonoEmpleado } from "@/lib/database"
+import { fetchDashboardData, DashboardTimeoutError, fetchPresupuestosNoLeidos } from "@/lib/api-client"
+import type { Servicio, Gasto, Empleado, AbonoEmpleado, Presupuesto } from "@/lib/database"
 import { useAuth } from "@/lib/auth-context"
 import { useEstados } from "@/lib/estados"
 import { extraerIvaIncluido, safeLocalStorage } from "@/lib/utils"
@@ -146,6 +147,7 @@ export default function DashboardPage() {
   const [facturasPendientes, setFacturasPendientes] = useState<Servicio[]>([])
   const [serviciosPendientesCobro, setServiciosPendientesCobro] = useState<Servicio[]>([])
   const [gastosPendientesPago, setGastosPendientesPago] = useState<Gasto[]>([])
+  const [solicitudesNoLeidas, setSolicitudesNoLeidas] = useState<Presupuesto[]>([])
   const [empleadosState, setEmpleadosState] = useState<Empleado[]>([])
   const [abonosMesState, setAbonosMesState] = useState<AbonoEmpleado[]>([])
   const [loading, setLoading] = useState(true)
@@ -205,6 +207,8 @@ export default function DashboardPage() {
       setFacturasPendientes(pendientesData || [])
       setServiciosPendientesCobro(cobrosPendData || [])
       setGastosPendientesPago(gastosPendData || [])
+      // Solicitudes no leídas: query independiente (no depende del mes).
+      fetchPresupuestosNoLeidos().then(setSolicitudesNoLeidas).catch(() => {})
       setEmpleadosState(empleadosData || [])
       setAbonosMesState(abonosMes || [])
       calculateKPIs(serviciosData, gastosData, empleadosData, activosData, abonosMes, apiKpis, entregadosMes, serviciosFacturadosMes)
@@ -876,6 +880,11 @@ export default function DashboardPage() {
           )}
         </div>
         <div className="flex flex-col gap-4">
+          <PendingSolicitudesAlert
+            solicitudes={solicitudesNoLeidas}
+            onUpdated={() => fetchPresupuestosNoLeidos().then(setSolicitudesNoLeidas).catch(() => {})}
+            maxItems={3}
+          />
           <PendingPaymentsAlert servicios={serviciosPendientesCobro} maxItems={3} />
           <PendingExpensesAlert gastos={gastosPendientesPago} maxItems={3} />
           <AverageTicketChart />
