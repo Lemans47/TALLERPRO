@@ -59,11 +59,11 @@ export default function ResetPasswordPage() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <Image
-            src="https://res.cloudinary.com/dzjtujwor/image/upload/v1775100136/LOGO_AUTOMOTORA_RS_narpoz.png"
-            alt="Automotora RS"
-            width={80}
-            height={80}
-            className="mx-auto mb-4 rounded-2xl"
+            src="/logo-sarmiento.svg"
+            alt="Sarmiento Automotriz"
+            width={400}
+            height={400}
+            className="mx-auto mb-4 w-full h-auto"
           />
           <h1 className="text-2xl font-bold text-foreground">Nueva contraseña</h1>
           <p className="text-muted-foreground text-sm mt-1">
@@ -137,7 +137,7 @@ export default function ResetPasswordPage() {
         </div>
 
         <p className="text-center text-xs text-muted-foreground mt-6">
-          © 2025 Automotora RS · Gestión Automotriz
+          © 2025 Sarmiento Automotriz · Gestión Automotriz
         </p>
       </div>
     </div>

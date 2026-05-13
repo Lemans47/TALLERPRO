@@ -56,13 +56,12 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <Image
-            src="https://res.cloudinary.com/dzjtujwor/image/upload/v1775100136/LOGO_AUTOMOTORA_RS_narpoz.png"
-            alt="Automotora RS"
-            width={80}
-            height={80}
-            className="mx-auto mb-4 rounded-2xl"
+            src="/logo-sarmiento.svg"
+            alt="Sarmiento Automotriz"
+            width={400}
+            height={400}
+            className="mx-auto mb-4 w-full h-auto"
           />
-          <h1 className="text-2xl font-bold text-foreground">Automotora RS</h1>
           <p className="text-muted-foreground text-sm mt-1">
             {mode === "login" ? "Ingresa a tu cuenta" : "Restablecer contraseña"}
           </p>
@@ -193,7 +192,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-xs text-muted-foreground mt-6">
-          © 2025 Automotora RS · Gestión Automotriz
+          © 2025 Sarmiento Automotriz · Gestión Automotriz
         </p>
       </div>
     </div>
