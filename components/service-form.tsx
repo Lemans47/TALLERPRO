@@ -105,14 +105,12 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   const [pdfPreview, setPdfPreview] = useState<{ url: string; fileName: string } | null>(null)
   const [piezasSeleccionadas, setPiezasSeleccionadas] = useState<PiezaPintura[]>([])
 
-  const [showPreciosModal, setShowPreciosModal] = useState(false)
   const [showManoObraModal, setShowManoObraModal] = useState(false)
   const [showMaterialesModal, setShowMaterialesModal] = useState(false)
   const [manoObraConfig, setManoObraConfig] = useState(0)
   const [costoRealPintor, setCostoRealPintor] = useState<number | null>(null)
   const [materialesConfig, setMaterialesConfig] = useState(0)
   const [, setPrecioGlobalPintura] = useState(0)
-  const [preciosTemp, setPreciosTemp] = useState<{ precio: number }[]>([{ precio: 0 }])
 
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchValue, setSearchValue] = useState("")
@@ -188,7 +186,6 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       // Guardar el precio global
       const precioGlobal = precio?.precio_por_pieza || 0
       setPrecioGlobalPintura(precioGlobal)
-      setPreciosTemp([{ precio: precioGlobal }])
 
       // En modo edición, no sobrescribir las piezas — las carga cargarPiezasSeleccionadas
       if (servicioAEditar) return
@@ -240,41 +237,6 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
     toast({ title: "Valor de materiales guardado" })
     setShowMaterialesModal(false)
   }
-
-  const savePreciosPintura = async () => {
-    try {
-      const nuevoPrecio = preciosTemp[0]?.precio || 0
-      
-      if (nuevoPrecio <= 0) {
-        toast({
-          title: "Error",
-          description: "El precio debe ser mayor a 0",
-          variant: "destructive",
-        })
-        return
-      }
-
-      // Guardar el precio global
-      await api.precioPintura.update(nuevoPrecio)
-
-      // Actualizar las piezas seleccionadas con el nuevo precio
-      setPiezasSeleccionadas((prev) =>
-        prev.map((p) => ({ ...p, precio: nuevoPrecio })),
-      )
-
-      toast({ title: "Precio guardado", description: `Precio por pieza: $${nuevoPrecio.toLocaleString("es-CL")}` })
-      setShowPreciosModal(false)
-    } catch (error: any) {
-      console.error("[v0] Error saving precio pintura:", error)
-      toast({
-        title: "Error al guardar precio",
-        description: error.message,
-        variant: "destructive",
-      })
-    }
-  }
-
-
 
   useEffect(() => {
     if (servicioAEditar) {
@@ -402,10 +364,22 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
               new Map(piezas.map((p) => [String(p.nombre || "").trim().toUpperCase(), p])).values()
             )
             const piezasConPrecio = piezasUnicas.map((p) => {
-              const saved = piezasData.find((pd: { nombre: string; cantidad: number }) => pd.nombre === p.nombre)
+              const saved = piezasData.find((pd: { nombre: string; cantidad: number; precio_unitario?: number; precio?: number }) => pd.nombre === p.nombre)
+              // Preferir precio_unitario guardado en este servicio (snapshot). Para
+              // servicios viejos sin precio_unitario, derivar de precio/cantidad o
+              // caer al global como último recurso.
+              let precioUnit = precioGlobal
+              if (saved) {
+                const cant = Number(saved.cantidad) || 1
+                if (saved.precio_unitario != null) {
+                  precioUnit = Number(saved.precio_unitario) || 0
+                } else if (saved.precio != null && cant > 0) {
+                  precioUnit = Number(saved.precio) / cant
+                }
+              }
               return {
                 nombre: p.nombre,
-                precio: precioGlobal,
+                precio: precioUnit,
                 cantidad_piezas: saved ? Number(saved.cantidad) || 1 : Number(p.cantidad_piezas) || 1,
                 seleccionada: !!saved,
               }
@@ -830,6 +804,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         .map((p) => ({
           nombre: p.nombre,
           cantidad: p.cantidad_piezas || 1,
+          precio_unitario: p.precio,
           precio: p.precio * (p.cantidad_piezas || 1),
         }))
 
@@ -954,6 +929,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         .map((p) => ({
           nombre: p.nombre,
           cantidad: p.cantidad_piezas || 1,
+          precio_unitario: p.precio,
           precio: p.precio * (p.cantidad_piezas || 1),
         }))
 
@@ -1097,31 +1073,20 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                 <DialogHeader>
                   <DialogTitle>Configurar Piezas de Pintura</DialogTitle>
                   <DialogDescription>
-                    Edita la cantidad de piezas para cada elemento. El precio se calcula automáticamente.
+                    Edita la cantidad y el precio por pieza para este servicio. El precio guardado queda fijo en este servicio aunque cambie el global.
                   </DialogDescription>
                 </DialogHeader>
                 
-                {/* Botón para configurar precio global */}
-                <div className="p-4 bg-primary/10 rounded-lg border border-primary/30 mb-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium">Precio Global por Pieza</p>
-                      <p className="text-xs text-muted-foreground">Configure el precio base multiplicado por cantidad</p>
-                    </div>
-                    <Button
-                      onClick={() => {
-                        setShowPreciosModal(true)
-                        setShowEditPiezasModal(false)
-                      }}
-                      className="h-8 text-xs"
-                    >
-                      Configurar
-                    </Button>
-                  </div>
-                </div>
-
                 {/* Lista de piezas */}
                 <div className="grid grid-cols-1 gap-3 mt-4">
+                  {piezasSeleccionadas.length > 0 && (
+                    <div className="grid grid-cols-[minmax(0,1fr)_5rem_7rem_6rem] items-center gap-3 px-3 text-xs text-muted-foreground">
+                      <span>Pieza</span>
+                      <span className="text-right">Cantidad</span>
+                      <span className="text-right">$ por pieza</span>
+                      <span className="text-right">Total</span>
+                    </div>
+                  )}
                   {piezasSeleccionadas.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       <p className="text-sm">No hay piezas de pintura configuradas</p>
@@ -1133,13 +1098,13 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                       return (
                         <div
                           key={pieza.nombre}
-                          className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
+                          className={`grid grid-cols-[minmax(0,1fr)_5rem_7rem_6rem] items-center gap-3 p-3 rounded-lg border transition-colors ${
                             isSelected
                               ? "bg-primary/10 border-primary/30"
                               : "bg-secondary/10 border-border hover:bg-secondary/20"
                           }`}
                         >
-                          <div className="flex items-center gap-3 flex-1">
+                          <div className="flex items-center gap-3 min-w-0">
                             <Checkbox
                               id={`edit-pieza-${pieza.nombre}`}
                               checked={isSelected}
@@ -1153,32 +1118,47 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                             />
                             <Label
                               htmlFor={`edit-pieza-${pieza.nombre}`}
-                              className="text-sm cursor-pointer flex-1"
+                              className="text-sm cursor-pointer break-words"
                             >
                               {pieza.nombre}
                             </Label>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Label className="text-xs text-muted-foreground whitespace-nowrap">Cantidad:</Label>
-                            <Input
-                              type="number"
-                              step="0.1"
-                              min="0.1"
-                              value={pieza.cantidad_piezas || 1}
-                              onChange={(e) => {
-                                setPiezasSeleccionadas((prev) =>
-                                  prev.map((p) =>
-                                    p.nombre === pieza.nombre
-                                      ? { ...p, cantidad_piezas: Number(e.target.value) || 1 }
-                                      : p,
-                                  ),
-                                )
-                              }}
-                              className="w-20 h-8 text-right text-sm"
-                              disabled={!isSelected}
-                            />
-                          </div>
-                          <span className="text-sm font-medium text-success ml-3 tabular-nums min-w-fit">
+                          <Input
+                            type="number"
+                            step="0.1"
+                            min="0.1"
+                            value={pieza.cantidad_piezas || 1}
+                            onChange={(e) => {
+                              setPiezasSeleccionadas((prev) =>
+                                prev.map((p) =>
+                                  p.nombre === pieza.nombre
+                                    ? { ...p, cantidad_piezas: Number(e.target.value) || 1 }
+                                    : p,
+                                ),
+                              )
+                            }}
+                            className="w-full h-8 text-right text-sm"
+                            disabled={!isSelected}
+                            title="Cantidad de piezas"
+                          />
+                          <Input
+                            type="number"
+                            step="1000"
+                            min="0"
+                            value={pieza.precio || ""}
+                            onChange={(e) => {
+                              const nuevo = Number(e.target.value) || 0
+                              setPiezasSeleccionadas((prev) =>
+                                prev.map((p) =>
+                                  p.nombre === pieza.nombre ? { ...p, precio: nuevo } : p,
+                                ),
+                              )
+                            }}
+                            className="w-full h-8 text-right text-sm"
+                            disabled={!isSelected}
+                            title="Precio por pieza para este servicio"
+                          />
+                          <span className="text-sm font-medium text-success tabular-nums text-right">
                             ${(pieza.precio * (pieza.cantidad_piezas || 1)).toLocaleString("es-CL")}
                           </span>
                         </div>
@@ -1195,72 +1175,6 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                 </div>
                 <div className="flex justify-end gap-2 mt-4">
                   <Button onClick={() => setShowEditPiezasModal(false)}>Cerrar</Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-
-            <Dialog open={showPreciosModal} onOpenChange={setShowPreciosModal}>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8 text-xs bg-transparent">
-                  <Paintbrush className="w-3.5 h-3.5 mr-1" />
-                  Precios Pintura
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="bg-card border-border max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Configurar Precio Global de Pintura</DialogTitle>
-                  <DialogDescription>
-                    Define el precio por pieza. Este valor se multiplicará por la cantidad de piezas de cada elemento.
-                  </DialogDescription>
-                </DialogHeader>
-                
-                <div className="space-y-4 mt-6">
-                  <div>
-                    <Label className="text-sm font-medium mb-2 block">Precio por Pieza</Label>
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg font-medium">$</span>
-                      <Input
-                        type="number"
-                        step="1000"
-                        value={preciosTemp[0]?.precio || ""}
-                        onChange={(e) => {
-                          setPreciosTemp((prev) => [
-                            {
-                              ...prev[0],
-                              precio: Number(e.target.value) || 0,
-                            },
-                          ])
-                        }}
-                        placeholder="90000"
-                        className="flex-1 text-lg text-right"
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Ejemplo: Si estableces $90.000 y el Capot tiene 2 piezas, el total será $180.000
-                    </p>
-                  </div>
-
-                  <div className="p-3 bg-secondary/30 rounded-lg">
-                    <p className="text-xs text-muted-foreground mb-2">Piezas Configuradas:</p>
-                    <div className="space-y-1 max-h-40 overflow-y-auto">
-                      {piezasSeleccionadas.map((pieza) => (
-                        <div key={pieza.nombre} className="flex justify-between text-sm">
-                          <span>{pieza.nombre}:</span>
-                          <span className="font-medium">{pieza.cantidad_piezas || 1} piezas</span>
-                        </div>
-                      ))}
-                      {piezasSeleccionadas.length === 0 && (
-                        <p className="text-xs text-muted-foreground italic">Sin piezas configuradas</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-2 mt-6">
-                  <Button variant="outline" onClick={() => setShowPreciosModal(false)}>
-                    Cancelar
-                  </Button>
-                  <Button onClick={savePreciosPintura}>Guardar Precio</Button>
                 </div>
               </DialogContent>
             </Dialog>
