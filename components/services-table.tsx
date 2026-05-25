@@ -26,6 +26,18 @@ const parseArr = (v: any): any[] => {
   return []
 }
 
+function parseAbonos(s: Servicio): { fecha: string; monto: number }[] {
+  return parseArr((s as any).abonos).map((a: any) => ({
+    fecha: String(a.fecha ?? ""),
+    monto: Number(a.monto ?? 0),
+  }))
+}
+
+function fechaHoy(): string {
+  const hoy = new Date()
+  return `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,"0")}-${String(hoy.getDate()).padStart(2,"0")}`
+}
+
 function calcGanancia(servicio: Servicio) {
   const ingreso = Number(servicio.monto_total_sin_iva || 0)
   const costos = parseArr(servicio.costos)
@@ -130,13 +142,18 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
       let nuevoAnticipo: number
       let nuevoSaldo: number
 
+      let newAbonos: { fecha: string; monto: number }[]
+
       if (modoCorregir) {
-        // Set exact anticipo value
+        // Reemplaza el historial con un único abono sintético al valor exacto indicado
         nuevoAnticipo = monto
         nuevoSaldo = Math.max(0, total - monto)
+        newAbonos = [{ fecha: fechaHoy(), monto: nuevoAnticipo }]
       } else {
-        // Add to existing anticipo
-        nuevoAnticipo = Number(servicioSeleccionado.anticipo) + monto
+        // Agrega un abono nuevo al historial existente
+        const existingAbonos = parseAbonos(servicioSeleccionado)
+        newAbonos = [...existingAbonos, { fecha: fechaHoy(), monto }]
+        nuevoAnticipo = newAbonos.reduce((s, a) => s + a.monto, 0)
         nuevoSaldo = Math.max(0, total - nuevoAnticipo)
       }
 
@@ -148,6 +165,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
       await api.servicios.update(servicioSeleccionado.id, {
         anticipo: nuevoAnticipo,
         saldo_pendiente: nuevoSaldo,
+        abonos: newAbonos,
         estado: nuevoEstado,
       })
 
@@ -297,6 +315,25 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                 Corregir anticipo
               </button>
             </div>
+
+            {/* Historial de abonos */}
+            {!modoCorregir && servicioSeleccionado && (() => {
+              const hist = parseAbonos(servicioSeleccionado)
+              if (!hist.length) return null
+              return (
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Historial de abonos</Label>
+                  <div className="rounded-lg border border-border bg-secondary/20 divide-y divide-border max-h-36 overflow-y-auto">
+                    {hist.map((a, i) => (
+                      <div key={i} className="flex justify-between px-3 py-1.5 text-xs">
+                        <span className="text-muted-foreground">{a.fecha}</span>
+                        <span className="font-medium tabular-nums">${Number(a.monto).toLocaleString("es-CL")}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
 
             <div className="grid grid-cols-2 gap-3">
               <div className="p-3 rounded-xl bg-success/5 border border-success/20">
