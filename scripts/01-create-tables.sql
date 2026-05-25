@@ -1,5 +1,5 @@
 -- Esquema de base de datos para gestión de taller automotriz
--- Base de datos: Neon PostgreSQL
+-- Base de datos: Supabase (PostgreSQL)
 
 -- Eliminar tablas existentes si existen
 DROP TABLE IF EXISTS servicios CASCADE;
