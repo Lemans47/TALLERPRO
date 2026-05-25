@@ -101,7 +101,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
     return { backgroundColor: `${c}1a`, color: c, borderColor: `${c}4d` }
   }
   const [filtroEstado, setFiltroEstado] = useState("todos")
-  const [sortBy, setSortBy] = useState("fecha_desc")
+  const [sortBy, setSortBy] = useState("estado")
   const [soloPendientes, setSoloPendientes] = useState(false)
   const [soloPagados, setSoloPagados] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
