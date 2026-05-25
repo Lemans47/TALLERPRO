@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -194,33 +194,35 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
     }
   }
 
-  const ESTADO_ORDER = estadosConfig.map((e) => e.nombre)
   const filtroEstadoIsCerrado = esCerrado(filtroEstado)
 
-  const serviciosFiltrados = servicios
-    .filter((s) => filtroEstado === "todos" || s.estado === filtroEstado)
-    .filter((s) => !soloPendientes || Boolean((s as any).detalle_pendiente))
-    .filter((s) => !soloPagados || esCerrado(s.estado))
-    .filter((s) => {
-      if (sortBy !== "estado") return true
-      if (soloPagados) return true
-      if (filtroEstadoIsCerrado) return true
-      return !esCerrado(s.estado)
-    })
-    .sort((a, b) => {
-      switch (sortBy) {
-        case "fecha_asc":  return (a.fecha_ingreso || "").localeCompare(b.fecha_ingreso || "")
-        case "fecha_desc": return (b.fecha_ingreso || "").localeCompare(a.fecha_ingreso || "")
-        case "estado":     return ESTADO_ORDER.indexOf(a.estado) - ESTADO_ORDER.indexOf(b.estado)
-        case "monto_desc": return Number(b.monto_total || 0) - Number(a.monto_total || 0)
-        case "monto_asc":  return Number(a.monto_total || 0) - Number(b.monto_total || 0)
-        case "margen": {
-          const mg = (s: Servicio) => { const g = calcGanancia(s); return g ? g.margen : -Infinity }
-          return mg(b) - mg(a)
+  const serviciosFiltrados = useMemo(() => {
+    const ESTADO_ORDER = estadosConfig.map((e) => e.nombre)
+    return servicios
+      .filter((s) => filtroEstado === "todos" || s.estado === filtroEstado)
+      .filter((s) => !soloPendientes || Boolean((s as any).detalle_pendiente))
+      .filter((s) => !soloPagados || esCerrado(s.estado))
+      .filter((s) => {
+        if (sortBy !== "estado") return true
+        if (soloPagados) return true
+        if (filtroEstadoIsCerrado) return true
+        return !esCerrado(s.estado)
+      })
+      .sort((a, b) => {
+        switch (sortBy) {
+          case "fecha_asc":  return (a.fecha_ingreso || "").localeCompare(b.fecha_ingreso || "")
+          case "fecha_desc": return (b.fecha_ingreso || "").localeCompare(a.fecha_ingreso || "")
+          case "estado":     return ESTADO_ORDER.indexOf(a.estado) - ESTADO_ORDER.indexOf(b.estado)
+          case "monto_desc": return Number(b.monto_total || 0) - Number(a.monto_total || 0)
+          case "monto_asc":  return Number(a.monto_total || 0) - Number(b.monto_total || 0)
+          case "margen": {
+            const mg = (s: Servicio) => { const g = calcGanancia(s); return g ? g.margen : -Infinity }
+            return mg(b) - mg(a)
+          }
+          default: return 0
         }
-        default: return 0
-      }
-    })
+      })
+  }, [servicios, filtroEstado, soloPendientes, soloPagados, sortBy, filtroEstadoIsCerrado, esCerrado, estadosConfig])
 
   if (loading) {
     return (
@@ -455,7 +457,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
       ) : (
         <div className="divide-y divide-border">
           {serviciosFiltrados.map((servicio) => (
-            <div key={servicio.id} className="p-4 hover:bg-secondary/30 transition-colors">
+            <div key={servicio.id} className="p-4 hover:bg-secondary/30 transition-colors [content-visibility:auto] [contain-intrinsic-size:0_220px]">
               <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                 {/* Info */}
                 <div className="flex-1 space-y-3">
