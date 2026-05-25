@@ -131,6 +131,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   const [guardarPlantillaOpen, setGuardarPlantillaOpen] = useState(false)
   const [nombreNuevaPlantilla, setNombreNuevaPlantilla] = useState("")
   const [savingPlantilla, setSavingPlantilla] = useState(false)
+  const [abonos, setAbonos] = useState<{ fecha: string; monto: number }[]>([])
 
   const [formData, setFormData] = useState({
     fecha_ingreso: (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}-${String(n.getDate()).padStart(2,"0")}` })(),
@@ -397,9 +398,14 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       const parseArr = (v: any) => Array.isArray(v) ? v : (typeof v === "string" && v ? JSON.parse(v) : [])
       setFotosIngreso(parseArr(servicioAEditar.fotos_ingreso))
       setFotosEntrega(parseArr(servicioAEditar.fotos_entrega))
+
+      // Cargar abonos (parseToFlatArray maneja double-encoding igual que cobros/costos)
+      const abonosRaw = parseToFlatArray((servicioAEditar as any).abonos)
+      setAbonos(abonosRaw.map((a: any) => ({ fecha: String(a.fecha ?? ""), monto: Number(a.monto ?? 0) })))
     } else {
       setFotosIngreso([])
       setFotosEntrega([])
+      setAbonos([])
     }
   }, [servicioAEditar])
 
@@ -448,6 +454,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
     })
     setFotosIngreso([])
     setFotosEntrega([])
+    setAbonos([])
     onClearEdit()
   }
 
@@ -808,9 +815,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
           precio: p.precio * (p.cantidad_piezas || 1),
         }))
 
-      const anticipoFinal = formData.anticipo || ((servicioAEditar && !servicioAEditar.isPresupuesto)
-        ? Number(servicioAEditar.anticipo) || 0
-        : 0)
+      const anticipoFinal = abonos.reduce((sum, a) => sum + (Number(a.monto) || 0), 0)
       const saldoPendiente = Math.max(0, montoConIva - anticipoFinal)
 
       const servicioData = {
@@ -832,6 +837,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         iva: formData.iva,
         anticipo: anticipoFinal,
         saldo_pendiente: saldoPendiente,
+        abonos: abonos,
         monto_total_sin_iva: cobroTotal,
         monto_total: montoConIva,
         observaciones_checkboxes: [],
@@ -1460,10 +1466,15 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                   <div className="space-y-1">
                     <Label className="text-xs">Estado</Label>
                     <Select value={formData.estado} onValueChange={(v) => {
-                      // Al pasar a un estado de tipo "cerrado", asentamos el anticipo al total
-                      // (mismo comportamiento que tenía el viejo check contra "Cerrado/Pagado").
                       if (esCerrado(v) && !esCerrado(formData.estado)) {
-                        setFormData({ ...formData, estado: v, anticipo: montoConIva })
+                        const currentAnticipo = abonos.reduce((s, a) => s + (Number(a.monto) || 0), 0)
+                        const remaining = montoConIva - currentAnticipo
+                        if (remaining > 0) {
+                          const hoy = new Date()
+                          const f = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,"0")}-${String(hoy.getDate()).padStart(2,"0")}`
+                          setAbonos([...abonos, { fecha: f, monto: remaining }])
+                        }
+                        setFormData({ ...formData, estado: v })
                       } else {
                         setFormData({ ...formData, estado: v })
                       }
@@ -2202,20 +2213,67 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                   </div>
                 )}
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Anticipo / Abono</Label>
-                <Input
-                  type="number"
-                  value={formData.anticipo || ""}
-                  onChange={(e) => setFormData({ ...formData, anticipo: Number(e.target.value) || 0 })}
-                  placeholder="0"
-                  className="bg-background/50 h-9"
-                />
+              {/* Gestor de abonos */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs text-muted-foreground">Abonos / Pagos parciales</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs gap-1"
+                    onClick={() => {
+                      const hoy = new Date()
+                      const f = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,"0")}-${String(hoy.getDate()).padStart(2,"0")}`
+                      setAbonos([...abonos, { fecha: f, monto: 0 }])
+                    }}
+                  >
+                    <Plus className="w-3 h-3" /> Agregar abono
+                  </Button>
+                </div>
+                {abonos.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-1">Sin abonos registrados</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {abonos.map((abono, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <Input
+                          type="date"
+                          value={abono.fecha}
+                          onChange={(e) => {
+                            const next = [...abonos]
+                            next[idx] = { ...next[idx], fecha: e.target.value }
+                            setAbonos(next)
+                          }}
+                          className="bg-background/50 h-8 text-xs w-36"
+                        />
+                        <Input
+                          type="number"
+                          value={abono.monto || ""}
+                          placeholder="0"
+                          onChange={(e) => {
+                            const next = [...abonos]
+                            next[idx] = { ...next[idx], monto: Number(e.target.value) || 0 }
+                            setAbonos(next)
+                          }}
+                          className="bg-background/50 h-8 text-xs flex-1"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setAbonos(abonos.filter((_, i) => i !== idx))}
+                          className="text-muted-foreground hover:text-destructive transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Saldo Pendiente</Label>
-                <div className={`text-lg font-bold ${montoConIva - (formData.anticipo || 0) <= 0 ? "text-success" : "text-warning"}`}>
-                  ${Math.max(0, montoConIva - (formData.anticipo || 0)).toLocaleString("es-CL")}
+                <div className={`text-lg font-bold ${montoConIva - abonos.reduce((s, a) => s + (Number(a.monto) || 0), 0) <= 0 ? "text-success" : "text-warning"}`}>
+                  ${Math.max(0, montoConIva - abonos.reduce((s, a) => s + (Number(a.monto) || 0), 0)).toLocaleString("es-CL")}
                 </div>
               </div>
               <div className="space-y-1">

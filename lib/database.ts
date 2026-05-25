@@ -52,6 +52,11 @@ export interface FotoServicio {
   publicId: string
 }
 
+export interface Abono {
+  fecha: string  // "YYYY-MM-DD"
+  monto: number
+}
+
 export interface Servicio {
   id: string
   fecha_ingreso: string
@@ -72,6 +77,7 @@ export interface Servicio {
   iva: string
   anticipo: number
   saldo_pendiente: number
+  abonos?: Abono[]
   monto_total: number
   monto_total_sin_iva: number
   observaciones_checkboxes: string[]
@@ -336,7 +342,7 @@ export async function createServicio(servicio: Omit<Servicio, "id" | "created_at
       fecha_ingreso, patente, marca, modelo, color, kilometraje, año, cliente, telefono, observaciones,
       mano_obra_pintura, cobros, costos, piezas_pintura, estado, iva,
       anticipo, saldo_pendiente, monto_total, monto_total_sin_iva, observaciones_checkboxes,
-      fotos_ingreso, fotos_entrega, numero_ot, detalle_pendiente, fecha_facturacion,
+      fotos_ingreso, fotos_entrega, abonos, numero_ot, detalle_pendiente, fecha_facturacion,
       fecha_entregado
     ) VALUES (
       ${servicio.fecha_ingreso}, ${servicio.patente}, ${servicio.marca}, ${servicio.modelo},
@@ -347,6 +353,7 @@ export async function createServicio(servicio: Omit<Servicio, "id" | "created_at
       ${servicio.anticipo}, ${servicio.saldo_pendiente}, ${servicio.monto_total},
       ${servicio.monto_total_sin_iva}, ${safeJson(servicio.observaciones_checkboxes)},
       ${safeJson(servicio.fotos_ingreso || [])}, ${safeJson(servicio.fotos_entrega || [])},
+      ${safeJson(servicio.abonos ?? [])},
       nextval('servicios_numero_ot_seq')::int, ${servicio.detalle_pendiente ?? false},
       ${servicio.fecha_facturacion || null},
       CASE
@@ -389,6 +396,7 @@ export async function updateServicio(id: string, servicio: Partial<Servicio>) {
       observaciones_checkboxes = COALESCE(${servicio.observaciones_checkboxes != null ? safeJson(servicio.observaciones_checkboxes) : null}::jsonb, observaciones_checkboxes),
       fotos_ingreso = COALESCE(${servicio.fotos_ingreso != null ? safeJson(servicio.fotos_ingreso) : null}::jsonb, fotos_ingreso),
       fotos_entrega = COALESCE(${servicio.fotos_entrega != null ? safeJson(servicio.fotos_entrega) : null}::jsonb, fotos_entrega),
+      abonos = COALESCE(${servicio.abonos != null ? safeJson(servicio.abonos) : null}::jsonb, abonos),
       detalle_pendiente = COALESCE(${servicio.detalle_pendiente ?? null}, detalle_pendiente),
       fecha_facturacion = CASE WHEN ${fechaFacSet}::boolean THEN ${fechaFacVal}::date ELSE fecha_facturacion END,
       fecha_entregado = CASE
