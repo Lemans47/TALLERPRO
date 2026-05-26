@@ -2240,15 +2240,36 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                   </div>
                 )}
               </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Saldo Pendiente</Label>
+                <div className={`text-lg font-bold ${montoConIva - abonos.reduce((s, a) => s + (Number(a.monto) || 0), 0) <= 0 ? "text-success" : "text-warning"}`}>
+                  ${Math.max(0, montoConIva - abonos.reduce((s, a) => s + (Number(a.monto) || 0), 0)).toLocaleString("es-CL")}
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Total a Cobrar</Label>
+                <div className="text-xl font-bold text-success">${montoConIva.toLocaleString("es-CL")}</div>
+                {formData.iva === "con" && (
+                  <p className="text-[10px] text-muted-foreground leading-tight">
+                    Neto ${cobroTotal.toLocaleString("es-CL")} · IVA ${montoIVA.toLocaleString("es-CL")}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Utilidad Estimada</Label>
+                <div className={`text-xl font-bold ${utilidad >= 0 ? "text-info" : "text-destructive"}`}>
+                  ${utilidad.toLocaleString("es-CL")}
+                </div>
+              </div>
               {/* Gestor de abonos */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
+              <div className="space-y-2 col-span-2 md:col-span-4 pt-2 border-t border-border/60">
+                <div className="flex items-center justify-between gap-2">
                   <Label className="text-xs text-muted-foreground">Abonos / Pagos parciales</Label>
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="h-7 text-xs gap-1"
+                    className="h-7 text-xs gap-1 shrink-0"
                     onClick={() => {
                       const hoy = new Date()
                       const f = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,"0")}-${String(hoy.getDate()).padStart(2,"0")}`
@@ -2272,7 +2293,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                             next[idx] = { ...next[idx], fecha: e.target.value }
                             setAbonos(next)
                           }}
-                          className="bg-background/50 h-8 text-xs w-36"
+                          className="bg-background/50 h-8 text-xs w-32 shrink-0 sm:w-36"
                         />
                         <Input
                           type="number"
@@ -2283,12 +2304,12 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                             next[idx] = { ...next[idx], monto: Number(e.target.value) || 0 }
                             setAbonos(next)
                           }}
-                          className="bg-background/50 h-8 text-xs flex-1"
+                          className="bg-background/50 h-8 text-xs flex-1 min-w-0"
                         />
                         <button
                           type="button"
                           onClick={() => setAbonos(abonos.filter((_, i) => i !== idx))}
-                          className="text-muted-foreground hover:text-destructive transition-colors"
+                          className="text-muted-foreground hover:text-destructive transition-colors shrink-0"
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -2296,27 +2317,6 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                     ))}
                   </div>
                 )}
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Saldo Pendiente</Label>
-                <div className={`text-lg font-bold ${montoConIva - abonos.reduce((s, a) => s + (Number(a.monto) || 0), 0) <= 0 ? "text-success" : "text-warning"}`}>
-                  ${Math.max(0, montoConIva - abonos.reduce((s, a) => s + (Number(a.monto) || 0), 0)).toLocaleString("es-CL")}
-                </div>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Total a Cobrar</Label>
-                <div className="text-xl font-bold text-success">${montoConIva.toLocaleString("es-CL")}</div>
-                {formData.iva === "con" && (
-                  <p className="text-[10px] text-muted-foreground leading-tight">
-                    Neto ${cobroTotal.toLocaleString("es-CL")} · IVA ${montoIVA.toLocaleString("es-CL")}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Utilidad Estimada</Label>
-                <div className={`text-xl font-bold ${utilidad >= 0 ? "text-info" : "text-destructive"}`}>
-                  ${utilidad.toLocaleString("es-CL")}
-                </div>
               </div>
             </div>
           </div>
