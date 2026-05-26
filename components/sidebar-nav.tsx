@@ -98,7 +98,7 @@ export function SidebarNav() {
         </div>
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="p-2 hover:bg-sidebar-accent rounded-lg transition-colors"
+          className="p-2 text-sidebar-foreground bg-white/10 hover:bg-sidebar-accent border border-white/15 rounded-lg transition-colors"
           aria-label="Toggle menu"
         >
           {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
