@@ -13,11 +13,14 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { Users, Search, Pencil, Trash2, Plus, Car, Phone, Mail, RefreshCw, X, GitMerge, History, ChevronDown, ChevronUp } from "lucide-react"
+import { Users, Search, Pencil, Trash2, Plus, Car, Phone, Mail, RefreshCw, X, GitMerge, History, ChevronDown, ChevronUp, FileText, AlignJustify, ListChecks, List } from "lucide-react"
 import { api, type Cliente, type Vehiculo } from "@/lib/api-client"
 import { formatFechaDMA } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
 import { useEstados } from "@/lib/estados"
+import { generarPDFPresupuesto, type PresupuestoPdfModo } from "@/lib/pdf-presupuesto"
+import { PDFPreviewModal } from "@/components/pdf-preview-modal"
+import type { Servicio } from "@/lib/database"
 
 type ServicioHistorial = {
   id: string
@@ -25,10 +28,13 @@ type ServicioHistorial = {
   patente: string
   marca: string
   modelo: string
+  color?: string
+  telefono?: string
   estado: string
   monto_total: number
   monto_total_sin_iva: number
   cobros: { categoria: string; descripcion: string; monto: number }[]
+  piezas_pintura?: { nombre: string; cantidad: number; precio: number }[]
   observaciones: string
   numero_ot?: string
 }
@@ -51,6 +57,8 @@ export default function ClientesPage() {
   const [historialData, setHistorialData] = useState<ServicioHistorial[]>([])
   const [historialLoading, setHistorialLoading] = useState(false)
   const [expandedServicio, setExpandedServicio] = useState<string | null>(null)
+  const [pdfFormatServicio, setPdfFormatServicio] = useState<ServicioHistorial | null>(null)
+  const [pdfPreview, setPdfPreview] = useState<{ url: string; fileName: string } | null>(null)
   const [form, setForm] = useState({ nombre: "", telefono: "", email: "", notas: "" })
 
   const cargarDatos = useCallback(async () => {
@@ -130,6 +138,12 @@ export default function ClientesPage() {
     } finally {
       setHistorialLoading(false)
     }
+  }
+
+  const generarPresupuesto = async (servicio: ServicioHistorial, modo: PresupuestoPdfModo) => {
+    const { blobUrl, fileName } = await generarPDFPresupuesto(servicio as unknown as Servicio, modo)
+    setPdfPreview({ url: blobUrl, fileName })
+    setPdfFormatServicio(null)
   }
 
   const deduplicar = async () => {
@@ -363,9 +377,22 @@ export default function ClientesPage() {
                             ))}
                           </div>
                         )}
-                        {s.numero_ot && (
-                          <p className="text-xs text-muted-foreground">OT #{s.numero_ot}</p>
-                        )}
+                        <div className="flex items-center justify-between gap-2 pt-1">
+                          {s.numero_ot ? (
+                            <p className="text-xs text-muted-foreground">OT #{s.numero_ot}</p>
+                          ) : (
+                            <span />
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 border-warning text-warning hover:bg-warning/10 bg-transparent"
+                            onClick={() => setPdfFormatServicio(s)}
+                          >
+                            <FileText className="w-3.5 h-3.5 mr-1.5" />
+                            Presupuesto
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -375,6 +402,51 @@ export default function ClientesPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* PDF format picker dialog */}
+      <Dialog open={!!pdfFormatServicio} onOpenChange={(open) => !open && setPdfFormatServicio(null)}>
+        <DialogContent className="bg-card border-border max-w-md">
+          <DialogHeader>
+            <DialogTitle>Generar Presupuesto PDF</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">Elige el formato del presupuesto:</p>
+          <div className="grid grid-cols-3 gap-3 pt-1">
+            <button
+              className="flex flex-col items-center gap-2 p-3 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-colors"
+              onClick={() => pdfFormatServicio && generarPresupuesto(pdfFormatServicio, "detalle")}
+            >
+              <AlignJustify className="w-6 h-6 text-primary" />
+              <span className="font-semibold text-sm">Con detalle</span>
+              <span className="text-xs text-muted-foreground text-center">Items y subtotal por categoría</span>
+            </button>
+            <button
+              className="flex flex-col items-center gap-2 p-3 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-colors"
+              onClick={() => pdfFormatServicio && generarPresupuesto(pdfFormatServicio, "completo")}
+            >
+              <ListChecks className="w-6 h-6 text-primary" />
+              <span className="font-semibold text-sm">Detalle completo</span>
+              <span className="text-xs text-muted-foreground text-center">Valor por item + subtotal por categoría</span>
+            </button>
+            <button
+              className="flex flex-col items-center gap-2 p-3 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-colors"
+              onClick={() => pdfFormatServicio && generarPresupuesto(pdfFormatServicio, "totales")}
+            >
+              <List className="w-6 h-6 text-primary" />
+              <span className="font-semibold text-sm">Solo totales</span>
+              <span className="text-xs text-muted-foreground text-center">Lista sin precios, total al final</span>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* PDF preview */}
+      {pdfPreview && (
+        <PDFPreviewModal
+          url={pdfPreview.url}
+          fileName={pdfPreview.fileName}
+          onClose={() => setPdfPreview(null)}
+        />
+      )}
 
       {/* Dialog nuevo/editar */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
