@@ -47,6 +47,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { generarPDFPresupuesto } from "@/lib/pdf-presupuesto"
 import { PDFPreviewModal } from "@/components/pdf-preview-modal"
+import { PhotoLightbox } from "@/components/photo-lightbox"
 import { roundMoney, costoNetoItem, sumCostosNetos, safeLocalStorage } from "@/lib/utils"
 import { useEstados } from "@/lib/estados"
 
@@ -120,6 +121,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   const [fotosIngreso, setFotosIngreso] = useState<FotoServicio[]>([])
   const [fotosEntrega, setFotosEntrega] = useState<FotoServicio[]>([])
   const [uploadingFoto, setUploadingFoto] = useState(false)
+  const [lightbox, setLightbox] = useState<{ fotos: FotoServicio[]; index: number } | null>(null)
   const [fieldErrors, setFieldErrors] = useState<{ patente?: boolean; cliente?: boolean }>({})
   const patenteRef = useRef<HTMLInputElement>(null)
   const clienteRef = useRef<HTMLInputElement>(null)
@@ -996,6 +998,15 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         />
       )}
 
+      {/* Visor de fotos ampliadas */}
+      {lightbox && (
+        <PhotoLightbox
+          fotos={lightbox.fotos}
+          initialIndex={lightbox.index}
+          onClose={() => setLightbox(null)}
+        />
+      )}
+
       {/* PDF format picker dialog */}
       <Dialog open={pdfFormatDialog} onOpenChange={setPdfFormatDialog}>
         <DialogContent className="bg-card border-border max-w-md">
@@ -1581,12 +1592,20 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-                      {fotosIngreso.map((foto) => (
+                      {fotosIngreso.map((foto, i) => (
                         <div key={foto.publicId} className="relative group rounded-lg overflow-hidden border border-border aspect-square">
-                          <img src={foto.url} alt="Foto ingreso" className="w-full h-full object-cover" />
+                          <img
+                            src={foto.url}
+                            alt="Foto ingreso"
+                            className="w-full h-full object-cover cursor-pointer"
+                            onClick={() => setLightbox({ fotos: fotosIngreso, index: i })}
+                          />
                           <button
                             type="button"
-                            onClick={() => handleDeleteFoto(foto.publicId, "ingreso")}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteFoto(foto.publicId, "ingreso")
+                            }}
                             className="absolute top-1 right-1 w-7 h-7 bg-destructive/90 hover:bg-destructive text-white rounded-full flex items-center justify-center shadow-md"
                           >
                             <X className="w-3.5 h-3.5" />
@@ -1644,12 +1663,20 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                      {fotosEntrega.map((foto) => (
+                      {fotosEntrega.map((foto, i) => (
                         <div key={foto.publicId} className="relative group rounded-lg overflow-hidden border border-border aspect-square">
-                          <img src={foto.url} alt="Foto entrega" className="w-full h-full object-cover" />
+                          <img
+                            src={foto.url}
+                            alt="Foto entrega"
+                            className="w-full h-full object-cover cursor-pointer"
+                            onClick={() => setLightbox({ fotos: fotosEntrega, index: i })}
+                          />
                           <button
                             type="button"
-                            onClick={() => handleDeleteFoto(foto.publicId, "entrega")}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteFoto(foto.publicId, "entrega")
+                            }}
                             className="absolute top-1 right-1 w-7 h-7 bg-destructive/90 hover:bg-destructive text-white rounded-full flex items-center justify-center shadow-md"
                           >
                             <X className="w-3.5 h-3.5" />
