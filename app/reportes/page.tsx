@@ -60,6 +60,22 @@ function InfoTip({ children }: { children: React.ReactNode }) {
   )
 }
 
+// Tooltip propio para gráficos de dinero: evita el recorte del tooltip por
+// defecto de recharts cuando los montos son grandes.
+function MoneyTooltip({ active, payload, label }: any) {
+  if (!active || !Array.isArray(payload) || payload.length === 0) return null
+  return (
+    <div className="rounded-lg border bg-card px-3 py-2 text-sm shadow-md whitespace-nowrap">
+      <p className="font-medium mb-1">{label}</p>
+      {payload.map((p: any) => (
+        <p key={p.dataKey} className="tabular-nums" style={{ color: p.color }}>
+          {p.name}: {fmtCLP(Number(p.value))}
+        </p>
+      ))}
+    </div>
+  )
+}
+
 interface DashboardResponse {
   servicios: Servicio[]
   gastos: Gasto[]
@@ -274,16 +290,17 @@ export default function ReportsPage() {
     { name: "Costos servicios", value: kpis?.costosDirectos ?? 0, color: "#dc2626" },
   ].filter((d) => d.value > 0)
 
-  // observaciones_checkboxes puede venir como string JSONB doble-encoded; normaliza con parseJsonbArray
-  const tieneTipo = (s: Servicio, tipo: string) =>
-    parseJsonbArray<string>(s.observaciones_checkboxes).includes(tipo)
-
-  const serviciosChartData = [
-    { name: "Pintura", value: servicios.filter((s) => tieneTipo(s, "pintura")).length },
-    { name: "Desabolladura", value: servicios.filter((s) => tieneTipo(s, "desabolladura")).length },
-    { name: "Mecánica", value: servicios.filter((s) => tieneTipo(s, "mecanica")).length },
-    { name: "Otros", value: servicios.filter((s) => tieneTipo(s, "otros")).length },
-  ].filter((d) => d.value > 0)
+  // Cantidad de servicios del mes agrupados por estado.
+  const serviciosPorEstadoData = useMemo(() => {
+    const acc: Record<string, number> = {}
+    for (const s of servicios) {
+      const estado = s.estado || "Sin estado"
+      acc[estado] = (acc[estado] ?? 0) + 1
+    }
+    return Object.entries(acc)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+  }, [servicios])
 
   // ── Top clientes (dos rankings: cobrado y facturado) ────────────────────────
   const topClientesCobrado = useMemo(() => {
@@ -876,15 +893,15 @@ export default function ReportsPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Servicios por Tipo</CardTitle>
+                <CardTitle className="text-lg">Servicios por Estado</CardTitle>
               </CardHeader>
               <CardContent>
-                {serviciosChartData.length > 0 ? (
+                {serviciosPorEstadoData.length > 0 ? (
                   <ResponsiveContainer width="100%" height={280}>
-                    <BarChart data={serviciosChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                    <BarChart data={serviciosPorEstadoData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                       <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                      <YAxis tick={{ fontSize: 12 }} />
+                      <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
                       <RTooltip
                         contentStyle={{
                           backgroundColor: "var(--card)",
@@ -892,7 +909,7 @@ export default function ReportsPage() {
                           borderRadius: "8px",
                         }}
                       />
-                      <Bar dataKey="value" fill="var(--chart-1)" radius={[4, 4, 0, 0]} name="Cantidad" />
+                      <Bar dataKey="value" fill="var(--chart-1)" radius={[4, 4, 0, 0]} name="Servicios" />
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
@@ -924,14 +941,7 @@ export default function ReportsPage() {
                       <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                       <XAxis dataKey="label" tick={{ fontSize: 12 }} />
                       <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => fmtCLP(Number(v))} width={80} />
-                      <RTooltip
-                        contentStyle={{
-                          backgroundColor: "var(--card)",
-                          border: "1px solid var(--border)",
-                          borderRadius: "8px",
-                        }}
-                        formatter={(value, name) => [fmtCLP(Number(value)), name]}
-                      />
+                      <RTooltip content={<MoneyTooltip />} allowEscapeViewBox={{ x: true }} cursor={{ fill: "var(--muted)", opacity: 0.4 }} />
                       <Bar dataKey="cobros" fill="#1a4ed8" radius={[4, 4, 0, 0]} name="Cobros" />
                       <Bar dataKey="costos" fill="#dc2626" radius={[4, 4, 0, 0]} name="Costos" />
                     </BarChart>
