@@ -290,18 +290,6 @@ export default function ReportsPage() {
     { name: "Costos servicios", value: kpis?.costosDirectos ?? 0, color: "#dc2626" },
   ].filter((d) => d.value > 0)
 
-  // Cantidad de servicios del mes agrupados por estado.
-  const serviciosPorEstadoData = useMemo(() => {
-    const acc: Record<string, number> = {}
-    for (const s of servicios) {
-      const estado = s.estado || "Sin estado"
-      acc[estado] = (acc[estado] ?? 0) + 1
-    }
-    return Object.entries(acc)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value)
-  }, [servicios])
-
   // ── Top clientes (dos rankings: cobrado y facturado) ────────────────────────
   const topClientesCobrado = useMemo(() => {
     const map: Record<string, { cliente: string; total: number; count: number }> = {}
@@ -856,70 +844,39 @@ export default function ReportsPage() {
           </div>
 
           {/* Charts */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Desglose de Gastos</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {gastosChartData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={280}>
-                    <PieChart>
-                      <Pie
-                        data={gastosChartData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={100}
-                        paddingAngle={2}
-                        dataKey="value"
-                        label={({ name, percent }: any) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
-                        labelLine={false}
-                      >
-                        {gastosChartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <RTooltip formatter={(value) => [fmtCLP(Number(value)), ""]} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-[280px] text-muted-foreground">
-                    No hay gastos registrados
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Servicios por Estado</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {serviciosPorEstadoData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={280}>
-                    <BarChart data={serviciosPorEstadoData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                      <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                      <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
-                      <RTooltip
-                        contentStyle={{
-                          backgroundColor: "var(--card)",
-                          border: "1px solid var(--border)",
-                          borderRadius: "8px",
-                        }}
-                      />
-                      <Bar dataKey="value" fill="var(--chart-1)" radius={[4, 4, 0, 0]} name="Servicios" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-[280px] text-muted-foreground">
-                    No hay servicios registrados
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Desglose de Gastos</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {gastosChartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={280}>
+                  <PieChart>
+                    <Pie
+                      data={gastosChartData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={2}
+                      dataKey="value"
+                      label={({ name, percent }: any) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
+                      labelLine={false}
+                    >
+                      {gastosChartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <RTooltip formatter={(value) => [fmtCLP(Number(value)), ""]} />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-[280px] text-muted-foreground">
+                  No hay gastos registrados
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Rentabilidad por Categoría de Servicio */}
           <Card>
