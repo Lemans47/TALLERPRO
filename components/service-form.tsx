@@ -2082,6 +2082,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                         <table className="w-full text-sm">
                           <thead>
                             <tr className="bg-secondary/40 border-b border-border">
+                              <th className="p-3 font-semibold w-10"></th>
                               <th className="text-left p-3 font-semibold">Descripción</th>
                               <th className="text-right p-3 font-semibold">Cobrado Cliente</th>
                               <th className="text-right p-3 font-semibold">Costo Taller</th>
@@ -2092,7 +2093,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                           <tbody>
                             {safeArr(cobros[categoria as keyof ItemsPorCategoria]).length === 0 ? (
                               <tr>
-                                <td colSpan={5} className="text-center p-4 text-muted-foreground text-xs">
+                                <td colSpan={6} className="text-center p-4 text-muted-foreground text-xs">
                                   Sin items. Usa el botón + para agregar.
                                 </td>
                               </tr>
@@ -2104,6 +2105,32 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                                 const utilidad = cobro - costo
                                 return (
                                   <tr key={itemCobro.id} className="border-b border-border hover:bg-secondary/20 transition-colors">
+                                    <td className="p-1 align-middle">
+                                      <div className="flex flex-col items-center justify-center gap-0.5">
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon"
+                                          disabled={index === 0}
+                                          onClick={() => moveItem(categoria as keyof ItemsPorCategoria, index, "up")}
+                                          className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-secondary disabled:opacity-30"
+                                          title="Subir"
+                                        >
+                                          <ChevronUp className="w-3.5 h-3.5" />
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon"
+                                          disabled={index === safeArr(cobros[categoria as keyof ItemsPorCategoria]).length - 1}
+                                          onClick={() => moveItem(categoria as keyof ItemsPorCategoria, index, "down")}
+                                          className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-secondary disabled:opacity-30"
+                                          title="Bajar"
+                                        >
+                                          <ChevronDown className="w-3.5 h-3.5" />
+                                        </Button>
+                                      </div>
+                                    </td>
                                     <td className="p-3 min-w-[160px] sm:min-w-[300px]">
                                       <Textarea
                                         value={itemCobro.descripcion}
@@ -2161,38 +2188,14 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                                       ${utilidad.toLocaleString("es-CL")}
                                     </td>
                                     <td className="p-3 text-center">
-                                      <div className="flex items-center justify-center gap-0.5">
-                                        <Button
-                                          type="button"
-                                          variant="ghost"
-                                          size="icon"
-                                          disabled={index === 0}
-                                          onClick={() => moveItem(categoria as keyof ItemsPorCategoria, index, "up")}
-                                          className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-secondary disabled:opacity-30"
-                                          title="Subir"
-                                        >
-                                          <ChevronUp className="w-3.5 h-3.5" />
-                                        </Button>
-                                        <Button
-                                          type="button"
-                                          variant="ghost"
-                                          size="icon"
-                                          disabled={index === safeArr(cobros[categoria as keyof ItemsPorCategoria]).length - 1}
-                                          onClick={() => moveItem(categoria as keyof ItemsPorCategoria, index, "down")}
-                                          className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-secondary disabled:opacity-30"
-                                          title="Bajar"
-                                        >
-                                          <ChevronDown className="w-3.5 h-3.5" />
-                                        </Button>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          onClick={() => removeItemCobro(categoria as keyof ItemsPorCategoria, itemCobro.id)}
-                                          className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                        >
-                                          <Trash2 className="w-3.5 h-3.5" />
-                                        </Button>
-                                      </div>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => removeItemCobro(categoria as keyof ItemsPorCategoria, itemCobro.id)}
+                                        className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </Button>
                                     </td>
                                   </tr>
                                 )
