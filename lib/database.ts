@@ -495,6 +495,7 @@ export async function updatePresupuesto(id: string, presupuesto: Partial<Presupu
       monto_total = COALESCE(${presupuesto.monto_total ?? null}, monto_total),
       monto_total_sin_iva = COALESCE(${presupuesto.monto_total_sin_iva ?? null}, monto_total_sin_iva),
       observaciones_checkboxes = COALESCE(${presupuesto.observaciones_checkboxes != null ? safeJson(presupuesto.observaciones_checkboxes) : null}::jsonb, observaciones_checkboxes),
+      fotos_ingreso = COALESCE(${presupuesto.fotos_ingreso != null ? safeJson(presupuesto.fotos_ingreso) : null}::jsonb, fotos_ingreso),
       updated_at = NOW()
     WHERE id = ${id}
     RETURNING *
