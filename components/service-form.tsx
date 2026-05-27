@@ -30,6 +30,8 @@ import {
   Settings,
   Check,
   ChevronsUpDown,
+  ChevronUp,
+  ChevronDown,
   Camera,
   Upload,
   ImageIcon,
@@ -578,6 +580,20 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       ...prev,
       [categoria]: prev[categoria].filter((item) => item.id !== id),
     }))
+  }, [])
+
+  const moveItem = useCallback((categoria: keyof ItemsPorCategoria, index: number, direccion: "up" | "down") => {
+    const target = index + (direccion === "up" ? -1 : 1)
+
+    const swapAtIndices = <T,>(arr: T[]): T[] => {
+      if (index < 0 || target < 0 || index >= arr.length || target >= arr.length) return arr
+      const next = [...arr]
+      ;[next[index], next[target]] = [next[target], next[index]]
+      return next
+    }
+
+    setCobros((prev) => ({ ...prev, [categoria]: swapAtIndices(prev[categoria]) }))
+    setCostos((prev) => ({ ...prev, [categoria]: swapAtIndices(prev[categoria]) }))
   }, [])
 
   const upsertItemCostoByIndex = useCallback(
@@ -2145,14 +2161,38 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                                       ${utilidad.toLocaleString("es-CL")}
                                     </td>
                                     <td className="p-3 text-center">
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => removeItemCobro(categoria as keyof ItemsPorCategoria, itemCobro.id)}
-                                        className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                      >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                      </Button>
+                                      <div className="flex items-center justify-center gap-0.5">
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon"
+                                          disabled={index === 0}
+                                          onClick={() => moveItem(categoria as keyof ItemsPorCategoria, index, "up")}
+                                          className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-secondary disabled:opacity-30"
+                                          title="Subir"
+                                        >
+                                          <ChevronUp className="w-3.5 h-3.5" />
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon"
+                                          disabled={index === safeArr(cobros[categoria as keyof ItemsPorCategoria]).length - 1}
+                                          onClick={() => moveItem(categoria as keyof ItemsPorCategoria, index, "down")}
+                                          className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-secondary disabled:opacity-30"
+                                          title="Bajar"
+                                        >
+                                          <ChevronDown className="w-3.5 h-3.5" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => removeItemCobro(categoria as keyof ItemsPorCategoria, itemCobro.id)}
+                                          className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </Button>
+                                      </div>
                                     </td>
                                   </tr>
                                 )
