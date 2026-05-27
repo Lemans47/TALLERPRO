@@ -142,8 +142,9 @@ export default function ClientesPage() {
 
   const generarPresupuesto = async (servicio: ServicioHistorial, modo: PresupuestoPdfModo) => {
     const { blobUrl, fileName } = await generarPDFPresupuesto(servicio as unknown as Servicio, modo)
-    setPdfPreview({ url: blobUrl, fileName })
     setPdfFormatServicio(null)
+    setHistorialOpen(false)
+    setPdfPreview({ url: blobUrl, fileName })
   }
 
   const deduplicar = async () => {
