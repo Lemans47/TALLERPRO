@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
-import { getPrecioPintura, updatePrecioPintura, initPrecioPintura } from "@/lib/database"
+import { getPrecioPintura, updatePrecioPintura, initPrecioPintura, getPromedioMaterialesMesAnterior } from "@/lib/database"
+
+export const dynamic = "force-dynamic"
 
 export async function GET() {
   try {
@@ -7,7 +9,11 @@ export async function GET() {
     if (!precio) {
       precio = await initPrecioPintura()
     }
-    return NextResponse.json(precio || { precio_por_pieza: 0 })
+    const promedio = await getPromedioMaterialesMesAnterior()
+    return NextResponse.json({
+      ...(precio || { precio_por_pieza: 0 }),
+      promedio_mes_anterior: promedio,
+    })
   } catch (error: any) {
     console.error("Error getting precio pintura:", error)
     return NextResponse.json({ error: "Error loading precio pintura" }, { status: 500 })
@@ -17,8 +23,8 @@ export async function GET() {
 export async function PUT(request: Request) {
   try {
     const body = await request.json()
-    const { precio_por_pieza } = body
-    const updated = await updatePrecioPintura(precio_por_pieza)
+    const { precio_por_pieza, mano_obra_default, materiales_default } = body
+    const updated = await updatePrecioPintura({ precio_por_pieza, mano_obra_default, materiales_default })
     return NextResponse.json(updated)
   } catch (error: any) {
     console.error("Error updating precio pintura:", error)

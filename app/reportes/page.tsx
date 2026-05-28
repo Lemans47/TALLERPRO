@@ -60,6 +60,22 @@ function InfoTip({ children }: { children: React.ReactNode }) {
   )
 }
 
+// Tooltip propio para gráficos de dinero: evita el recorte del tooltip por
+// defecto de recharts cuando los montos son grandes.
+function MoneyTooltip({ active, payload, label }: any) {
+  if (!active || !Array.isArray(payload) || payload.length === 0) return null
+  return (
+    <div className="rounded-lg border bg-card px-3 py-2 text-sm shadow-md whitespace-nowrap">
+      <p className="font-medium mb-1">{label}</p>
+      {payload.map((p: any) => (
+        <p key={p.dataKey} className="tabular-nums" style={{ color: p.color }}>
+          {p.name}: {fmtCLP(Number(p.value))}
+        </p>
+      ))}
+    </div>
+  )
+}
+
 interface DashboardResponse {
   servicios: Servicio[]
   gastos: Gasto[]
@@ -166,6 +182,40 @@ export default function ReportsPage() {
   )
   const totalUnidadesPintura = piezasDetalle.reduce((s, p) => s + p.unidades, 0)
   const ingresosPiezas = piezasDetalle.reduce((s, p) => s + p.ingresos, 0)
+
+  // ── Rentabilidad por categoría de servicio (cliente, derivado de JSONB) ─────
+  const rentabilidadPorCategoria = useMemo(() => {
+    const CATS = ["pintura", "desabolladura", "repuestos", "reparar", "mecanica", "desmontar", "otros"] as const
+    const CAT_LABEL: Record<string, string> = {
+      pintura: "Pintura", desabolladura: "Desabolladura", repuestos: "Repuestos",
+      reparar: "Reparar", mecanica: "Mecánica", desmontar: "Desmontar", otros: "Otros",
+    }
+    const acc: Record<string, { cobros: number; costos: number }> = {}
+    const get = (c: string) => (acc[c] ??= { cobros: 0, costos: 0 })
+    for (const s of servicios) {
+      parseJsonbArray<{ categoria?: string; monto?: number }>(s.cobros).forEach((c) => {
+        get(c.categoria ?? "otros").cobros += Number(c.monto || 0)
+      })
+      parseJsonbArray<{ categoria?: string; monto?: number }>(s.costos).forEach((c) => {
+        get(c.categoria ?? "otros").costos += Number(c.monto || 0)
+      })
+      // El ingreso de pintura proviene de las piezas pintadas, no de cobros[]
+      parseJsonbArray<{ precio?: number }>(s.piezas_pintura).forEach((p) => {
+        get("pintura").cobros += Number(p.precio || 0)
+      })
+    }
+    return CATS.map((cat) => {
+      const { cobros, costos } = acc[cat] ?? { cobros: 0, costos: 0 }
+      const margen = cobros - costos
+      return { cat, label: CAT_LABEL[cat], cobros, costos, margen, margenPct: cobros > 0 ? (margen / cobros) * 100 : null }
+    })
+      .filter((r) => r.cobros > 0 || r.costos > 0)
+      .sort((a, b) => b.margen - a.margen)
+  }, [servicios])
+  const rentCatTotales = rentabilidadPorCategoria.reduce(
+    (t, r) => ({ cobros: t.cobros + r.cobros, costos: t.costos + r.costos, margen: t.margen + r.margen }),
+    { cobros: 0, costos: 0, margen: 0 },
+  )
   const materialesPinturaItems = gastos.filter((g) => g.categoria === "Gastos de Pintura")
   const totalMaterialesPintura = materialesPinturaItems.reduce((s, g) => s + Number(g.monto || 0), 0)
   const costoPorUnidad = totalUnidadesPintura > 0 ? totalMaterialesPintura / totalUnidadesPintura : 0
@@ -238,17 +288,6 @@ export default function ReportsPage() {
     { name: "Misceláneos", value: gastosMiscelaneos, color: "#8e9fc0" },
     { name: "Sueldos pagados", value: sueldosPagados, color: "#16a34a" },
     { name: "Costos servicios", value: kpis?.costosDirectos ?? 0, color: "#dc2626" },
-  ].filter((d) => d.value > 0)
-
-  // observaciones_checkboxes puede venir como string JSONB doble-encoded; normaliza con parseJsonbArray
-  const tieneTipo = (s: Servicio, tipo: string) =>
-    parseJsonbArray<string>(s.observaciones_checkboxes).includes(tipo)
-
-  const serviciosChartData = [
-    { name: "Pintura", value: servicios.filter((s) => tieneTipo(s, "pintura")).length },
-    { name: "Desabolladura", value: servicios.filter((s) => tieneTipo(s, "desabolladura")).length },
-    { name: "Mecánica", value: servicios.filter((s) => tieneTipo(s, "mecanica")).length },
-    { name: "Otros", value: servicios.filter((s) => tieneTipo(s, "otros")).length },
   ].filter((d) => d.value > 0)
 
   // ── Top clientes (dos rankings: cobrado y facturado) ────────────────────────
@@ -805,70 +844,115 @@ export default function ReportsPage() {
           </div>
 
           {/* Charts */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Desglose de Gastos</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {gastosChartData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={280}>
-                    <PieChart>
-                      <Pie
-                        data={gastosChartData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={100}
-                        paddingAngle={2}
-                        dataKey="value"
-                        label={({ name, percent }: any) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
-                        labelLine={false}
-                      >
-                        {gastosChartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <RTooltip formatter={(value) => [fmtCLP(Number(value)), ""]} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-[280px] text-muted-foreground">
-                    No hay gastos registrados
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Desglose de Gastos</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {gastosChartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={280}>
+                  <PieChart>
+                    <Pie
+                      data={gastosChartData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={2}
+                      dataKey="value"
+                      label={({ name, percent }: any) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
+                      labelLine={false}
+                    >
+                      {gastosChartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <RTooltip formatter={(value) => [fmtCLP(Number(value)), ""]} />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-[280px] text-muted-foreground">
+                  No hay gastos registrados
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Servicios por Tipo</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {serviciosChartData.length > 0 ? (
+          {/* Rentabilidad por Categoría de Servicio */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-1.5">
+                Rentabilidad por Categoría de Servicio
+                <InfoTip>
+                  Cobros vs. costos del mes agrupados por categoría. La fila de Pintura incluye el
+                  ingreso de las piezas pintadas y, en el costo, la mano de obra y materiales
+                  calculados automáticamente.
+                </InfoTip>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {rentabilidadPorCategoria.length > 0 ? (
+                <div className="space-y-6">
                   <ResponsiveContainer width="100%" height={280}>
-                    <BarChart data={serviciosChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                    <BarChart data={rentabilidadPorCategoria} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                      <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                      <YAxis tick={{ fontSize: 12 }} />
-                      <RTooltip
-                        contentStyle={{
-                          backgroundColor: "var(--card)",
-                          border: "1px solid var(--border)",
-                          borderRadius: "8px",
-                        }}
-                      />
-                      <Bar dataKey="value" fill="var(--chart-1)" radius={[4, 4, 0, 0]} name="Cantidad" />
+                      <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                      <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => fmtCLP(Number(v))} width={80} />
+                      <RTooltip content={<MoneyTooltip />} allowEscapeViewBox={{ x: true }} cursor={{ fill: "var(--muted)", opacity: 0.4 }} />
+                      <Bar dataKey="cobros" fill="#1a4ed8" radius={[4, 4, 0, 0]} name="Cobros" />
+                      <Bar dataKey="costos" fill="#dc2626" radius={[4, 4, 0, 0]} name="Costos" />
                     </BarChart>
                   </ResponsiveContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-[280px] text-muted-foreground">
-                    No hay servicios registrados
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b text-muted-foreground">
+                          <th className="text-left font-medium py-2 pr-4">Categoría</th>
+                          <th className="text-right font-medium py-2 px-4">Cobros</th>
+                          <th className="text-right font-medium py-2 px-4">Costos</th>
+                          <th className="text-right font-medium py-2 px-4">Margen $</th>
+                          <th className="text-right font-medium py-2 pl-4">Margen %</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rentabilidadPorCategoria.map((r) => (
+                          <tr key={r.cat} className="border-b last:border-0">
+                            <td className="text-left py-2 pr-4 font-medium">{r.label}</td>
+                            <td className="text-right py-2 px-4 tabular-nums">{fmtCLP(r.cobros)}</td>
+                            <td className="text-right py-2 px-4 tabular-nums">{fmtCLP(r.costos)}</td>
+                            <td className={`text-right py-2 px-4 tabular-nums font-medium ${r.margen >= 0 ? "text-green-600" : "text-red-600"}`}>
+                              {fmtCLP(r.margen)}
+                            </td>
+                            <td className={`text-right py-2 pl-4 tabular-nums ${r.margen >= 0 ? "text-green-600" : "text-red-600"}`}>
+                              {fmtPct(r.margenPct)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t-2 font-semibold">
+                          <td className="text-left py-2 pr-4">Total</td>
+                          <td className="text-right py-2 px-4 tabular-nums">{fmtCLP(rentCatTotales.cobros)}</td>
+                          <td className="text-right py-2 px-4 tabular-nums">{fmtCLP(rentCatTotales.costos)}</td>
+                          <td className={`text-right py-2 px-4 tabular-nums ${rentCatTotales.margen >= 0 ? "text-green-600" : "text-red-600"}`}>
+                            {fmtCLP(rentCatTotales.margen)}
+                          </td>
+                          <td className={`text-right py-2 pl-4 tabular-nums ${rentCatTotales.margen >= 0 ? "text-green-600" : "text-red-600"}`}>
+                            {fmtPct(rentCatTotales.cobros > 0 ? (rentCatTotales.margen / rentCatTotales.cobros) * 100 : null)}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-[200px] text-muted-foreground">
+                  No hay cobros ni costos registrados este mes
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Detailed Breakdown */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

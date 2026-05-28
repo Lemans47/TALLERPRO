@@ -137,6 +137,10 @@ export interface Gasto {
 export interface PrecioPintura {
   id: string
   precio_por_pieza: number
+  /** Costo global por defecto de mano de obra por pieza (editable por servicio). */
+  mano_obra_default: number
+  /** Costo global por defecto de materiales por pieza (editable por servicio). */
+  materiales_default: number
   created_at: string
   updated_at: string
 }
@@ -495,6 +499,7 @@ export async function updatePresupuesto(id: string, presupuesto: Partial<Presupu
       monto_total = COALESCE(${presupuesto.monto_total ?? null}, monto_total),
       monto_total_sin_iva = COALESCE(${presupuesto.monto_total_sin_iva ?? null}, monto_total_sin_iva),
       observaciones_checkboxes = COALESCE(${presupuesto.observaciones_checkboxes != null ? safeJson(presupuesto.observaciones_checkboxes) : null}::jsonb, observaciones_checkboxes),
+      fotos_ingreso = COALESCE(${presupuesto.fotos_ingreso != null ? safeJson(presupuesto.fotos_ingreso) : null}::jsonb, fotos_ingreso),
       updated_at = NOW()
     WHERE id = ${id}
     RETURNING *
@@ -834,9 +839,25 @@ export async function getVehicleHistory(patente: string) {
 }
 
 // Precio Pintura
-// Precios Pintura - Solo precio global
+// Precios Pintura - Precio global + defaults de costo (mano de obra y materiales)
+
+// Migración idempotente: agrega las columnas de defaults de costo si no existen.
+let precioPinturaColumnsReady = false
+async function ensurePrecioPinturaColumns() {
+  if (precioPinturaColumnsReady) return
+  try {
+    const db = getSQL()
+    await db`ALTER TABLE precios_pintura ADD COLUMN IF NOT EXISTS mano_obra_default NUMERIC(12,0) NOT NULL DEFAULT 0`
+    await db`ALTER TABLE precios_pintura ADD COLUMN IF NOT EXISTS materiales_default NUMERIC(12,0) NOT NULL DEFAULT 0`
+    precioPinturaColumnsReady = true
+  } catch (error: any) {
+    console.error("[v0] ensurePrecioPinturaColumns:", error?.message)
+  }
+}
+
 export async function getPrecioPintura(): Promise<PrecioPintura | null> {
   try {
+    await ensurePrecioPinturaColumns()
     const db = getSQL()
     const data = await db`SELECT * FROM precios_pintura LIMIT 1`
     return (data[0] as PrecioPintura) || null
@@ -846,12 +867,20 @@ export async function getPrecioPintura(): Promise<PrecioPintura | null> {
   }
 }
 
-export async function updatePrecioPintura(precio_por_pieza: number) {
+export async function updatePrecioPintura(values: {
+  precio_por_pieza?: number
+  mano_obra_default?: number
+  materiales_default?: number
+}) {
   try {
+    await ensurePrecioPinturaColumns()
     const db = getSQL()
     const data = await db`
-      UPDATE precios_pintura 
-      SET precio_por_pieza = ${precio_por_pieza}, updated_at = NOW() 
+      UPDATE precios_pintura SET
+        precio_por_pieza = COALESCE(${values.precio_por_pieza ?? null}, precio_por_pieza),
+        mano_obra_default = COALESCE(${values.mano_obra_default ?? null}, mano_obra_default),
+        materiales_default = COALESCE(${values.materiales_default ?? null}, materiales_default),
+        updated_at = NOW()
       RETURNING *
     `
     return data[0] as PrecioPintura
@@ -863,20 +892,96 @@ export async function updatePrecioPintura(precio_por_pieza: number) {
 
 export async function initPrecioPintura(precio_por_pieza: number = 0) {
   try {
+    await ensurePrecioPinturaColumns()
     const db = getSQL()
     const existing = await db`SELECT * FROM precios_pintura LIMIT 1`
     if (existing.length > 0) {
       return existing[0] as PrecioPintura
     }
     const data = await db`
-      INSERT INTO precios_pintura (precio_por_pieza) 
-      VALUES (${precio_por_pieza}) 
+      INSERT INTO precios_pintura (precio_por_pieza)
+      VALUES (${precio_por_pieza})
       RETURNING *
     `
     return data[0] as PrecioPintura
   } catch (error: any) {
     console.error("[v0] Error initializing precios_pintura:", error?.message)
     throw error
+  }
+}
+
+export interface PromedioMaterialesMesAnterior {
+  mesInicio: string
+  gastos: number
+  piezas: number
+  promedioPorPieza: number | null
+}
+
+export async function getPromedioMaterialesMesAnterior(): Promise<PromedioMaterialesMesAnterior> {
+  const db = getSQL()
+  const result = await db`
+    WITH periodo AS (
+      SELECT
+        (date_trunc('month', CURRENT_DATE) - INTERVAL '2 months')::date AS inicio,
+        date_trunc('month', CURRENT_DATE)::date AS fin
+    ),
+    gastos_pintura AS (
+      SELECT COALESCE(SUM(monto), 0) AS total_gastos
+      FROM gastos
+      WHERE categoria = 'Gastos de Pintura'
+        AND fecha::date >= (SELECT inicio FROM periodo)
+        AND fecha::date < (SELECT fin FROM periodo)
+    ),
+    piezas_periodo AS (
+      SELECT COALESCE(SUM(
+        CASE
+          WHEN jsonb_typeof(s.piezas_pintura) = 'array' THEN (
+            SELECT COALESCE(SUM(
+              CASE
+                WHEN (p->>'cantidad') ~ '^-?[0-9]+(\.[0-9]+)?$' THEN (p->>'cantidad')::numeric
+                WHEN (p->>'cantidad_piezas') ~ '^-?[0-9]+(\.[0-9]+)?$' THEN (p->>'cantidad_piezas')::numeric
+                ELSE 1
+              END
+            ), 0)
+            FROM jsonb_array_elements(s.piezas_pintura) p
+          )
+          WHEN jsonb_typeof(s.piezas_pintura) = 'string' THEN (
+            SELECT COALESCE(SUM(
+              CASE
+                WHEN (p->>'cantidad') ~ '^-?[0-9]+(\.[0-9]+)?$' THEN (p->>'cantidad')::numeric
+                WHEN (p->>'cantidad_piezas') ~ '^-?[0-9]+(\.[0-9]+)?$' THEN (p->>'cantidad_piezas')::numeric
+                ELSE 1
+              END
+            ), 0)
+            FROM jsonb_array_elements((s.piezas_pintura #>> '{}')::jsonb) p
+          )
+          ELSE 0
+        END
+      ), 0) AS total_piezas
+      FROM servicios s
+      WHERE s.fecha_ingreso::date >= (SELECT inicio FROM periodo)
+        AND s.fecha_ingreso::date < (SELECT fin FROM periodo)
+    )
+    SELECT
+      (SELECT inicio FROM periodo) AS mes_inicio,
+      (SELECT total_gastos FROM gastos_pintura) AS gastos,
+      (SELECT total_piezas FROM piezas_periodo) AS piezas,
+      CASE
+        WHEN (SELECT total_piezas FROM piezas_periodo) > 0
+          AND (SELECT total_gastos FROM gastos_pintura) > 0
+        THEN ROUND(
+          (SELECT total_gastos FROM gastos_pintura) /
+          (SELECT total_piezas FROM piezas_periodo)
+        )
+        ELSE NULL
+      END AS promedio_por_pieza
+  `
+  const row = result[0]
+  return {
+    mesInicio: String(row.mes_inicio),
+    gastos: Number(row.gastos),
+    piezas: Number(row.piezas),
+    promedioPorPieza: row.promedio_por_pieza != null ? Number(row.promedio_por_pieza) : null,
   }
 }
 

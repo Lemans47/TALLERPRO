@@ -36,7 +36,7 @@ import {
   EyeOff,
 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { api, type PrecioPintura, type PiezaPintura, type EstadoServicio, type EstadoTipo } from "@/lib/api-client"
+import { api, type PrecioPintura, type PiezaPintura, type EstadoServicio, type EstadoTipo, type PromedioMateriales, type PrecioPinturaConPromedio } from "@/lib/api-client"
 import { formatFechaDMA } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
 import { useEstados } from "@/lib/estados"
@@ -51,7 +51,11 @@ export default function ConfiguracionPage() {
   const [precioPintura, setPrecioPintura] = useState<PrecioPintura | null>(null)
   const [piezasPintura, setPiezasPintura] = useState<PiezaPintura[]>([])
   const [precioTemp, setPrecioTemp] = useState("")
+  const [manoObraTemp, setManoObraTemp] = useState("")
+  const [materialesTemp, setMaterialesTemp] = useState("")
   const [savingPrecio, setSavingPrecio] = useState(false)
+  const [promedioSugerido, setPromedioSugerido] = useState<PromedioMateriales | null>(null)
+  const [aplicandoPromedio, setAplicandoPromedio] = useState(false)
   const [nuevaPieza, setNuevaPieza] = useState({ nombre: "", cantidad_piezas: "1" })
   const [savingPiezas, setSavingPiezas] = useState(false)
   const { toast } = useToast()
@@ -91,8 +95,12 @@ export default function ConfiguracionPage() {
         gastos: gastos.length,
         presupuestos: presupuestos.length,
       })
+      const precioConPromedio = precio as PrecioPinturaConPromedio | null
       setPrecioPintura(precio)
+      setPromedioSugerido(precioConPromedio?.promedio_mes_anterior ?? null)
       setPrecioTemp(precio?.precio_por_pieza?.toString() || "")
+      setManoObraTemp(Number(precio?.mano_obra_default) > 0 ? String(Number(precio?.mano_obra_default)) : "")
+      setMaterialesTemp(Number(precio?.materiales_default) > 0 ? String(Number(precio?.materiales_default)) : "")
       setPiezasPintura(piezas)
       if (configRes?.provider) setDbProvider(configRes.provider)
     } catch (error) {
@@ -164,13 +172,44 @@ export default function ConfiguracionPage() {
     }
     setSavingPrecio(true)
     try {
-      await api.precioPintura.update(Number.parseFloat(precioTemp))
-      toast({ title: "Precio guardado", description: "El precio por pieza se actualizó correctamente" })
+      await api.precioPintura.update({
+        precio_por_pieza: Number.parseFloat(precioTemp),
+        mano_obra_default: Number(manoObraTemp) || 0,
+        materiales_default: Number(materialesTemp) || 0,
+      })
+      toast({ title: "Valores guardados", description: "Los valores globales de pintura se actualizaron correctamente" })
       await loadData()
     } catch (error) {
       toast({ title: "Error", description: "No se pudo guardar el precio", variant: "destructive" })
     } finally {
       setSavingPrecio(false)
+    }
+  }
+
+  function formatPeriodo(mesInicio: string): string {
+    const inicio = new Date(mesInicio + "T12:00:00")
+    const fin = new Date(inicio)
+    fin.setMonth(fin.getMonth() + 2)
+    fin.setDate(0)
+    const mesI = inicio.toLocaleString("es-CL", { month: "long" })
+    const mesF = fin.toLocaleString("es-CL", { month: "long", year: "numeric" })
+    return `${mesI} – ${mesF}`
+  }
+
+  const handleAplicarPromedio = async () => {
+    if (!promedioSugerido?.promedioPorPieza) return
+    setAplicandoPromedio(true)
+    try {
+      await api.precioPintura.update({ materiales_default: promedioSugerido.promedioPorPieza })
+      toast({
+        title: "Promedio aplicado",
+        description: `Materiales actualizado a $${promedioSugerido.promedioPorPieza.toLocaleString("es-CL")}/pieza`,
+      })
+      await loadData()
+    } catch {
+      toast({ title: "Error", description: "No se pudo aplicar el promedio", variant: "destructive" })
+    } finally {
+      setAplicandoPromedio(false)
     }
   }
 
@@ -490,17 +529,18 @@ export default function ConfiguracionPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Paintbrush className="w-5 h-5" />
-                Precio Global por Pieza
+                Valores Globales de Pintura
               </CardTitle>
               <CardDescription>
-                Define el precio por pieza de pintura. Este valor se multiplicará por la cantidad de piezas de cada elemento.
-                Por ejemplo: Si fijas $90.000 y un maletero son 2 piezas, el total será $180.000.
+                Defaults por pieza que se aplican a los servicios nuevos. El precio se multiplica por la
+                cantidad de piezas (ej: $90.000 y un maletero de 2 piezas = $180.000). La mano de obra y
+                los materiales son costos por defecto: puedes ajustarlos por servicio sin cambiar estos globales.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-end gap-2 max-w-sm">
-                <div className="flex-1">
-                  <Label className="text-sm mb-2 block">Valor por pieza</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <Label className="text-sm mb-2 block">Precio venta por pieza</Label>
                   <div className="flex items-center gap-2">
                     <span className="text-lg font-medium">$</span>
                     <Input
@@ -509,24 +549,84 @@ export default function ConfiguracionPage() {
                       value={precioTemp}
                       onChange={(e) => setPrecioTemp(e.target.value)}
                       placeholder="90000"
-                      className="text-right text-lg"
+                      className="text-right"
                     />
                   </div>
                 </div>
-                <Button
-                  onClick={handleSavePrecio}
-                  disabled={savingPrecio}
-                  className="bg-primary"
-                >
-                  <Save className="w-4 h-4 mr-2" />
-                  {savingPrecio ? "Guardando..." : "Guardar"}
-                </Button>
+                <div>
+                  <Label className="text-sm mb-2 block">Costo mano de obra por pieza</Label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg font-medium">$</span>
+                    <Input
+                      type="number"
+                      step="1000"
+                      value={manoObraTemp}
+                      onChange={(e) => setManoObraTemp(e.target.value)}
+                      placeholder="0"
+                      className="text-right"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-sm mb-2 block">Costo materiales por pieza</Label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg font-medium">$</span>
+                    <Input
+                      type="number"
+                      step="1000"
+                      value={materialesTemp}
+                      onChange={(e) => setMaterialesTemp(e.target.value)}
+                      placeholder="0"
+                      className="text-right"
+                    />
+                  </div>
+                </div>
               </div>
-              {precioPintura && (
-                <div className="p-3 bg-success/10 rounded-lg border border-success/30">
-                  <p className="text-sm text-success font-medium">
-                    Precio actual: ${precioPintura.precio_por_pieza?.toLocaleString("es-CL") || "0"}
+              {promedioSugerido && (
+                <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg text-sm space-y-2">
+                  <p className="font-medium text-blue-800 dark:text-blue-200">
+                    Promedio real: {formatPeriodo(promedioSugerido.mesInicio)}
                   </p>
+                  {promedioSugerido.promedioPorPieza !== null ? (
+                    <>
+                      <p className="text-blue-700 dark:text-blue-300">
+                        ${promedioSugerido.gastos.toLocaleString("es-CL")} en gastos /{" "}
+                        {promedioSugerido.piezas} piezas ={" "}
+                        <strong>${promedioSugerido.promedioPorPieza.toLocaleString("es-CL")}/pieza</strong>
+                      </p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleAplicarPromedio}
+                        disabled={aplicandoPromedio}
+                        className="border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900/30"
+                      >
+                        {aplicandoPromedio ? "Aplicando..." : `Usar $${promedioSugerido.promedioPorPieza.toLocaleString("es-CL")}/pieza`}
+                      </Button>
+                    </>
+                  ) : (
+                    <p className="text-blue-600 dark:text-blue-400">
+                      Sin datos suficientes para calcular promedio
+                      {promedioSugerido.piezas === 0
+                        ? " (sin piezas pintadas en ese período)"
+                        : " (sin gastos de pintura registrados)"}
+                    </p>
+                  )}
+                </div>
+              )}
+              <Button
+                onClick={handleSavePrecio}
+                disabled={savingPrecio}
+                className="bg-primary"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                {savingPrecio ? "Guardando..." : "Guardar"}
+              </Button>
+              {precioPintura && (
+                <div className="p-3 bg-success/10 rounded-lg border border-success/30 text-sm text-success font-medium space-y-0.5">
+                  <p>Precio venta: ${precioPintura.precio_por_pieza?.toLocaleString("es-CL") || "0"} / pieza</p>
+                  <p>Mano de obra: ${Number(precioPintura.mano_obra_default || 0).toLocaleString("es-CL")} / pieza</p>
+                  <p>Materiales: ${Number(precioPintura.materiales_default || 0).toLocaleString("es-CL")} / pieza</p>
                 </div>
               )}
             </CardContent>
