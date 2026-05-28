@@ -48,7 +48,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { generarPDFPresupuesto } from "@/lib/pdf-presupuesto"
 import { PDFPreviewModal } from "@/components/pdf-preview-modal"
 import { PhotoLightbox } from "@/components/photo-lightbox"
-import { roundMoney, costoNetoItem, sumCostosNetos, safeLocalStorage } from "@/lib/utils"
+import { roundMoney, costoNetoItem, sumCostosNetos } from "@/lib/utils"
 import { useEstados } from "@/lib/estados"
 
 interface ServiceFormProps {
@@ -174,11 +174,9 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
     otros: [],
   })
 
-  // Cargar precios de pintura y mano de obra config al montar
+  // Cargar precios de pintura y defaults de costo al montar
   useEffect(() => {
     loadPreciosYPiezasPintura()
-    loadManoObraConfig()
-    loadMaterialesConfig()
     api.plantillasServicio.getAll().then(setPlantillas).catch((e) => console.error("plantillasServicio.getAll:", e))
   }, [])
 
@@ -189,6 +187,12 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       // Guardar el precio global
       const precioGlobal = precio?.precio_por_pieza || 0
       setPrecioGlobalPintura(precioGlobal)
+
+      // Defaults globales de costo (mano de obra y materiales por pieza). Solo
+      // rellenan si el servicio no aportó un valor propio (el override por servicio
+      // se setea sincrónicamente al editar y debe prevalecer sobre este fetch async).
+      setManoObraConfig((prev) => (prev > 0 ? prev : Number(precio?.mano_obra_default || 0)))
+      setMaterialesConfig((prev) => (prev > 0 ? prev : Number(precio?.materiales_default || 0)))
 
       // En modo edición, no sobrescribir las piezas — las carga cargarPiezasSeleccionadas
       if (servicioAEditar) return
@@ -215,29 +219,13 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
     }
   }
 
-  const loadManoObraConfig = () => {
-    const saved = safeLocalStorage.get("mano_obra_pintura_default")
-    if (saved) {
-      setManoObraConfig(Number(saved))
-    }
-  }
-
+  // Aplican el ajuste solo a este servicio (el valor por defecto global se
+  // configura en Configuración → Pintura, no aquí).
   const saveManoObraConfig = () => {
-    safeLocalStorage.set("mano_obra_pintura_default", manoObraConfig.toString())
-    toast({ title: "Valor de mano de obra guardado" })
     setShowManoObraModal(false)
   }
 
-  const loadMaterialesConfig = () => {
-    const saved = safeLocalStorage.get("materiales_pintura_default")
-    if (saved) {
-      setMaterialesConfig(Number(saved))
-    }
-  }
-
   const saveMaterialesConfig = () => {
-    safeLocalStorage.set("materiales_pintura_default", materialesConfig.toString())
-    toast({ title: "Valor de materiales guardado" })
     setShowMaterialesModal(false)
   }
 
@@ -1227,14 +1215,15 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
               </DialogTrigger>
               <DialogContent className="bg-card border-border">
                 <DialogHeader>
-                  <DialogTitle>Configurar Mano de Obra de Pintura</DialogTitle>
+                  <DialogTitle>Mano de Obra de Pintura (este servicio)</DialogTitle>
                   <DialogDescription>
-                    Define el valor por defecto de mano de obra. Se agregará automáticamente a costos.
+                    Ajusta el costo de mano de obra por pieza solo para este servicio. El valor global
+                    por defecto se configura en Configuración → Pintura.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 mt-4">
                   <div className="flex items-center gap-2">
-                    <Label>Valor por defecto:</Label>
+                    <Label>Costo por pieza:</Label>
                     <div className="flex items-center gap-1">
                       <span className="text-muted-foreground">$</span>
                       <Input
@@ -1265,14 +1254,15 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
               </DialogTrigger>
               <DialogContent className="bg-card border-border">
                 <DialogHeader>
-                  <DialogTitle>Configurar Costo de Materiales de Pintura</DialogTitle>
+                  <DialogTitle>Materiales de Pintura (este servicio)</DialogTitle>
                   <DialogDescription>
-                    Define el valor por defecto de materiales. Se agregará automáticamente a costos.
+                    Ajusta el costo de materiales por pieza solo para este servicio. El valor global
+                    por defecto se configura en Configuración → Pintura.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 mt-4">
                   <div className="flex items-center gap-2">
-                    <Label>Valor por defecto:</Label>
+                    <Label>Costo por pieza:</Label>
                     <div className="flex items-center gap-1">
                       <span className="text-muted-foreground">$</span>
                       <Input

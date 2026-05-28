@@ -17,8 +17,8 @@ export async function GET() {
 export async function PUT(request: Request) {
   try {
     const body = await request.json()
-    const { precio_por_pieza } = body
-    const updated = await updatePrecioPintura(precio_por_pieza)
+    const { precio_por_pieza, mano_obra_default, materiales_default } = body
+    const updated = await updatePrecioPintura({ precio_por_pieza, mano_obra_default, materiales_default })
     return NextResponse.json(updated)
   } catch (error: any) {
     console.error("Error updating precio pintura:", error)

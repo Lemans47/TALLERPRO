@@ -242,11 +242,15 @@ export async function fetchPrecioPintura(): Promise<PrecioPintura | null> {
   return res.json()
 }
 
-export async function updatePrecioPinturaApi(precio_por_pieza: number): Promise<PrecioPintura> {
+export async function updatePrecioPinturaApi(values: {
+  precio_por_pieza?: number
+  mano_obra_default?: number
+  materiales_default?: number
+}): Promise<PrecioPintura> {
   const res = await fetch("/api/precios-pintura", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ precio_por_pieza }),
+    body: JSON.stringify(values),
   })
   if (!res.ok) throw new Error("Error updating precio pintura")
   return res.json()
