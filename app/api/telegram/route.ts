@@ -8,7 +8,6 @@ const CATEGORIAS = [
   { id: "Gastos de Pintura", label: "Pintura" },
   { id: "Gastos Misceláneos", label: "Misceláneos" },
   { id: "Gastos Fijos", label: "Fijos" },
-  { id: "Sueldos", label: "Sueldos" },
 ]
 
 async function sendMessage(chatId: number, text: string, replyMarkup?: object) {
