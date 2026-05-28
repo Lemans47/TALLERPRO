@@ -211,19 +211,20 @@ export async function getActiveServicios() {
   return data as Servicio[]
 }
 
-// Servicios con saldo pendiente (cuentas por cobrar): todo lo que el cliente
-// todavía debe, excluyendo los servicios ya cerrados/pagados. Se ordena por
-// antigüedad (fecha_entregado o, si falta, fecha_ingreso) para priorizar la
-// cobranza de las deudas más viejas. Usado por el bot de cobranzas de Telegram.
+// Servicios en estado Entregado / Por Cobrar (tipo `por_cobrar`) que todavía
+// tienen saldo pendiente. Es la cobranza "real": trabajo terminado y entregado
+// que el cliente aún debe. Se ordena por antigüedad (fecha_entregado o, si
+// falta, fecha_ingreso) para priorizar las deudas más viejas. Usado por el bot
+// de cobranzas de Telegram.
 export async function getServiciosPorCobrar() {
   const db = getSQL()
-  const cerrados = await getNombresEstadosPorTipo(["cerrado"])
+  const porCobrar = await getNombresEstadosPorTipo(["por_cobrar"])
   const data = await db`
     SELECT id, numero_ot, patente, cliente, telefono, estado,
            saldo_pendiente, fecha_ingreso, fecha_entregado
     FROM servicios
     WHERE saldo_pendiente > 0
-      AND estado <> ALL(${cerrados.length ? cerrados : [""]}::text[])
+      AND estado = ANY(${porCobrar.length ? porCobrar : [""]}::text[])
     ORDER BY COALESCE(fecha_entregado::date, fecha_ingreso::date) ASC
   `
   return data as Servicio[]
