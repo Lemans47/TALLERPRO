@@ -30,6 +30,8 @@ import {
   Settings,
   Check,
   ChevronsUpDown,
+  ChevronUp,
+  ChevronDown,
   Camera,
   Upload,
   ImageIcon,
@@ -559,7 +561,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   }, [])
 
   const updateItemCobro = useCallback(
-    (categoria: keyof ItemsPorCategoria, id: string, field: "descripcion" | "monto", value: string | number) => {
+    (categoria: keyof ItemsPorCategoria, id: string, field: "descripcion" | "monto", value: string | number, index: number) => {
       setCobros((prev) => ({
         ...prev,
         [categoria]: prev[categoria].map((item) => (item.id === id ? { ...item, [field]: value } : item)),
@@ -568,8 +570,8 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       if (field === "descripcion") {
         setCostos((prev) => ({
           ...prev,
-          [categoria]: prev[categoria].map((item) =>
-            item.id === id ? { ...item, descripcion: value as string } : item,
+          [categoria]: prev[categoria].map((item, i) =>
+            i === index ? { ...item, descripcion: value as string } : item,
           ),
         }))
       }
@@ -577,17 +579,31 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
     [],
   )
 
-  const removeItemCobro = useCallback((categoria: keyof ItemsPorCategoria, id: string) => {
-    // Remover de cobros
+  const removeItemCobro = useCallback((categoria: keyof ItemsPorCategoria, index: number) => {
+    // Cobros y costos se emparejan por índice; borrar la misma posición en ambos.
     setCobros((prev) => ({
       ...prev,
-      [categoria]: prev[categoria].filter((item) => item.id !== id),
+      [categoria]: prev[categoria].filter((_, i) => i !== index),
     }))
 
     setCostos((prev) => ({
       ...prev,
-      [categoria]: prev[categoria].filter((item) => item.id !== id),
+      [categoria]: prev[categoria].filter((_, i) => i !== index),
     }))
+  }, [])
+
+  const moveItem = useCallback((categoria: keyof ItemsPorCategoria, index: number, direccion: "up" | "down") => {
+    const target = index + (direccion === "up" ? -1 : 1)
+
+    const swapAtIndices = <T,>(arr: T[]): T[] => {
+      if (index < 0 || target < 0 || index >= arr.length || target >= arr.length) return arr
+      const next = [...arr]
+      ;[next[index], next[target]] = [next[target], next[index]]
+      return next
+    }
+
+    setCobros((prev) => ({ ...prev, [categoria]: swapAtIndices(prev[categoria]) }))
+    setCostos((prev) => ({ ...prev, [categoria]: swapAtIndices(prev[categoria]) }))
   }, [])
 
   const upsertItemCostoByIndex = useCallback(
@@ -1916,7 +1932,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                                   <td className="p-3">
                                     <Input
                                       value={itemCobro.descripcion}
-                                      onChange={(e) => updateItemCobro("pintura", itemCobro.id, "descripcion", e.target.value)}
+                                      onChange={(e) => updateItemCobro("pintura", itemCobro.id, "descripcion", e.target.value, index)}
                                       placeholder="Descripción..."
                                       className="bg-background/50 text-xs h-8 border-0"
                                     />
@@ -1927,7 +1943,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                                       <Input
                                         type="number"
                                         value={itemCobro.monto || ""}
-                                        onChange={(e) => updateItemCobro("pintura", itemCobro.id, "monto", Number(e.target.value) || 0)}
+                                        onChange={(e) => updateItemCobro("pintura", itemCobro.id, "monto", Number(e.target.value) || 0, index)}
                                         placeholder="0"
                                         className="bg-background/50 text-xs h-8 border-0 text-right w-32"
                                       />
@@ -1952,7 +1968,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                                     <Button
                                       variant="ghost"
                                       size="icon"
-                                      onClick={() => removeItemCobro("pintura", itemCobro.id)}
+                                      onClick={() => removeItemCobro("pintura", index)}
                                       className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
                                     >
                                       <Trash2 className="w-3.5 h-3.5" />
@@ -2079,6 +2095,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                         <table className="w-full text-sm">
                           <thead>
                             <tr className="bg-secondary/40 border-b border-border">
+                              <th className="p-3 font-semibold w-10"></th>
                               <th className="text-left p-3 font-semibold">Descripción</th>
                               <th className="text-right p-3 font-semibold">Cobrado Cliente</th>
                               <th className="text-right p-3 font-semibold">Costo Taller</th>
@@ -2089,7 +2106,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                           <tbody>
                             {safeArr(cobros[categoria as keyof ItemsPorCategoria]).length === 0 ? (
                               <tr>
-                                <td colSpan={5} className="text-center p-4 text-muted-foreground text-xs">
+                                <td colSpan={6} className="text-center p-4 text-muted-foreground text-xs">
                                   Sin items. Usa el botón + para agregar.
                                 </td>
                               </tr>
@@ -2101,10 +2118,36 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                                 const utilidad = cobro - costo
                                 return (
                                   <tr key={itemCobro.id} className="border-b border-border hover:bg-secondary/20 transition-colors">
+                                    <td className="p-1 align-middle">
+                                      <div className="flex flex-col items-center justify-center gap-0.5">
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon"
+                                          disabled={index === 0}
+                                          onClick={() => moveItem(categoria as keyof ItemsPorCategoria, index, "up")}
+                                          className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-secondary disabled:opacity-30"
+                                          title="Subir"
+                                        >
+                                          <ChevronUp className="w-3.5 h-3.5" />
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon"
+                                          disabled={index === safeArr(cobros[categoria as keyof ItemsPorCategoria]).length - 1}
+                                          onClick={() => moveItem(categoria as keyof ItemsPorCategoria, index, "down")}
+                                          className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-secondary disabled:opacity-30"
+                                          title="Bajar"
+                                        >
+                                          <ChevronDown className="w-3.5 h-3.5" />
+                                        </Button>
+                                      </div>
+                                    </td>
                                     <td className="p-3 min-w-[160px] sm:min-w-[300px]">
                                       <Textarea
                                         value={itemCobro.descripcion}
-                                        onChange={(e) => updateItemCobro(categoria as keyof ItemsPorCategoria, itemCobro.id, "descripcion", e.target.value)}
+                                        onChange={(e) => updateItemCobro(categoria as keyof ItemsPorCategoria, itemCobro.id, "descripcion", e.target.value, index)}
                                         placeholder="Descripción..."
                                         className="bg-background/50 text-xs border-0 resize-none min-h-[60px]"
                                       />
@@ -2115,7 +2158,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                                         <Input
                                           type="number"
                                           value={itemCobro.monto || ""}
-                                          onChange={(e) => updateItemCobro(categoria as keyof ItemsPorCategoria, itemCobro.id, "monto", Number(e.target.value) || 0)}
+                                          onChange={(e) => updateItemCobro(categoria as keyof ItemsPorCategoria, itemCobro.id, "monto", Number(e.target.value) || 0, index)}
                                           placeholder="0"
                                           className="bg-background/50 text-xs h-8 border-0 text-right w-32"
                                         />
@@ -2161,7 +2204,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                                       <Button
                                         variant="ghost"
                                         size="icon"
-                                        onClick={() => removeItemCobro(categoria as keyof ItemsPorCategoria, itemCobro.id)}
+                                        onClick={() => removeItemCobro(categoria as keyof ItemsPorCategoria, index)}
                                         className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
                                       >
                                         <Trash2 className="w-3.5 h-3.5" />
