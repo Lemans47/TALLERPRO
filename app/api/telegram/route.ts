@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { createGasto, getServiciosPorCobrar } from "@/lib/database"
+import { createGasto } from "@/lib/database"
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || ""
 const ALLOWED_IDS = (process.env.TELEGRAM_ALLOWED_CHAT_IDS || "").split(",").map((s) => s.trim())
@@ -36,44 +36,6 @@ async function editMessage(chatId: number, messageId: number, text: string) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ chat_id: chatId, message_id: messageId, text, parse_mode: "HTML" }),
   })
-}
-
-function fmtCLP(n: number): string {
-  return "$" + Math.round(n).toLocaleString("es-CL")
-}
-
-function diasDesde(fecha?: string | null): number | null {
-  if (!fecha) return null
-  const d = new Date(fecha)
-  if (isNaN(d.getTime())) return null
-  const ms = Date.now() - d.getTime()
-  return Math.max(0, Math.floor(ms / 86_400_000))
-}
-
-async function buildCobranzasMessage(): Promise<string> {
-  const servicios = await getServiciosPorCobrar()
-  if (!servicios.length) {
-    return "✅ <b>No hay saldos pendientes.</b>\nTodos los servicios están al día. 🎉"
-  }
-
-  const total = servicios.reduce((acc, s) => acc + (Number(s.saldo_pendiente) || 0), 0)
-  const header = `💰 <b>Cuentas por cobrar</b>\nTotal pendiente: <b>${fmtCLP(total)}</b>\n${servicios.length} servicio(s) con deuda\n`
-
-  // Telegram limita a ~4096 caracteres: mostramos las más antiguas primero y
-  // cortamos si la lista es muy larga.
-  const MAX = 30
-  const lineas = servicios.slice(0, MAX).map((s) => {
-    const dias = diasDesde(s.fecha_entregado ?? s.fecha_ingreso)
-    const antig = dias !== null ? ` · ${dias}d` : ""
-    const ot = s.numero_ot ? `OT ${s.numero_ot} · ` : ""
-    return `• <b>${fmtCLP(Number(s.saldo_pendiente))}</b> — ${s.cliente} (${s.patente})\n   ${ot}${s.estado}${antig}`
-  })
-
-  let msg = header + "\n" + lineas.join("\n")
-  if (servicios.length > MAX) {
-    msg += `\n\n… y ${servicios.length - MAX} más. Revisá el panel para el detalle completo.`
-  }
-  return msg
 }
 
 function parseMontoDescripcion(text: string): { monto: number; descripcion: string } | null {
@@ -155,15 +117,8 @@ export async function POST(request: Request) {
     if (text === "/start" || text === "/ayuda") {
       await sendMessage(
         chatId,
-        `👋 <b>Bot de Gastos - TallerPro</b>\n\nEnviá un mensaje con el monto y descripción:\n\n<code>3500 combustible</code>\n<code>15000 pintura base</code>\n<code>repuesto disco 8900</code>\n\nLuego elegís la categoría con los botones.\n\n<b>Comandos:</b>\n/saldos — ver cuentas por cobrar`
+        `👋 <b>Bot de Gastos - TallerPro</b>\n\nEnviá un mensaje con el monto y descripción:\n\n<code>3500 combustible</code>\n<code>15000 pintura base</code>\n<code>repuesto disco 8900</code>\n\nLuego elegís la categoría con los botones.`
       )
-      return NextResponse.json({ ok: true })
-    }
-
-    // Cobranzas / saldos pendientes
-    if (text === "/saldos" || text === "/cobranzas" || text === "/cobrar") {
-      const msg = await buildCobranzasMessage()
-      await sendMessage(chatId, msg)
       return NextResponse.json({ ok: true })
     }
 
