@@ -970,6 +970,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         monto_total: montoConIva,
         monto_total_sin_iva: cobroTotal,
         observaciones_checkboxes: [],
+        fotos_ingreso: fotosIngreso,
       }
 
       let newPresupuesto: Presupuesto
