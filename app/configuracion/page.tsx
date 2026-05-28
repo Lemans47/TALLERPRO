@@ -36,7 +36,7 @@ import {
   EyeOff,
 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { api, type PrecioPintura, type PiezaPintura, type EstadoServicio, type EstadoTipo } from "@/lib/api-client"
+import { api, type PrecioPintura, type PiezaPintura, type EstadoServicio, type EstadoTipo, type PromedioMateriales, type PrecioPinturaConPromedio } from "@/lib/api-client"
 import { formatFechaDMA } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
 import { useEstados } from "@/lib/estados"
@@ -54,6 +54,8 @@ export default function ConfiguracionPage() {
   const [manoObraTemp, setManoObraTemp] = useState("")
   const [materialesTemp, setMaterialesTemp] = useState("")
   const [savingPrecio, setSavingPrecio] = useState(false)
+  const [promedioSugerido, setPromedioSugerido] = useState<PromedioMateriales | null>(null)
+  const [aplicandoPromedio, setAplicandoPromedio] = useState(false)
   const [nuevaPieza, setNuevaPieza] = useState({ nombre: "", cantidad_piezas: "1" })
   const [savingPiezas, setSavingPiezas] = useState(false)
   const { toast } = useToast()
@@ -93,7 +95,9 @@ export default function ConfiguracionPage() {
         gastos: gastos.length,
         presupuestos: presupuestos.length,
       })
+      const precioConPromedio = precio as PrecioPinturaConPromedio | null
       setPrecioPintura(precio)
+      setPromedioSugerido(precioConPromedio?.promedio_mes_anterior ?? null)
       setPrecioTemp(precio?.precio_por_pieza?.toString() || "")
       setManoObraTemp(Number(precio?.mano_obra_default) > 0 ? String(Number(precio?.mano_obra_default)) : "")
       setMaterialesTemp(Number(precio?.materiales_default) > 0 ? String(Number(precio?.materiales_default)) : "")
@@ -179,6 +183,33 @@ export default function ConfiguracionPage() {
       toast({ title: "Error", description: "No se pudo guardar el precio", variant: "destructive" })
     } finally {
       setSavingPrecio(false)
+    }
+  }
+
+  function formatPeriodo(mesInicio: string): string {
+    const inicio = new Date(mesInicio + "T12:00:00")
+    const fin = new Date(inicio)
+    fin.setMonth(fin.getMonth() + 2)
+    fin.setDate(0)
+    const mesI = inicio.toLocaleString("es-CL", { month: "long" })
+    const mesF = fin.toLocaleString("es-CL", { month: "long", year: "numeric" })
+    return `${mesI} – ${mesF}`
+  }
+
+  const handleAplicarPromedio = async () => {
+    if (!promedioSugerido?.promedioPorPieza) return
+    setAplicandoPromedio(true)
+    try {
+      await api.precioPintura.update({ materiales_default: promedioSugerido.promedioPorPieza })
+      toast({
+        title: "Promedio aplicado",
+        description: `Materiales actualizado a $${promedioSugerido.promedioPorPieza.toLocaleString("es-CL")}/pieza`,
+      })
+      await loadData()
+    } catch {
+      toast({ title: "Error", description: "No se pudo aplicar el promedio", variant: "destructive" })
+    } finally {
+      setAplicandoPromedio(false)
     }
   }
 
@@ -551,6 +582,38 @@ export default function ConfiguracionPage() {
                   </div>
                 </div>
               </div>
+              {promedioSugerido && (
+                <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg text-sm space-y-2">
+                  <p className="font-medium text-blue-800 dark:text-blue-200">
+                    Promedio real: {formatPeriodo(promedioSugerido.mesInicio)}
+                  </p>
+                  {promedioSugerido.promedioPorPieza !== null ? (
+                    <>
+                      <p className="text-blue-700 dark:text-blue-300">
+                        ${promedioSugerido.gastos.toLocaleString("es-CL")} en gastos /{" "}
+                        {promedioSugerido.piezas} piezas ={" "}
+                        <strong>${promedioSugerido.promedioPorPieza.toLocaleString("es-CL")}/pieza</strong>
+                      </p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleAplicarPromedio}
+                        disabled={aplicandoPromedio}
+                        className="border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900/30"
+                      >
+                        {aplicandoPromedio ? "Aplicando..." : `Usar $${promedioSugerido.promedioPorPieza.toLocaleString("es-CL")}/pieza`}
+                      </Button>
+                    </>
+                  ) : (
+                    <p className="text-blue-600 dark:text-blue-400">
+                      Sin datos suficientes para calcular promedio
+                      {promedioSugerido.piezas === 0
+                        ? " (sin piezas pintadas en ese período)"
+                        : " (sin gastos de pintura registrados)"}
+                    </p>
+                  )}
+                </div>
+              )}
               <Button
                 onClick={handleSavePrecio}
                 disabled={savingPrecio}

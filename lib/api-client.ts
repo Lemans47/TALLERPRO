@@ -236,7 +236,18 @@ export async function deleteGastoApi(id: string): Promise<void> {
 }
 
 // Precios Pintura - Solo el precio global
-export async function fetchPrecioPintura(): Promise<PrecioPintura | null> {
+export interface PromedioMateriales {
+  mesInicio: string
+  gastos: number
+  piezas: number
+  promedioPorPieza: number | null
+}
+
+export interface PrecioPinturaConPromedio extends PrecioPintura {
+  promedio_mes_anterior: PromedioMateriales | null
+}
+
+export async function fetchPrecioPintura(): Promise<PrecioPinturaConPromedio | null> {
   const res = await fetch("/api/precios-pintura")
   if (!res.ok) throw new Error("Error fetching precio pintura")
   return res.json()
