@@ -7,7 +7,6 @@ const ALLOWED_IDS = (process.env.TELEGRAM_ALLOWED_CHAT_IDS || "").split(",").map
 const CATEGORIAS = [
   { id: "Gastos de Pintura", label: "Pintura" },
   { id: "Gastos Misceláneos", label: "Misceláneos" },
-  { id: "Gastos Fijos", label: "Fijos" },
 ]
 
 async function sendMessage(chatId: number, text: string, replyMarkup?: object) {
