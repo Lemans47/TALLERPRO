@@ -764,8 +764,8 @@ export default function DashboardPage() {
                   {kpis.puntoEquilibrio === 0
                     ? "Sin datos suficientes para calcular"
                     : faltan > 0
-                      ? `Faltan ${faltan} servicio${faltan !== 1 ? "s" : ""} para cubrir los gastos fijos`
-                      : "Los gastos fijos están cubiertos este mes"}
+                      ? `Faltan ${faltan} servicio${faltan !== 1 ? "s" : ""} para cubrir los gastos operativos`
+                      : "Los gastos operativos están cubiertos este mes"}
                 </p>
               </div>
               <div className="text-right">
@@ -793,7 +793,7 @@ export default function DashboardPage() {
                 </button>
                 {showBreakeven && (
                   <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                    <span>Gastos fijos: <span className="text-foreground font-medium">{fmt(kpis.gastosOperativos)}</span></span>
+                    <span>Gastos operativos: <span className="text-foreground font-medium">{fmt(kpis.gastosOperativos)}</span></span>
                     <span>÷</span>
                     <span>Margen prom. por servicio: <span className="text-foreground font-medium">{fmt(margenPorServicio)}</span></span>
                     <span>= <span className="text-foreground font-medium">{kpis.puntoEquilibrio} servicios</span></span>

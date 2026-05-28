@@ -137,6 +137,10 @@ export interface Gasto {
 export interface PrecioPintura {
   id: string
   precio_por_pieza: number
+  /** Costo global por defecto de mano de obra por pieza (editable por servicio). */
+  mano_obra_default: number
+  /** Costo global por defecto de materiales por pieza (editable por servicio). */
+  materiales_default: number
   created_at: string
   updated_at: string
 }
@@ -834,9 +838,25 @@ export async function getVehicleHistory(patente: string) {
 }
 
 // Precio Pintura
-// Precios Pintura - Solo precio global
+// Precios Pintura - Precio global + defaults de costo (mano de obra y materiales)
+
+// Migración idempotente: agrega las columnas de defaults de costo si no existen.
+let precioPinturaColumnsReady = false
+async function ensurePrecioPinturaColumns() {
+  if (precioPinturaColumnsReady) return
+  try {
+    const db = getSQL()
+    await db`ALTER TABLE precios_pintura ADD COLUMN IF NOT EXISTS mano_obra_default NUMERIC(12,0) NOT NULL DEFAULT 0`
+    await db`ALTER TABLE precios_pintura ADD COLUMN IF NOT EXISTS materiales_default NUMERIC(12,0) NOT NULL DEFAULT 0`
+    precioPinturaColumnsReady = true
+  } catch (error: any) {
+    console.error("[v0] ensurePrecioPinturaColumns:", error?.message)
+  }
+}
+
 export async function getPrecioPintura(): Promise<PrecioPintura | null> {
   try {
+    await ensurePrecioPinturaColumns()
     const db = getSQL()
     const data = await db`SELECT * FROM precios_pintura LIMIT 1`
     return (data[0] as PrecioPintura) || null
@@ -846,12 +866,20 @@ export async function getPrecioPintura(): Promise<PrecioPintura | null> {
   }
 }
 
-export async function updatePrecioPintura(precio_por_pieza: number) {
+export async function updatePrecioPintura(values: {
+  precio_por_pieza?: number
+  mano_obra_default?: number
+  materiales_default?: number
+}) {
   try {
+    await ensurePrecioPinturaColumns()
     const db = getSQL()
     const data = await db`
-      UPDATE precios_pintura 
-      SET precio_por_pieza = ${precio_por_pieza}, updated_at = NOW() 
+      UPDATE precios_pintura SET
+        precio_por_pieza = COALESCE(${values.precio_por_pieza ?? null}, precio_por_pieza),
+        mano_obra_default = COALESCE(${values.mano_obra_default ?? null}, mano_obra_default),
+        materiales_default = COALESCE(${values.materiales_default ?? null}, materiales_default),
+        updated_at = NOW()
       RETURNING *
     `
     return data[0] as PrecioPintura
@@ -863,14 +891,15 @@ export async function updatePrecioPintura(precio_por_pieza: number) {
 
 export async function initPrecioPintura(precio_por_pieza: number = 0) {
   try {
+    await ensurePrecioPinturaColumns()
     const db = getSQL()
     const existing = await db`SELECT * FROM precios_pintura LIMIT 1`
     if (existing.length > 0) {
       return existing[0] as PrecioPintura
     }
     const data = await db`
-      INSERT INTO precios_pintura (precio_por_pieza) 
-      VALUES (${precio_por_pieza}) 
+      INSERT INTO precios_pintura (precio_por_pieza)
+      VALUES (${precio_por_pieza})
       RETURNING *
     `
     return data[0] as PrecioPintura
