@@ -224,7 +224,7 @@ export async function getServiciosPorCobrar() {
     FROM servicios
     WHERE saldo_pendiente > 0
       AND estado <> ALL(${cerrados.length ? cerrados : [""]}::text[])
-    ORDER BY COALESCE(fecha_entregado, fecha_ingreso) ASC
+    ORDER BY COALESCE(fecha_entregado::date, fecha_ingreso::date) ASC
   `
   return data as Servicio[]
 }

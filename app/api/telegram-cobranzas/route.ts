@@ -27,6 +27,16 @@ function fmtCLP(n: number): string {
   return "$" + Math.round(n).toLocaleString("es-CL")
 }
 
+// Escapa los caracteres que rompen el parseo HTML de Telegram. Sin esto, un
+// nombre de cliente con "&", "<" o ">" hace que Telegram rechace el mensaje
+// completo (Bad Request: can't parse entities) y el bot no responde nada.
+function esc(v: unknown): string {
+  return String(v ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+}
+
 function diasDesde(fecha?: string | null): number | null {
   if (!fecha) return null
   const d = new Date(fecha)
@@ -50,8 +60,8 @@ async function buildCobranzasMessage(): Promise<string> {
   const lineas = servicios.slice(0, MAX).map((s) => {
     const dias = diasDesde(s.fecha_entregado ?? s.fecha_ingreso)
     const antig = dias !== null ? ` · ${dias}d` : ""
-    const ot = s.numero_ot ? `OT ${s.numero_ot} · ` : ""
-    return `• <b>${fmtCLP(Number(s.saldo_pendiente))}</b> — ${s.cliente} (${s.patente})\n   ${ot}${s.estado}${antig}`
+    const ot = s.numero_ot ? `OT ${esc(s.numero_ot)} · ` : ""
+    return `• <b>${fmtCLP(Number(s.saldo_pendiente))}</b> — ${esc(s.cliente)} (${esc(s.patente)})\n   ${ot}${esc(s.estado)}${antig}`
   })
 
   let msg = header + "\n" + lineas.join("\n")
@@ -85,8 +95,13 @@ export async function POST(request: Request) {
     }
 
     if (text === "/saldos" || text === "/cobranzas" || text === "/cobrar") {
-      const msg = await buildCobranzasMessage()
-      await sendMessage(chatId, msg)
+      try {
+        const msg = await buildCobranzasMessage()
+        await sendMessage(chatId, msg)
+      } catch (err) {
+        console.error("Telegram cobranzas /saldos error:", err)
+        await sendMessage(chatId, "⚠️ No pude consultar las cuentas por cobrar. Intentá de nuevo en un momento.")
+      }
       return NextResponse.json({ ok: true })
     }
 
