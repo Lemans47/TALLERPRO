@@ -910,6 +910,81 @@ export async function initPrecioPintura(precio_por_pieza: number = 0) {
   }
 }
 
+export interface PromedioMaterialesMesAnterior {
+  mesInicio: string
+  gastos: number
+  piezas: number
+  promedioPorPieza: number | null
+}
+
+export async function getPromedioMaterialesMesAnterior(): Promise<PromedioMaterialesMesAnterior> {
+  const db = getSQL()
+  const result = await db`
+    WITH periodo AS (
+      SELECT
+        (date_trunc('month', CURRENT_DATE) - INTERVAL '2 months')::date AS inicio,
+        date_trunc('month', CURRENT_DATE)::date AS fin
+    ),
+    gastos_pintura AS (
+      SELECT COALESCE(SUM(monto), 0) AS total_gastos
+      FROM gastos
+      WHERE categoria = 'Gastos de Pintura'
+        AND fecha::date >= (SELECT inicio FROM periodo)
+        AND fecha::date < (SELECT fin FROM periodo)
+    ),
+    piezas_periodo AS (
+      SELECT COALESCE(SUM(
+        CASE
+          WHEN jsonb_typeof(s.piezas_pintura) = 'array' THEN (
+            SELECT COALESCE(SUM(
+              CASE
+                WHEN (p->>'cantidad') ~ '^-?[0-9]+(\.[0-9]+)?$' THEN (p->>'cantidad')::numeric
+                WHEN (p->>'cantidad_piezas') ~ '^-?[0-9]+(\.[0-9]+)?$' THEN (p->>'cantidad_piezas')::numeric
+                ELSE 1
+              END
+            ), 0)
+            FROM jsonb_array_elements(s.piezas_pintura) p
+          )
+          WHEN jsonb_typeof(s.piezas_pintura) = 'string' THEN (
+            SELECT COALESCE(SUM(
+              CASE
+                WHEN (p->>'cantidad') ~ '^-?[0-9]+(\.[0-9]+)?$' THEN (p->>'cantidad')::numeric
+                WHEN (p->>'cantidad_piezas') ~ '^-?[0-9]+(\.[0-9]+)?$' THEN (p->>'cantidad_piezas')::numeric
+                ELSE 1
+              END
+            ), 0)
+            FROM jsonb_array_elements((s.piezas_pintura #>> '{}')::jsonb) p
+          )
+          ELSE 0
+        END
+      ), 0) AS total_piezas
+      FROM servicios s
+      WHERE s.fecha_ingreso::date >= (SELECT inicio FROM periodo)
+        AND s.fecha_ingreso::date < (SELECT fin FROM periodo)
+    )
+    SELECT
+      (SELECT inicio FROM periodo) AS mes_inicio,
+      (SELECT total_gastos FROM gastos_pintura) AS gastos,
+      (SELECT total_piezas FROM piezas_periodo) AS piezas,
+      CASE
+        WHEN (SELECT total_piezas FROM piezas_periodo) > 0
+          AND (SELECT total_gastos FROM gastos_pintura) > 0
+        THEN ROUND(
+          (SELECT total_gastos FROM gastos_pintura) /
+          (SELECT total_piezas FROM piezas_periodo)
+        )
+        ELSE NULL
+      END AS promedio_por_pieza
+  `
+  const row = result[0]
+  return {
+    mesInicio: String(row.mes_inicio),
+    gastos: Number(row.gastos),
+    piezas: Number(row.piezas),
+    promedioPorPieza: row.promedio_por_pieza != null ? Number(row.promedio_por_pieza) : null,
+  }
+}
+
 // Piezas Pintura - Lista de piezas con cantidad
 export async function getPiezasPintura() {
   try {
