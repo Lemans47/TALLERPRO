@@ -332,6 +332,28 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       if (autoManoObra?.costoReal != null) {
         setCostoRealPintor(Number(autoManoObra.costoReal))
       }
+
+      // Recuperar configs de pintura desde el servicio guardado: el localStorage
+      // puede estar vacío (otro navegador/dispositivo o caché limpiada), lo que
+      // hacía que dejaran de calcularse los costos. El servicio es la fuente fiable.
+      const moPorPieza = Number(servicioAEditar.mano_obra_pintura) || 0
+      if (moPorPieza > 0) setManoObraConfig(moPorPieza)
+
+      const piezasGuardadas: any[] = Array.isArray(servicioAEditar.piezas_pintura)
+        ? servicioAEditar.piezas_pintura
+        : (typeof servicioAEditar.piezas_pintura === "string" && servicioAEditar.piezas_pintura
+            ? (() => { try { return JSON.parse(servicioAEditar.piezas_pintura as string) } catch { return [] } })()
+            : [])
+      const totalCantidadPiezas = piezasGuardadas.reduce((s, p) => s + (Number(p.cantidad) || 1), 0)
+      // Materiales no se guarda por servicio, pero se deriva del item auto: monto = piezas × valor.
+      const autoMateriales = costosData.find(
+        (c: any) => isAutoItem(c.descripcion) && c.descripcion?.toLowerCase().includes("materiales"),
+      )
+      if (autoMateriales && totalCantidadPiezas > 0) {
+        const matPorPieza = Math.round(Number(autoMateriales.monto) / totalCantidadPiezas)
+        if (matPorPieza > 0) setMaterialesConfig(matPorPieza)
+      }
+
       const newCostos: ItemsPorCategoria = {
         desmontar: [],
         desabolladura: [],
