@@ -23,9 +23,27 @@ https://tallerprosarmientoautomotriz.vercel.app
 - `TELEGRAM_COBRANZAS_BOT_TOKEN` — token del bot de cobranzas (de @BotFather).
 - `TELEGRAM_ALLOWED_CHAT_IDS` — IDs de chat autorizados, separados por coma. Aplica a ambos bots.
 - `TELEGRAM_COBRANZAS_ALLOWED_CHAT_IDS` *(opcional)* — IDs autorizados solo para el bot de cobranzas. Si no se define, usa `TELEGRAM_ALLOWED_CHAT_IDS`.
+- `CRON_SECRET` — cadena aleatoria larga para proteger el reporte diario (ver más abajo). Vercel la envía como `Authorization: Bearer <CRON_SECRET>` al llamar el cron.
 
 > Para obtener tu chat ID, escribile a **@userinfobot** en Telegram.
 > Tras cambiar variables en Vercel, hacé **Redeploy** para que apliquen.
+
+## Reporte diario automático de cobranzas
+
+Un cron de Vercel (`vercel.json`) llama a `/api/cron/cobranzas` y envía el informe
+de cuentas por cobrar (el mismo de `/saldos`) a todos los chats autorizados.
+
+- **Horario:** `0 23 * * *` → 23:00 UTC. En Chile equivale a las **19hs** en
+  horario estándar (otoño/invierno) y a las **20hs** en horario de verano, porque
+  Vercel ejecuta los crons en hora UTC fija. Para cambiar el horario, editá el
+  campo `schedule` en `vercel.json`.
+- **Seguridad:** definí `CRON_SECRET` en Vercel. Si falta, el endpoint queda
+  abierto (cualquiera podría disparar el envío llamando la URL).
+- **Solo producción:** los crons de Vercel corren únicamente en deployments de
+  producción, no en previews. En el plan gratuito se permite 1 ejecución diaria.
+- **Probar a mano:** Vercel → pestaña **Cron Jobs** → botón **Run** del job
+  `/api/cron/cobranzas`. (O un `GET` al endpoint con el header
+  `Authorization: Bearer <CRON_SECRET>`.)
 
 ## Registrar / actualizar webhook
 
