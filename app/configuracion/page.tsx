@@ -59,6 +59,7 @@ export default function ConfiguracionPage() {
   const [nuevaPieza, setNuevaPieza] = useState({ nombre: "", cantidad_piezas: "1" })
   const [savingPiezas, setSavingPiezas] = useState(false)
   const [editingNombrePieza, setEditingNombrePieza] = useState<Record<string, string>>({})
+  const [editingCantidad, setEditingCantidad] = useState<Record<string, string>>({})
   const { toast } = useToast()
   const router = useRouter()
   const { role: myRole } = useAuth()
@@ -236,10 +237,15 @@ export default function ConfiguracionPage() {
     }
   }
 
-  const handleUpdateCantidadPieza = async (id: string, cantidad: number) => {
+  const handleSaveCantidadPieza = async (id: string, cantidadActual: number) => {
+    const raw = editingCantidad[id]
+    setEditingCantidad((p) => { const n = { ...p }; delete n[id]; return n })
+    if (raw === undefined) return
+    const cantidad = Number.parseFloat(raw) || 1
+    if (cantidad === cantidadActual) return
     try {
-      await api.piezasPintura.update(id, { cantidad_piezas: cantidad })
-      await loadData()
+      const updated = await api.piezasPintura.update(id, { cantidad_piezas: cantidad })
+      setPiezasPintura((prev) => prev.map((p) => (p.id === id ? updated : p)))
     } catch (error) {
       toast({ title: "Error", description: "No se pudo actualizar la cantidad", variant: "destructive" })
     }
@@ -250,8 +256,8 @@ export default function ConfiguracionPage() {
     setEditingNombrePieza((p) => { const n = { ...p }; delete n[id]; return n })
     if (!nombre || nombre === nombreActual) return
     try {
-      await api.piezasPintura.update(id, { nombre })
-      await loadData()
+      const updated = await api.piezasPintura.update(id, { nombre })
+      setPiezasPintura((prev) => prev.map((p) => (p.id === id ? updated : p)))
       toast({ title: "Pieza actualizada" })
     } catch (error: any) {
       toast({ title: "Error", description: error.message || "No se pudo actualizar el nombre", variant: "destructive" })
@@ -688,10 +694,18 @@ export default function ConfiguracionPage() {
                           type="number"
                           step="0.1"
                           min="0.1"
-                          value={pieza.cantidad_piezas || 1}
+                          value={editingCantidad[pieza.id] ?? String(pieza.cantidad_piezas ?? 1)}
                           onChange={(e) =>
-                            handleUpdateCantidadPieza(pieza.id, Number.parseFloat(e.target.value) || 1)
+                            setEditingCantidad((p) => ({ ...p, [pieza.id]: e.target.value }))
                           }
+                          onBlur={() => handleSaveCantidadPieza(pieza.id, Number(pieza.cantidad_piezas ?? 1))}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") e.currentTarget.blur()
+                            if (e.key === "Escape") {
+                              setEditingCantidad((p) => { const n = { ...p }; delete n[pieza.id]; return n })
+                              e.currentTarget.blur()
+                            }
+                          }}
                           className="w-20 bg-background border-border text-right text-sm"
                           placeholder="1"
                         />
