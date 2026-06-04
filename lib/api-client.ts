@@ -285,14 +285,18 @@ export async function createPiezaPinturaApi(nombre: string, cantidad_piezas?: nu
   return res.json()
 }
 
-export async function updatePiezaPinturaApi(id: string, cantidad_piezas: number): Promise<PiezaPintura> {
+export async function updatePiezaPinturaApi(
+  id: string,
+  patch: { cantidad_piezas?: number; nombre?: string },
+): Promise<PiezaPintura> {
   const res = await fetch("/api/piezas-pintura", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id, cantidad_piezas }),
+    body: JSON.stringify({ id, ...patch }),
   })
-  if (!res.ok) throw new Error("Error updating pieza pintura")
-  return res.json()
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || "Error updating pieza pintura")
+  return data
 }
 
 export async function deletePiezaPinturaApi(id: string): Promise<void> {
