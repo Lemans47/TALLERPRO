@@ -52,6 +52,15 @@ const PDF_FILL: RGB = [241, 245, 249]    // relleno suave
 
 const capitalize = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s)
 
+// Colores del desglose de gastos (torta). Categorías conocidas fijas; el resto
+// rota por una paleta de respaldo.
+const GASTO_COLORS: Record<string, string> = {
+  "Gastos Fijos": "#1a4ed8",
+  "Gastos de Pintura": "#f59e0b",
+  "Gastos Misceláneos": "#8e9fc0",
+}
+const GASTO_FALLBACK = ["#0891b2", "#7c3aed", "#db2777", "#65a30d", "#ca8a04", "#475569"]
+
 // Carga el logo del taller como PNG base64 (mismo patrón que lib/pdf-orden-trabajo.ts).
 // Devuelve "" si falla, para degradar con elegancia.
 async function loadLogoBase64(): Promise<string> {
@@ -224,7 +233,6 @@ export default function ReportsPage() {
   // ── Aliases sobre datos cargados ─────────────────────────────────────────────
   const servicios = data?.servicios ?? []
   const gastos = data?.gastos ?? []
-  const abonos = data?.abonosMes ?? []
   const kpis = data?.kpis
   const serviciosFacturadosMes = data?.serviciosFacturadosMes ?? []
   const serviciosPendientesCobro = data?.serviciosPendientesCobro ?? []
@@ -358,16 +366,24 @@ export default function ReportsPage() {
   // ── Datos para gráficos del Resumen ─────────────────────────────────────────
   const gastosFijos = gastos.filter((g) => g.categoria === "Gastos Fijos").reduce((s, g) => s + Number(g.monto), 0)
   const gastosPinturaCat = gastos.filter((g) => g.categoria === "Gastos de Pintura").reduce((s, g) => s + Number(g.monto), 0)
-  const gastosMiscelaneos = gastos.filter((g) => g.categoria === "Gastos Misceláneos").reduce((s, g) => s + Number(g.monto), 0)
-  const sueldosPagados = abonos.reduce((sum, a) => sum + Number(a.monto || 0), 0)
 
-  const gastosChartData = [
-    { name: "Fijos", value: gastosFijos, color: "#1a4ed8" },
-    { name: "Pintura", value: gastosPinturaCat, color: "#f59e0b" },
-    { name: "Misceláneos", value: gastosMiscelaneos, color: "#8e9fc0" },
-    { name: "Sueldos pagados", value: sueldosPagados, color: "#16a34a" },
-    { name: "Costos servicios", value: kpis?.costosDirectos ?? 0, color: "#dc2626" },
-  ].filter((d) => d.value > 0)
+  // Desglose de "lo que se gastó" en criterio DEVENGADO (gerencial). Se deriva de
+  // kpis.gastosDesglose para cubrir TODAS las categorías (no solo 3 fijas) y para
+  // que la suma sea exactamente costosDirectos + gastosTabla + sueldosDevengados.
+  const gastosChartData = useMemo(() => {
+    if (!kpis) return [] as { name: string; value: number; color: string }[]
+    let fi = 0
+    const cats = kpis.gastosDesglose.map((g) => ({
+      name: g.categoria,
+      value: g.monto,
+      color: GASTO_COLORS[g.categoria] ?? GASTO_FALLBACK[fi++ % GASTO_FALLBACK.length],
+    }))
+    return [
+      ...cats,
+      { name: "Sueldos (devengados)", value: kpis.sueldosDevengados, color: "#16a34a" },
+      { name: "Costos de servicios", value: kpis.costosDirectos, color: "#dc2626" },
+    ].filter((d) => d.value > 0)
+  }, [kpis])
 
   // ── Top clientes (dos rankings: cobrado y facturado) ────────────────────────
   const topClientesCobrado = useMemo(() => {
@@ -553,23 +569,34 @@ export default function ReportsPage() {
     )
     y += 34
 
-    // Tarjetas grandes (2 x 2)
+    // Tarjetas grandes (3 x 2): ingresos arriba (facturado / cobrado / falta),
+    // resultado abajo (gasto / ganancia / deuda total).
     const drawCard = (x: number, cy: number, w: number, h: number, label: string, value: string, accent: RGB) => {
       doc.setFillColor(250, 251, 253); doc.setDrawColor(...accent); doc.setLineWidth(0.4)
       doc.roundedRect(x, cy, w, h, 2, 2, "FD")
       doc.setFillColor(...accent); doc.rect(x, cy, 2, h, "F")
-      doc.setTextColor(...PDF_GRIS); doc.setFont("helvetica", "normal"); doc.setFontSize(9.5)
-      doc.text(label, x + 7, cy + 9)
-      doc.setTextColor(...accent); doc.setFont("helvetica", "bold"); doc.setFontSize(17)
-      doc.text(value, x + 7, cy + 21)
+      doc.setTextColor(...PDF_GRIS); doc.setFont("helvetica", "normal"); doc.setFontSize(8.5)
+      const lab = doc.splitTextToSize(label, w - 9) as string[]
+      doc.text(lab, x + 6, cy + 7)
+      doc.setTextColor(...accent); doc.setFont("helvetica", "bold"); doc.setFontSize(13)
+      doc.text(value, x + 6, cy + h - 6)
     }
-    const cardW = (pageWidth - 28 - 8) / 2
-    const cardH = 28
-    drawCard(14, y, cardW, cardH, "Lo que entró (trabajos del mes)", fmtCLP(entro), PDF_AZUL)
-    drawCard(14 + cardW + 8, y, cardW, cardH, "Lo que se gastó", fmtCLP(gasto), PDF_GRIS)
-    drawCard(14, y + cardH + 8, cardW, cardH, "Lo que quedó", fmtCLP(quedo), gano ? PDF_VERDE : PDF_ROJO)
-    drawCard(14 + cardW + 8, y + cardH + 8, cardW, cardH, "Plata que aún le deben", fmtCLP(cuentasPorCobrar.total), PDF_AMBAR)
-    y += cardH * 2 + 8 + 12
+    const cobrado = k.ingresoCobrado
+    const faltaCobrarMes = Math.max(0, entro - cobrado)
+    const gap = 6
+    const cardW = (pageWidth - 28 - gap * 2) / 3
+    const cardH = 26
+    const col = (i: number) => 14 + i * (cardW + gap)
+    // Fila 1 — ingresos: facturado vs cobrado de verdad vs diferencia
+    drawCard(col(0), y, cardW, cardH, "Se trabajó (facturado)", fmtCLP(entro), PDF_AZUL)
+    drawCard(col(1), y, cardW, cardH, "Se cobró de verdad", fmtCLP(cobrado), PDF_VERDE)
+    drawCard(col(2), y, cardW, cardH, "Falta cobrar de este mes", fmtCLP(faltaCobrarMes), PDF_AMBAR)
+    // Fila 2 — gasto, ganancia y deuda total
+    const y2 = y + cardH + gap
+    drawCard(col(0), y2, cardW, cardH, "Se gastó", fmtCLP(gasto), PDF_GRIS)
+    drawCard(col(1), y2, cardW, cardH, "Quedó de ganancia", fmtCLP(quedo), gano ? PDF_VERDE : PDF_ROJO)
+    drawCard(col(2), y2, cardW, cardH, "Le deben en total", fmtCLP(cuentasPorCobrar.total), PDF_AMBAR)
+    y = y2 + cardH + 12
 
     // Comparación simple con el mes pasado
     if (prevMonthKpis) {
@@ -605,6 +632,12 @@ export default function ReportsPage() {
         : `Este mes el negocio perdió plata (${fmtCLP(Math.abs(quedo))}). Conviene revisar los gastos.`,
       tone: gano ? "ok" : "warn",
     })
+    if (faltaCobrarMes > 0) {
+      bullets.push({
+        text: `De lo que se trabajó este mes (${fmtCLP(entro)}), se cobró ${fmtCLP(cobrado)} y faltan ${fmtCLP(faltaCobrarMes)} por cobrar.`,
+        tone: "info",
+      })
+    }
     if (cuentasPorCobrar.total > 0) {
       if (cuentasPorCobrar.buckets.viejo > 0) {
         bullets.push({
@@ -646,6 +679,9 @@ export default function ReportsPage() {
     // ── PÁGINA 3: ¿En qué se va la plata? (torta de gastos) ───────────────────
     doc.addPage()
     y = brandHeader("¿En qué se va la plata?")
+    doc.setFontSize(8); doc.setTextColor(...PDF_GRIS)
+    doc.text("Incluye sueldos del mes completos (devengados), gastos del taller y costos de los trabajos.", 14, y)
+    doc.setTextColor(0); y += 5
     if (pieImg) {
       const imgW = 120
       const imgH = imgW * (pieImg.h / pieImg.w)
@@ -818,6 +854,7 @@ export default function ReportsPage() {
       body: [
         kpiRow("Ingresos Cobrados (cerrados)", fmtCLP(k.ingresoCobrado), prev ? fmtCLP(prev.ingresoCobrado) : "—", prev ? fmtCLP(cmp(k.ingresoCobrado, prev.ingresoCobrado).diff) : "—"),
         kpiRow("Ingresos Facturados (con monto)", fmtCLP(k.ingresoFacturado), prev ? fmtCLP(prev.ingresoFacturado) : "—", prev ? fmtCLP(cmp(k.ingresoFacturado, prev.ingresoFacturado).diff) : "—"),
+        kpiRow("Falta por cobrar (Facturado − Cobrado)", fmtCLP(k.ingresoFacturado - k.ingresoCobrado), prev ? fmtCLP(prev.ingresoFacturado - prev.ingresoCobrado) : "—", prev ? fmtCLP(cmp(k.ingresoFacturado - k.ingresoCobrado, prev.ingresoFacturado - prev.ingresoCobrado).diff) : "—"),
         kpiRow("Costos Directos (variables)", fmtCLP(k.costosDirectos), prev ? fmtCLP(prev.costosDirectos) : "—", prev ? fmtCLP(cmp(k.costosDirectos, prev.costosDirectos).diff) : "—"),
         kpiRow("Margen de Contribución", `${fmtCLP(k.margenContribucion)} (${fmtPct(k.margenContribucionPct)})`, prev ? fmtCLP(prev.margenContribucion) : "—", prev ? fmtCLP(cmp(k.margenContribucion, prev.margenContribucion).diff) : "—"),
         kpiRow("Sueldos devengados", fmtCLP(k.sueldosDevengados), prev ? fmtCLP(prev.sueldosDevengados) : "—", prev ? fmtCLP(cmp(k.sueldosDevengados, prev.sueldosDevengados).diff) : "—"),
@@ -1022,8 +1059,10 @@ export default function ReportsPage() {
       startY: y,
       head: [["Indicador", "Definición"]],
       body: [
-        ["Ingresos Cobrados", "Suma de monto_total_sin_iva de servicios cerrados/pagados."],
+        ["Ingresos Cobrados", "Suma de monto_total_sin_iva de servicios cerrados/pagados. Es lo realmente cobrado."],
         ["Ingresos Facturados", "Suma de monto_total_sin_iva de servicios con monto > 0 (incluye por cobrar)."],
+        ["Falta por cobrar (mes)", "Facturado − Cobrado. Trabajo del mes con monto asignado que aún no está cerrado/pagado."],
+        ["Lo que se gastó", "Costos directos + gastos del taller (s/sueldos) + sueldos devengados. Criterio devengado."],
         ["Costos Directos", "Items de costos[] excluyendo isAuto=true (mano de obra de pintura auto, materiales pintura auto) para evitar doble conteo con la categoría 'Gastos de Pintura'."],
         ["Sueldos Devengados", "Sueldo base de empleados activos. Criterio contable."],
         ["Sueldos Pagados", "Abonos efectivamente realizados a empleados en el mes. Criterio caja."],
@@ -1273,7 +1312,13 @@ export default function ReportsPage() {
           {/* Charts */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Desglose de Gastos</CardTitle>
+              <CardTitle className="text-lg flex items-center gap-1.5">
+                Desglose de Gastos
+                <InfoTip>
+                  Criterio devengado: costos directos + gastos del taller (sin sueldos) +
+                  sueldos devengados. Suma exactamente el total de "Gastos Totales".
+                </InfoTip>
+              </CardTitle>
             </CardHeader>
             <CardContent>
               {gastosChartData.length > 0 ? (
