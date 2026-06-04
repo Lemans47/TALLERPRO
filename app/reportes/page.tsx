@@ -530,22 +530,26 @@ export default function ReportsPage() {
       return { diff, pct }
     }
 
-    // ── PÁGINA 1: Portada ─────────────────────────────────────────────────────
-    doc.setFillColor(...PDF_NAVY)
-    doc.rect(0, 0, pageWidth, 297, "F")
+    // ── PÁGINA 1: Portada (fondo blanco) ──────────────────────────────────────
     if (logo) doc.addImage(logo, "PNG", (pageWidth - 80) / 2, 60, 80, 29)
-    doc.setTextColor(255, 255, 255)
+    // Línea azul de marca bajo el logo
+    doc.setDrawColor(...PDF_AZUL); doc.setLineWidth(1)
+    doc.line((pageWidth - 80) / 2, 98, (pageWidth + 80) / 2, 98)
+    doc.setLineWidth(0.2)
+    doc.setTextColor(...PDF_NAVY)
     doc.setFont("helvetica", "bold"); doc.setFontSize(30)
     doc.text("Reporte Gerencial", pageWidth / 2, 130, { align: "center" })
     doc.setFont("helvetica", "normal"); doc.setFontSize(14)
+    doc.setTextColor(...PDF_GRIS)
     doc.text("Cómo le fue al taller este mes", pageWidth / 2, 142, { align: "center" })
     // Banda de período
     doc.setFillColor(...PDF_AZUL)
     doc.roundedRect((pageWidth - 110) / 2, 160, 110, 18, 3, 3, "F")
+    doc.setTextColor(255, 255, 255)
     doc.setFont("helvetica", "bold"); doc.setFontSize(16)
     doc.text(periodo, pageWidth / 2, 172, { align: "center" })
     doc.setFont("helvetica", "normal"); doc.setFontSize(10)
-    doc.setTextColor(200, 210, 225)
+    doc.setTextColor(...PDF_GRIS)
     doc.text(`Generado el ${today}`, pageWidth / 2, 270, { align: "center" })
 
     // ── PÁGINA 2: ¿Cómo le fue este mes? (lenguaje simple) ────────────────────
