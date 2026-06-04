@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -39,6 +39,81 @@ import * as XLSX from "xlsx"
 // Helper de formato chileno
 const fmtCLP = (n: number) => `$${Math.round(n).toLocaleString("es-CL")}`
 const fmtPct = (n: number | null) => (n === null || !isFinite(n) ? "—" : `${n.toFixed(1)}%`)
+
+// ── Paleta de marca para el PDF ──────────────────────────────────────────────
+type RGB = [number, number, number]
+const PDF_AZUL: RGB = [15, 56, 114]      // azul corporativo
+const PDF_NAVY: RGB = [15, 23, 42]       // encabezados de tabla
+const PDF_VERDE: RGB = [22, 163, 74]     // semáforo "bien"
+const PDF_ROJO: RGB = [220, 38, 38]      // semáforo "atención"
+const PDF_AMBAR: RGB = [217, 119, 6]     // por cobrar
+const PDF_GRIS: RGB = [100, 100, 100]
+const PDF_FILL: RGB = [241, 245, 249]    // relleno suave
+
+const capitalize = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s)
+
+// Carga el logo del taller como PNG base64 (mismo patrón que lib/pdf-orden-trabajo.ts).
+// Devuelve "" si falla, para degradar con elegancia.
+async function loadLogoBase64(): Promise<string> {
+  return await new Promise<string>((resolve) => {
+    const img = new window.Image()
+    img.crossOrigin = "anonymous"
+    img.onload = () => {
+      try {
+        const scale = 3
+        const w = (img.width || 560) * scale
+        const h = (img.height || 200) * scale
+        const canvas = document.createElement("canvas")
+        canvas.width = w
+        canvas.height = h
+        canvas.getContext("2d")!.drawImage(img, 0, 0, w, h)
+        resolve(canvas.toDataURL("image/png"))
+      } catch {
+        resolve("")
+      }
+    }
+    img.onerror = () => resolve("")
+    img.src = "/logo-sarmiento.svg"
+  })
+}
+
+// Serializa un <svg> de recharts (dentro de `container`) a PNG base64 para
+// incrustarlo en el PDF. Mismo mecanismo canvas que el logo. Devuelve null si falla.
+async function svgToPng(
+  container: HTMLElement | null,
+  scale = 2,
+): Promise<{ url: string; w: number; h: number } | null> {
+  if (!container) return null
+  const svg = container.querySelector("svg")
+  if (!svg) return null
+  const w = Number(svg.getAttribute("width")) || svg.clientWidth || 520
+  const h = Number(svg.getAttribute("height")) || svg.clientHeight || 320
+  const clone = svg.cloneNode(true) as SVGElement
+  clone.setAttribute("xmlns", "http://www.w3.org/2000/svg")
+  clone.setAttribute("width", String(w))
+  clone.setAttribute("height", String(h))
+  const xml = new XMLSerializer().serializeToString(clone)
+  const src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(xml)
+  return await new Promise((resolve) => {
+    const img = new window.Image()
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas")
+        canvas.width = w * scale
+        canvas.height = h * scale
+        const ctx = canvas.getContext("2d")!
+        ctx.fillStyle = "#ffffff"
+        ctx.fillRect(0, 0, canvas.width, canvas.height)
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+        resolve({ url: canvas.toDataURL("image/png"), w, h })
+      } catch {
+        resolve(null)
+      }
+    }
+    img.onerror = () => resolve(null)
+    img.src = src
+  })
+}
 
 // Tooltip inline reusable: ícono "i" con texto explicativo
 function InfoTip({ children }: { children: React.ReactNode }) {
@@ -268,6 +343,10 @@ export default function ReportsPage() {
   const desviacionMat = totalMaterialesPintura - materialesEstimado
   const [showMoDetalle, setShowMoDetalle] = useState(false)
 
+  // Refs a los gráficos ocultos que se capturan para el PDF gerencial.
+  const pieChartRef = useRef<HTMLDivElement>(null)
+  const barChartRef = useRef<HTMLDivElement>(null)
+
   // ── Histórico de pintura (6 meses) ───────────────────────────────────────────
   const [pinturaHistorico, setPinturaHistorico] = useState<PinturaHistoricoRow[]>([])
   useEffect(() => {
@@ -397,126 +476,418 @@ export default function ReportsPage() {
   }, [serviciosFacturadosMes, gastos, servicios])
 
   // ── Exportar PDF gerencial ──────────────────────────────────────────────────
-  const exportarPDF = () => {
+  const exportarPDF = async () => {
     if (!kpis) return
+    const k = kpis
     const doc = new jsPDF()
     const pageWidth = doc.internal.pageSize.getWidth()
     const today = new Date().toLocaleDateString("es-CL")
+    const periodo = capitalize(monthName)
 
-    // ── Portada ───────────────────────────────────────────────────────────────
-    doc.setFillColor(15, 23, 42)
-    doc.rect(0, 0, pageWidth, 50, "F")
+    // Cargar logo y capturar gráficos (degradan a null/"" sin romper el PDF).
+    const [logo, pieImg, barImg] = await Promise.all([
+      loadLogoBase64(),
+      svgToPng(pieChartRef.current),
+      svgToPng(barChartRef.current),
+    ])
+
+    // ── Helpers de dibujo ─────────────────────────────────────────────────────
+    // Encabezado compacto de marca para páginas de contenido.
+    const brandHeader = (titulo: string): number => {
+      if (logo) doc.addImage(logo, "PNG", 14, 8, 42, 15)
+      doc.setTextColor(...PDF_GRIS); doc.setFont("helvetica", "normal"); doc.setFontSize(8)
+      doc.text(periodo, pageWidth - 14, 14, { align: "right" })
+      doc.setDrawColor(...PDF_AZUL); doc.setLineWidth(1)
+      doc.line(14, 26, pageWidth - 14, 26)
+      doc.setLineWidth(0.2)
+      doc.setTextColor(...PDF_NAVY); doc.setFont("helvetica", "bold"); doc.setFontSize(15)
+      doc.text(titulo, 14, 36)
+      doc.setFont("helvetica", "normal"); doc.setTextColor(0, 0, 0)
+      return 42
+    }
+    const afterTable = () => (doc as any).lastAutoTable.finalY as number
+
+    // Comparación numérica con el mes anterior.
+    const cmp = (cur: number, prev: number) => {
+      const diff = cur - prev
+      const pct = prev !== 0 ? (diff / Math.abs(prev)) * 100 : null
+      return { diff, pct }
+    }
+
+    // ── PÁGINA 1: Portada ─────────────────────────────────────────────────────
+    doc.setFillColor(...PDF_NAVY)
+    doc.rect(0, 0, pageWidth, 297, "F")
+    if (logo) doc.addImage(logo, "PNG", (pageWidth - 80) / 2, 60, 80, 29)
     doc.setTextColor(255, 255, 255)
-    doc.setFontSize(20)
-    doc.text("Reporte Gerencial", 14, 22)
-    doc.setFontSize(13)
-    doc.text("Taller — Gestión Mensual", 14, 32)
-    doc.setFontSize(10)
-    doc.text(`Período: ${monthName.charAt(0).toUpperCase() + monthName.slice(1)}`, 14, 42)
-    doc.text(`Generado: ${today}`, pageWidth - 14, 42, { align: "right" })
+    doc.setFont("helvetica", "bold"); doc.setFontSize(30)
+    doc.text("Reporte Gerencial", pageWidth / 2, 130, { align: "center" })
+    doc.setFont("helvetica", "normal"); doc.setFontSize(14)
+    doc.text("Cómo le fue al taller este mes", pageWidth / 2, 142, { align: "center" })
+    // Banda de período
+    doc.setFillColor(...PDF_AZUL)
+    doc.roundedRect((pageWidth - 110) / 2, 160, 110, 18, 3, 3, "F")
+    doc.setFont("helvetica", "bold"); doc.setFontSize(16)
+    doc.text(periodo, pageWidth / 2, 172, { align: "center" })
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10)
+    doc.setTextColor(200, 210, 225)
+    doc.text(`Generado el ${today}`, pageWidth / 2, 270, { align: "center" })
 
-    // ── KPIs principales ──────────────────────────────────────────────────────
-    doc.setTextColor(0, 0, 0)
-    doc.setFontSize(14)
-    doc.text("Resumen Ejecutivo", 14, 65)
+    // ── PÁGINA 2: ¿Cómo le fue este mes? (lenguaje simple) ────────────────────
+    // Modelo simple y honesto: Entró − Gastó = Quedó (identidad exacta con utilidadNeta).
+    const entro = k.ingresoFacturado
+    const gasto = k.costosDirectos + k.gastosOperativos
+    const quedo = k.utilidadNeta
+    doc.addPage()
+    let y = brandHeader("¿Cómo le fue este mes?")
 
-    autoTable(doc, {
-      startY: 70,
-      head: [["Indicador", "Valor"]],
-      body: [
-        ["Ingresos Cobrados (cerrados)", fmtCLP(kpis.ingresoCobrado)],
-        ["Ingresos Facturados (con monto)", fmtCLP(kpis.ingresoFacturado)],
-        ["Costos Directos (variables)", fmtCLP(kpis.costosDirectos)],
-        ["Margen de Contribución", `${fmtCLP(kpis.margenContribucion)} (${fmtPct(kpis.margenContribucionPct)})`],
-        ["Sueldos devengados", fmtCLP(kpis.sueldosDevengados)],
-        ["Sueldos pagados (caja)", fmtCLP(kpis.sueldosPagados)],
-        ["Gastos operacionales (s/sueldos)", fmtCLP(kpis.gastosTabla)],
-        ["Utilidad Neta", `${fmtCLP(kpis.utilidadNeta)} (${fmtPct(kpis.margenPct)})`],
-        ["Servicios facturados (n°)", String(kpis.serviciosCount)],
-        ["Servicios finalizados (n°)", String(kpis.serviciosFinalizados)],
-        ["Punto de equilibrio", kpis.puntoEquilibrio === null ? "No alcanzable (margen ≤ 0)" : `${kpis.puntoEquilibrio} servicios`],
-        ["Cobertura de gastos", fmtPct(kpis.coberturaGastos)],
-      ],
-      theme: "grid",
-      headStyles: { fillColor: [15, 23, 42] },
+    // Veredicto destacado
+    const gano = quedo >= 0
+    doc.setFillColor(...(gano ? PDF_VERDE : PDF_ROJO))
+    doc.roundedRect(14, y, pageWidth - 28, 24, 3, 3, "F")
+    doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(17)
+    doc.text(
+      gano
+        ? `Este mes el taller GANÓ ${fmtCLP(quedo)}`
+        : `Este mes el taller PERDIÓ ${fmtCLP(Math.abs(quedo))}`,
+      pageWidth / 2, y + 15, { align: "center" },
+    )
+    y += 34
+
+    // Tarjetas grandes (2 x 2)
+    const drawCard = (x: number, cy: number, w: number, h: number, label: string, value: string, accent: RGB) => {
+      doc.setFillColor(250, 251, 253); doc.setDrawColor(...accent); doc.setLineWidth(0.4)
+      doc.roundedRect(x, cy, w, h, 2, 2, "FD")
+      doc.setFillColor(...accent); doc.rect(x, cy, 2, h, "F")
+      doc.setTextColor(...PDF_GRIS); doc.setFont("helvetica", "normal"); doc.setFontSize(9.5)
+      doc.text(label, x + 7, cy + 9)
+      doc.setTextColor(...accent); doc.setFont("helvetica", "bold"); doc.setFontSize(17)
+      doc.text(value, x + 7, cy + 21)
+    }
+    const cardW = (pageWidth - 28 - 8) / 2
+    const cardH = 28
+    drawCard(14, y, cardW, cardH, "Lo que entró (trabajos del mes)", fmtCLP(entro), PDF_AZUL)
+    drawCard(14 + cardW + 8, y, cardW, cardH, "Lo que se gastó", fmtCLP(gasto), PDF_GRIS)
+    drawCard(14, y + cardH + 8, cardW, cardH, "Lo que quedó", fmtCLP(quedo), gano ? PDF_VERDE : PDF_ROJO)
+    drawCard(14 + cardW + 8, y + cardH + 8, cardW, cardH, "Plata que aún le deben", fmtCLP(cuentasPorCobrar.total), PDF_AMBAR)
+    y += cardH * 2 + 8 + 12
+
+    // Comparación simple con el mes pasado
+    if (prevMonthKpis) {
+      const dq = cmp(quedo, prevMonthKpis.utilidadNeta)
+      const de = cmp(entro, prevMonthKpis.ingresoFacturado)
+      doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(...PDF_NAVY)
+      doc.text("Comparado con el mes pasado", 14, y); y += 7
+      doc.setFont("helvetica", "normal"); doc.setFontSize(10.5)
+      const linea = (txt: string, positivo: boolean) => {
+        doc.setTextColor(...(positivo ? PDF_VERDE : PDF_ROJO))
+        doc.text(`${positivo ? "▲" : "▼"}  ${txt}`, 18, y); y += 7
+      }
+      linea(
+        de.diff >= 0
+          ? `Entró ${fmtCLP(de.diff)} más en trabajos`
+          : `Entró ${fmtCLP(Math.abs(de.diff))} menos en trabajos`,
+        de.diff >= 0,
+      )
+      linea(
+        dq.diff >= 0
+          ? `Quedó ${fmtCLP(dq.diff)} más de ganancia`
+          : `Quedó ${fmtCLP(Math.abs(dq.diff))} menos de ganancia`,
+        dq.diff >= 0,
+      )
+      y += 4
+    }
+
+    // Diagnóstico en frases simples
+    const bullets: { text: string; tone: "ok" | "warn" | "info" }[] = []
+    bullets.push({
+      text: gano
+        ? `Este mes el negocio dejó ganancia (${fmtCLP(quedo)}).`
+        : `Este mes el negocio perdió plata (${fmtCLP(Math.abs(quedo))}). Conviene revisar los gastos.`,
+      tone: gano ? "ok" : "warn",
+    })
+    if (cuentasPorCobrar.total > 0) {
+      if (cuentasPorCobrar.buckets.viejo > 0) {
+        bullets.push({
+          text: `Le deben ${fmtCLP(cuentasPorCobrar.total)} en total; ${fmtCLP(cuentasPorCobrar.buckets.viejo)} es de hace más de un mes — conviene cobrar.`,
+          tone: "warn",
+        })
+      } else {
+        bullets.push({
+          text: `Le deben ${fmtCLP(cuentasPorCobrar.total)} por trabajos ya entregados.`,
+          tone: "info",
+        })
+      }
+    }
+    if (rentabilidadPorCategoria.length > 0) {
+      const best = rentabilidadPorCategoria[0]
+      bullets.push({ text: `El trabajo que más deja es ${best.label} (ganó ${fmtCLP(best.margen)} después de costos).`, tone: "info" })
+      const worst = rentabilidadPorCategoria[rentabilidadPorCategoria.length - 1]
+      if (worst.margen < 0) {
+        bullets.push({ text: `Ojo: en ${worst.label} se gastó más de lo que entró (${fmtCLP(worst.margen)}).`, tone: "warn" })
+      }
+    }
+    bullets.push({
+      text: `Se trabajó en ${k.serviciosCount} ${k.serviciosCount === 1 ? "vehículo" : "vehículos"} este mes.`,
+      tone: "info",
     })
 
-    // ── Estado de Resultados (cascada) ────────────────────────────────────────
-    let y = (doc as any).lastAutoTable.finalY + 10
-    doc.setFontSize(12)
-    doc.text("Estado de Resultados", 14, y)
-    autoTable(doc, {
-      startY: y + 4,
-      head: [["Concepto", "Monto"]],
-      body: [
-        ["Ingresos facturados", fmtCLP(kpis.ingresoFacturado)],
-        ["(−) Costos directos", `-${fmtCLP(kpis.costosDirectos)}`],
-        ["= Margen de contribución", fmtCLP(kpis.margenContribucion)],
-        ["(−) Sueldos devengados", `-${fmtCLP(kpis.sueldosDevengados)}`],
-        ["(−) Gastos operacionales", `-${fmtCLP(kpis.gastosTabla)}`],
-        ["= Utilidad neta", fmtCLP(kpis.utilidadNeta)],
-      ],
-      theme: "striped",
-      headStyles: { fillColor: [15, 23, 42] },
-    })
+    doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(...PDF_NAVY)
+    doc.text("En resumen", 14, y); y += 7
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10.5)
+    for (const b of bullets) {
+      const color = b.tone === "ok" ? PDF_VERDE : b.tone === "warn" ? PDF_ROJO : PDF_NAVY
+      doc.setFillColor(...color); doc.circle(16, y - 1.2, 1.1, "F")
+      doc.setTextColor(40, 40, 40)
+      const lines = doc.splitTextToSize(b.text, pageWidth - 38) as string[]
+      doc.text(lines, 20, y)
+      y += lines.length * 6 + 2
+    }
 
-    // ── IVA ────────────────────────────────────────────────────────────────────
-    y = (doc as any).lastAutoTable.finalY + 10
-    doc.setFontSize(12)
-    doc.text("IVA del mes (criterio SII por fecha de facturación)", 14, y)
-    autoTable(doc, {
-      startY: y + 4,
-      body: [
-        ["IVA Débito (ventas)", fmtCLP(kpis.ivaDebitoMes)],
-        ["IVA Crédito (compras c/factura)", fmtCLP(kpis.ivaCreditoMes)],
-        ["IVA Neto a pagar", fmtCLP(kpis.ivaNetoMes)],
-      ],
-      theme: "grid",
-    })
+    // ── PÁGINA 3: ¿En qué se va la plata? (torta de gastos) ───────────────────
+    doc.addPage()
+    y = brandHeader("¿En qué se va la plata?")
+    if (pieImg) {
+      const imgW = 120
+      const imgH = imgW * (pieImg.h / pieImg.w)
+      doc.addImage(pieImg.url, "PNG", (pageWidth - imgW) / 2, y, imgW, imgH)
+      y += imgH + 6
+    }
+    const totalGastosChart = gastosChartData.reduce((s, d) => s + d.value, 0)
+    if (gastosChartData.length > 0) {
+      autoTable(doc, {
+        startY: y,
+        head: [["Tipo de gasto", "Monto", "%"]],
+        body: gastosChartData.map((d) => [
+          d.name,
+          fmtCLP(d.value),
+          totalGastosChart > 0 ? `${((d.value / totalGastosChart) * 100).toFixed(0)}%` : "—",
+        ]),
+        foot: [["Total", fmtCLP(totalGastosChart), "100%"]],
+        theme: "striped",
+        headStyles: { fillColor: PDF_NAVY },
+        footStyles: { fillColor: PDF_FILL, textColor: PDF_NAVY, fontStyle: "bold" },
+        columnStyles: { 1: { halign: "right" }, 2: { halign: "right" } },
+      })
+    }
 
-    // ── Cuentas por cobrar ─────────────────────────────────────────────────────
+    // ── PÁGINA: Plata que aún le deben (cuentas por cobrar, lenguaje simple) ───
     if (cuentasPorCobrar.rows.length > 0) {
       doc.addPage()
-      doc.setFontSize(14)
-      doc.text("Cuentas por Cobrar", 14, 20)
-      doc.setFontSize(9)
-      doc.setTextColor(100)
+      y = brandHeader("Plata que aún le deben")
+      doc.setFontSize(10); doc.setTextColor(...PDF_GRIS)
       doc.text(
-        `Total pendiente: ${fmtCLP(cuentasPorCobrar.total)}  ·  >30d: ${fmtCLP(cuentasPorCobrar.buckets.viejo)}  ·  15-30d: ${fmtCLP(cuentasPorCobrar.buckets.medio)}  ·  <15d: ${fmtCLP(cuentasPorCobrar.buckets.reciente)}`,
-        14, 26,
+        `Total: ${fmtCLP(cuentasPorCobrar.total)}   ·   Hace +30 días: ${fmtCLP(cuentasPorCobrar.buckets.viejo)}   ·   15-30 días: ${fmtCLP(cuentasPorCobrar.buckets.medio)}   ·   Reciente: ${fmtCLP(cuentasPorCobrar.buckets.reciente)}`,
+        14, y,
       )
       doc.setTextColor(0)
       autoTable(doc, {
-        startY: 32,
-        head: [["Patente", "Cliente", "Ingreso", "Días", "Saldo"]],
+        startY: y + 5,
+        head: [["Patente", "Cliente", "Entregado", "Días", "Le debe"]],
         body: cuentasPorCobrar.rows.map((r) => [
           r.patente,
           r.cliente,
-          formatFechaDMA(r.fecha_ingreso),
+          formatFechaDMA(r.fecha_entregado || r.fecha_ingreso),
           String(r.dias),
           fmtCLP(Number(r.saldo_pendiente || 0)),
         ]),
         theme: "striped",
         styles: { fontSize: 8 },
-        headStyles: { fillColor: [15, 23, 42] },
+        headStyles: { fillColor: PDF_NAVY },
+        columnStyles: { 4: { halign: "right" } },
+        // Resalta en rojo las deudas de más de 30 días.
+        didParseCell: (data: any) => {
+          if (data.section === "body" && Number(cuentasPorCobrar.rows[data.row.index]?.dias) > 30) {
+            data.cell.styles.textColor = PDF_ROJO
+          }
+        },
       })
     }
 
-    // ── Anexo: servicios del mes (agrupados por estado) ──────────────────────
+    // ── PÁGINA: ¿Qué trabajos dejan más? (rentabilidad por categoría) ─────────
+    if (rentabilidadPorCategoria.length > 0) {
+      doc.addPage()
+      y = brandHeader("¿Qué trabajos dejan más?")
+      if (barImg) {
+        const imgW = 165
+        const imgH = imgW * (barImg.h / barImg.w)
+        doc.addImage(barImg.url, "PNG", (pageWidth - imgW) / 2, y, imgW, imgH)
+        y += imgH + 6
+      }
+      autoTable(doc, {
+        startY: y,
+        head: [["Trabajo", "Entró", "Costó", "Quedó"]],
+        body: rentabilidadPorCategoria.map((r) => [r.label, fmtCLP(r.cobros), fmtCLP(r.costos), fmtCLP(r.margen)]),
+        foot: [["Total", fmtCLP(rentCatTotales.cobros), fmtCLP(rentCatTotales.costos), fmtCLP(rentCatTotales.margen)]],
+        theme: "striped",
+        headStyles: { fillColor: PDF_NAVY },
+        footStyles: { fillColor: PDF_FILL, textColor: PDF_NAVY, fontStyle: "bold" },
+        columnStyles: { 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" } },
+      })
+    }
+
+    // ── PÁGINA: Mejores clientes ──────────────────────────────────────────────
+    if (topClientesFacturado.length > 0 || topClientesCobrado.length > 0) {
+      doc.addPage()
+      y = brandHeader("Mejores clientes del mes")
+      if (topClientesCobrado.length > 0) {
+        doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(...PDF_NAVY)
+        doc.text("Por plata cobrada (trabajos pagados)", 14, y)
+        autoTable(doc, {
+          startY: y + 3,
+          head: [["#", "Cliente", "Trabajos", "Total"]],
+          body: topClientesCobrado.map((c, i) => [String(i + 1), c.cliente, String(c.count), fmtCLP(c.total)]),
+          theme: "striped",
+          styles: { fontSize: 8 },
+          headStyles: { fillColor: PDF_NAVY },
+          columnStyles: { 0: { cellWidth: 10 }, 2: { halign: "center" }, 3: { halign: "right" } },
+        })
+        y = afterTable() + 8
+      }
+      if (topClientesFacturado.length > 0) {
+        doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(...PDF_NAVY)
+        doc.text("Por plata facturada (incluye lo por cobrar)", 14, y)
+        autoTable(doc, {
+          startY: y + 3,
+          head: [["#", "Cliente", "Trabajos", "Total"]],
+          body: topClientesFacturado.map((c, i) => [String(i + 1), c.cliente, String(c.count), fmtCLP(c.total)]),
+          theme: "striped",
+          styles: { fontSize: 8 },
+          headStyles: { fillColor: PDF_NAVY },
+          columnStyles: { 0: { cellWidth: 10 }, 2: { halign: "center" }, 3: { halign: "right" } },
+        })
+      }
+    }
+
+    // ── PÁGINA: Pintura ───────────────────────────────────────────────────────
+    if (piezasDetalle.length > 0 || pinturaHistorico.length > 0) {
+      doc.addPage()
+      y = brandHeader("Trabajos de pintura")
+      if (piezasDetalle.length > 0) {
+        doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(...PDF_NAVY)
+        doc.text("Piezas pintadas este mes", 14, y)
+        autoTable(doc, {
+          startY: y + 3,
+          head: [["Pieza", "Veces", "Unidades", "Ingresos"]],
+          body: piezasDetalle.map((p) => [p.nombre, String(p.veces), String(p.unidades), fmtCLP(p.ingresos)]),
+          foot: [["Total", "", String(totalUnidadesPintura), fmtCLP(ingresosPiezas)]],
+          theme: "striped",
+          styles: { fontSize: 8 },
+          headStyles: { fillColor: PDF_NAVY },
+          footStyles: { fillColor: PDF_FILL, textColor: PDF_NAVY, fontStyle: "bold" },
+          columnStyles: { 1: { halign: "center" }, 2: { halign: "center" }, 3: { halign: "right" } },
+        })
+        y = afterTable() + 8
+      }
+      if (pinturaHistorico.length > 0) {
+        doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(...PDF_NAVY)
+        doc.text("Últimos meses (piezas y mano de obra)", 14, y)
+        autoTable(doc, {
+          startY: y + 3,
+          head: [["Mes", "Piezas", "MO estimada", "MO real", "Mat. estimado", "Mat. real"]],
+          body: pinturaHistorico.map((h) => [
+            h.mes, String(h.piezas), fmtCLP(h.mo_estimada), fmtCLP(h.mo_real), fmtCLP(h.mat_estimado), fmtCLP(h.mat_real),
+          ]),
+          theme: "striped",
+          styles: { fontSize: 8 },
+          headStyles: { fillColor: PDF_NAVY },
+          columnStyles: { 1: { halign: "center" }, 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" }, 5: { halign: "right" } },
+        })
+      }
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // ANEXOS TÉCNICOS (parte contable) — separados de la lectura simple
+    // ════════════════════════════════════════════════════════════════════════
     doc.addPage()
-    doc.setFontSize(14)
-    doc.text("Anexo A: Servicios del Mes", 14, 20)
+    doc.setFillColor(...PDF_NAVY)
+    doc.rect(0, 0, pageWidth, 297, "F")
+    doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(26)
+    doc.text("Anexos técnicos", pageWidth / 2, 140, { align: "center" })
+    doc.setFont("helvetica", "normal"); doc.setFontSize(12)
+    doc.setTextColor(200, 210, 225)
+    doc.text("Detalle contable e indicadores de gestión", pageWidth / 2, 152, { align: "center" })
+
+    // ── Resumen Ejecutivo (KPIs) + comparación con mes anterior ───────────────
+    doc.addPage()
+    y = brandHeader("Resumen Ejecutivo (indicadores)")
+    const kpiRow = (label: string, cur: string, prev: string, diff: string) => [label, cur, prev, diff]
+    const prev = prevMonthKpis
+    autoTable(doc, {
+      startY: y,
+      head: [["Indicador", "Mes actual", "Mes anterior", "Variación"]],
+      body: [
+        kpiRow("Ingresos Cobrados (cerrados)", fmtCLP(k.ingresoCobrado), prev ? fmtCLP(prev.ingresoCobrado) : "—", prev ? fmtCLP(cmp(k.ingresoCobrado, prev.ingresoCobrado).diff) : "—"),
+        kpiRow("Ingresos Facturados (con monto)", fmtCLP(k.ingresoFacturado), prev ? fmtCLP(prev.ingresoFacturado) : "—", prev ? fmtCLP(cmp(k.ingresoFacturado, prev.ingresoFacturado).diff) : "—"),
+        kpiRow("Costos Directos (variables)", fmtCLP(k.costosDirectos), prev ? fmtCLP(prev.costosDirectos) : "—", prev ? fmtCLP(cmp(k.costosDirectos, prev.costosDirectos).diff) : "—"),
+        kpiRow("Margen de Contribución", `${fmtCLP(k.margenContribucion)} (${fmtPct(k.margenContribucionPct)})`, prev ? fmtCLP(prev.margenContribucion) : "—", prev ? fmtCLP(cmp(k.margenContribucion, prev.margenContribucion).diff) : "—"),
+        kpiRow("Sueldos devengados", fmtCLP(k.sueldosDevengados), prev ? fmtCLP(prev.sueldosDevengados) : "—", prev ? fmtCLP(cmp(k.sueldosDevengados, prev.sueldosDevengados).diff) : "—"),
+        kpiRow("Sueldos pagados (caja)", fmtCLP(k.sueldosPagados), prev ? fmtCLP(prev.sueldosPagados) : "—", prev ? fmtCLP(cmp(k.sueldosPagados, prev.sueldosPagados).diff) : "—"),
+        kpiRow("Gastos operacionales (s/sueldos)", fmtCLP(k.gastosTabla), prev ? fmtCLP(prev.gastosTabla) : "—", prev ? fmtCLP(cmp(k.gastosTabla, prev.gastosTabla).diff) : "—"),
+        kpiRow("Utilidad Neta", `${fmtCLP(k.utilidadNeta)} (${fmtPct(k.margenPct)})`, prev ? fmtCLP(prev.utilidadNeta) : "—", prev ? fmtCLP(cmp(k.utilidadNeta, prev.utilidadNeta).diff) : "—"),
+        kpiRow("Servicios facturados (n°)", String(k.serviciosCount), prev ? String(prev.serviciosCount) : "—", prev ? String(k.serviciosCount - prev.serviciosCount) : "—"),
+        kpiRow("Servicios finalizados (n°)", String(k.serviciosFinalizados), prev ? String(prev.serviciosFinalizados) : "—", prev ? String(k.serviciosFinalizados - prev.serviciosFinalizados) : "—"),
+        kpiRow("Punto de equilibrio", k.puntoEquilibrio === null ? "No alcanzable" : `${k.puntoEquilibrio} serv.`, prev ? (prev.puntoEquilibrio === null ? "No alcanzable" : `${prev.puntoEquilibrio} serv.`) : "—", "—"),
+        kpiRow("Cobertura de gastos", fmtPct(k.coberturaGastos), prev ? fmtPct(prev.coberturaGastos) : "—", "—"),
+        kpiRow("IVA Neto a pagar", fmtCLP(k.ivaNetoMes), prev ? fmtCLP(prev.ivaNetoMes) : "—", prev ? fmtCLP(cmp(k.ivaNetoMes, prev.ivaNetoMes).diff) : "—"),
+      ],
+      theme: "grid",
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: PDF_NAVY },
+      columnStyles: { 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" } },
+    })
+
+    // ── Estado de Resultados (cascada) ────────────────────────────────────────
+    y = afterTable() + 10
+    doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(...PDF_NAVY)
+    doc.text("Estado de Resultados", 14, y)
+    doc.setFont("helvetica", "normal"); doc.setTextColor(0, 0, 0)
+    autoTable(doc, {
+      startY: y + 4,
+      head: [["Concepto", "Monto"]],
+      body: [
+        ["Ingresos facturados", fmtCLP(k.ingresoFacturado)],
+        ["(−) Costos directos", `-${fmtCLP(k.costosDirectos)}`],
+        ["= Margen de contribución", fmtCLP(k.margenContribucion)],
+        ["(−) Sueldos devengados", `-${fmtCLP(k.sueldosDevengados)}`],
+        ["(−) Gastos operacionales", `-${fmtCLP(k.gastosTabla)}`],
+        ["= Utilidad neta", fmtCLP(k.utilidadNeta)],
+      ],
+      theme: "striped",
+      headStyles: { fillColor: PDF_NAVY },
+      columnStyles: { 1: { halign: "right" } },
+    })
+
+    // ── IVA ────────────────────────────────────────────────────────────────────
+    y = afterTable() + 10
+    doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(...PDF_NAVY)
+    doc.text("IVA del mes (criterio SII por fecha de facturación)", 14, y)
+    doc.setFont("helvetica", "normal"); doc.setTextColor(0, 0, 0)
+    autoTable(doc, {
+      startY: y + 4,
+      body: [
+        ["IVA Débito (ventas)", fmtCLP(k.ivaDebitoMes)],
+        ["IVA Crédito (compras c/factura)", fmtCLP(k.ivaCreditoMes)],
+        ["IVA Neto a pagar", fmtCLP(k.ivaNetoMes)],
+      ],
+      theme: "grid",
+      columnStyles: { 1: { halign: "right" } },
+    })
+
+    // ── Anexo A: servicios del mes (agrupados por estado) ─────────────────────
+    doc.addPage()
+    y = brandHeader("Anexo A: Servicios del Mes")
     doc.setFontSize(8)
     doc.setTextColor(100)
-    doc.text("Agrupados por estado, ordenados por fecha", 14, 26)
+    doc.text("Agrupados por estado, ordenados por fecha", 14, y)
     doc.setTextColor(0)
+    y += 4
 
     // Agrupar por estado y ordenar grupos por monto total descendente
     const grupos = new Map<string, Servicio[]>()
     for (const s of servicios) {
-      const k = s.estado || "Sin estado"
-      if (!grupos.has(k)) grupos.set(k, [])
-      grupos.get(k)!.push(s)
+      const est = s.estado || "Sin estado"
+      if (!grupos.has(est)) grupos.set(est, [])
+      grupos.get(est)!.push(s)
     }
     const gruposOrdenados = [...grupos.entries()]
       .map(([estado, items]) => ({
@@ -565,30 +936,31 @@ export default function ReportsPage() {
     ])
 
     autoTable(doc, {
-      startY: 32,
+      startY: y,
       head: [["Fecha", "Patente", "Cliente", "Marca/Modelo", "Estado", "Monto"]],
       body: bodyServicios,
       theme: "striped",
       styles: { fontSize: 7 },
       headStyles: { fillColor: [15, 23, 42] },
       columnStyles: { 5: { halign: "right" } },
+      margin: { top: 28 },
     })
 
-    // ── Anexo: gastos del mes (agrupados por categoría) ──────────────────────
+    // ── Anexo B: gastos del mes (agrupados por categoría) ─────────────────────
     if (gastos.length > 0) {
       doc.addPage()
-      doc.setFontSize(14)
-      doc.text("Anexo B: Gastos del Mes", 14, 20)
+      y = brandHeader("Anexo B: Gastos del Mes")
       doc.setFontSize(8)
       doc.setTextColor(100)
-      doc.text("Agrupados por categoría, ordenados por fecha", 14, 26)
+      doc.text("Agrupados por categoría, ordenados por fecha", 14, y)
       doc.setTextColor(0)
+      y += 4
 
       const cats = new Map<string, Gasto[]>()
       for (const g of gastos) {
-        const k = g.categoria || "Sin categoría"
-        if (!cats.has(k)) cats.set(k, [])
-        cats.get(k)!.push(g)
+        const cat = g.categoria || "Sin categoría"
+        if (!cats.has(cat)) cats.set(cat, [])
+        cats.get(cat)!.push(g)
       }
       const categoriasOrdenadas = [...cats.entries()]
         .map(([categoria, items]) => ({
@@ -632,22 +1004,22 @@ export default function ReportsPage() {
       ])
 
       autoTable(doc, {
-        startY: 32,
+        startY: y,
         head: [["Fecha", "Categoría", "Descripción", "Doc.", "Monto"]],
         body: bodyGastos,
         theme: "striped",
         styles: { fontSize: 7 },
         headStyles: { fillColor: [15, 23, 42] },
         columnStyles: { 4: { halign: "right" } },
+        margin: { top: 28 },
       })
     }
 
-    // ── Anexo: definiciones ───────────────────────────────────────────────────
+    // ── Anexo C: definiciones ─────────────────────────────────────────────────
     doc.addPage()
-    doc.setFontSize(14)
-    doc.text("Anexo C: Definiciones de KPIs", 14, 20)
+    y = brandHeader("Anexo C: Definiciones de KPIs")
     autoTable(doc, {
-      startY: 26,
+      startY: y,
       head: [["Indicador", "Definición"]],
       body: [
         ["Ingresos Cobrados", "Suma de monto_total_sin_iva de servicios cerrados/pagados."],
@@ -666,7 +1038,17 @@ export default function ReportsPage() {
       theme: "grid",
       styles: { fontSize: 8 },
       columnStyles: { 1: { cellWidth: 130 } },
+      margin: { top: 28 },
     })
+
+    // ── Pie de página con numeración (en todas menos la portada) ──────────────
+    const totalPages = doc.getNumberOfPages()
+    for (let i = 2; i <= totalPages; i++) {
+      doc.setPage(i)
+      doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(...PDF_GRIS)
+      doc.text(`Reporte Gerencial · ${periodo} · Generado ${today}`, 14, 290)
+      doc.text(`Página ${i - 1} de ${totalPages - 1}`, pageWidth - 14, 290, { align: "right" })
+    }
 
     doc.save(`reporte-gerencial-${selectedMonth}.pdf`)
   }
@@ -718,6 +1100,44 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
+      {/* Gráficos ocultos, siempre montados, para capturar al PDF (no dependen
+          de la pestaña activa). Posicionados fuera de pantalla. */}
+      <div aria-hidden style={{ position: "absolute", left: -99999, top: 0, pointerEvents: "none" }}>
+        <div ref={pieChartRef} style={{ width: 520, height: 320, background: "#fff" }}>
+          {gastosChartData.length > 0 && (
+            <PieChart width={520} height={320}>
+              <Pie
+                data={gastosChartData}
+                cx="50%"
+                cy="50%"
+                innerRadius={70}
+                outerRadius={120}
+                paddingAngle={2}
+                dataKey="value"
+                isAnimationActive={false}
+                label={({ name, percent }: any) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
+                labelLine={false}
+              >
+                {gastosChartData.map((entry, index) => (
+                  <Cell key={`pdf-cell-${index}`} fill={entry.color} />
+                ))}
+              </Pie>
+            </PieChart>
+          )}
+        </div>
+        <div ref={barChartRef} style={{ width: 640, height: 340, background: "#fff" }}>
+          {rentabilidadPorCategoria.length > 0 && (
+            <BarChart width={640} height={340} data={rentabilidadPorCategoria} margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+              <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => fmtCLP(Number(v))} width={90} />
+              <Bar dataKey="cobros" fill="#1a4ed8" radius={[4, 4, 0, 0]} name="Entró" isAnimationActive={false} />
+              <Bar dataKey="costos" fill="#dc2626" radius={[4, 4, 0, 0]} name="Costó" isAnimationActive={false} />
+            </BarChart>
+          )}
+        </div>
+      </div>
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -737,7 +1157,14 @@ export default function ReportsPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={exportarPDF}>
+              <DropdownMenuItem
+                onClick={() =>
+                  exportarPDF().catch((e) => {
+                    console.error(e)
+                    alert("No se pudo generar el PDF. Intenta de nuevo.")
+                  })
+                }
+              >
                 <Download className="w-4 h-4 mr-2" />
                 Reporte Gerencial PDF
               </DropdownMenuItem>
