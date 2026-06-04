@@ -49,6 +49,7 @@ const PDF_ROJO: RGB = [220, 38, 38]      // semáforo "atención"
 const PDF_AMBAR: RGB = [217, 119, 6]     // por cobrar
 const PDF_GRIS: RGB = [100, 100, 100]
 const PDF_FILL: RGB = [241, 245, 249]    // relleno suave
+const PDF_HEAD: RGB = [226, 232, 240]    // encabezados de tabla claros (para imprimir)
 
 const capitalize = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s)
 
@@ -542,10 +543,11 @@ export default function ReportsPage() {
     doc.setFont("helvetica", "normal"); doc.setFontSize(14)
     doc.setTextColor(...PDF_GRIS)
     doc.text("Cómo le fue al taller este mes", pageWidth / 2, 142, { align: "center" })
-    // Banda de período
-    doc.setFillColor(...PDF_AZUL)
-    doc.roundedRect((pageWidth - 110) / 2, 160, 110, 18, 3, 3, "F")
-    doc.setTextColor(255, 255, 255)
+    // Banda de período (clara, con borde azul)
+    doc.setFillColor(255, 255, 255); doc.setDrawColor(...PDF_AZUL); doc.setLineWidth(0.6)
+    doc.roundedRect((pageWidth - 110) / 2, 160, 110, 18, 3, 3, "FD")
+    doc.setLineWidth(0.2)
+    doc.setTextColor(...PDF_AZUL)
     doc.setFont("helvetica", "bold"); doc.setFontSize(16)
     doc.text(periodo, pageWidth / 2, 172, { align: "center" })
     doc.setFont("helvetica", "normal"); doc.setFontSize(10)
@@ -560,11 +562,13 @@ export default function ReportsPage() {
     doc.addPage()
     let y = brandHeader("¿Cómo le fue este mes?")
 
-    // Veredicto destacado
+    // Veredicto destacado (recuadro blanco con borde y texto de color, para imprimir)
     const gano = quedo >= 0
-    doc.setFillColor(...(gano ? PDF_VERDE : PDF_ROJO))
-    doc.roundedRect(14, y, pageWidth - 28, 24, 3, 3, "F")
-    doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(17)
+    const vColor = gano ? PDF_VERDE : PDF_ROJO
+    doc.setFillColor(255, 255, 255); doc.setDrawColor(...vColor); doc.setLineWidth(0.8)
+    doc.roundedRect(14, y, pageWidth - 28, 24, 3, 3, "FD")
+    doc.setLineWidth(0.2)
+    doc.setTextColor(...vColor); doc.setFont("helvetica", "bold"); doc.setFontSize(17)
     doc.text(
       gano
         ? `Este mes el taller GANÓ ${fmtCLP(quedo)}`
@@ -704,7 +708,7 @@ export default function ReportsPage() {
         ]),
         foot: [["Total", fmtCLP(totalGastosChart), "100%"]],
         theme: "striped",
-        headStyles: { fillColor: PDF_NAVY },
+        headStyles: { fillColor: PDF_HEAD, textColor: PDF_NAVY },
         footStyles: { fillColor: PDF_FILL, textColor: PDF_NAVY, fontStyle: "bold" },
         columnStyles: { 1: { halign: "right" }, 2: { halign: "right" } },
       })
@@ -732,7 +736,7 @@ export default function ReportsPage() {
         ]),
         theme: "striped",
         styles: { fontSize: 8 },
-        headStyles: { fillColor: PDF_NAVY },
+        headStyles: { fillColor: PDF_HEAD, textColor: PDF_NAVY },
         columnStyles: { 4: { halign: "right" } },
         // Resalta en rojo las deudas de más de 30 días.
         didParseCell: (data: any) => {
@@ -759,7 +763,7 @@ export default function ReportsPage() {
         body: rentabilidadPorCategoria.map((r) => [r.label, fmtCLP(r.cobros), fmtCLP(r.costos), fmtCLP(r.margen)]),
         foot: [["Total", fmtCLP(rentCatTotales.cobros), fmtCLP(rentCatTotales.costos), fmtCLP(rentCatTotales.margen)]],
         theme: "striped",
-        headStyles: { fillColor: PDF_NAVY },
+        headStyles: { fillColor: PDF_HEAD, textColor: PDF_NAVY },
         footStyles: { fillColor: PDF_FILL, textColor: PDF_NAVY, fontStyle: "bold" },
         columnStyles: { 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" } },
       })
@@ -778,7 +782,7 @@ export default function ReportsPage() {
           body: topClientesCobrado.map((c, i) => [String(i + 1), c.cliente, String(c.count), fmtCLP(c.total)]),
           theme: "striped",
           styles: { fontSize: 8 },
-          headStyles: { fillColor: PDF_NAVY },
+          headStyles: { fillColor: PDF_HEAD, textColor: PDF_NAVY },
           columnStyles: { 0: { cellWidth: 10 }, 2: { halign: "center" }, 3: { halign: "right" } },
         })
         y = afterTable() + 8
@@ -792,7 +796,7 @@ export default function ReportsPage() {
           body: topClientesFacturado.map((c, i) => [String(i + 1), c.cliente, String(c.count), fmtCLP(c.total)]),
           theme: "striped",
           styles: { fontSize: 8 },
-          headStyles: { fillColor: PDF_NAVY },
+          headStyles: { fillColor: PDF_HEAD, textColor: PDF_NAVY },
           columnStyles: { 0: { cellWidth: 10 }, 2: { halign: "center" }, 3: { halign: "right" } },
         })
       }
@@ -812,7 +816,7 @@ export default function ReportsPage() {
           foot: [["Total", "", String(totalUnidadesPintura), fmtCLP(ingresosPiezas)]],
           theme: "striped",
           styles: { fontSize: 8 },
-          headStyles: { fillColor: PDF_NAVY },
+          headStyles: { fillColor: PDF_HEAD, textColor: PDF_NAVY },
           footStyles: { fillColor: PDF_FILL, textColor: PDF_NAVY, fontStyle: "bold" },
           columnStyles: { 1: { halign: "center" }, 2: { halign: "center" }, 3: { halign: "right" } },
         })
@@ -829,7 +833,7 @@ export default function ReportsPage() {
           ]),
           theme: "striped",
           styles: { fontSize: 8 },
-          headStyles: { fillColor: PDF_NAVY },
+          headStyles: { fillColor: PDF_HEAD, textColor: PDF_NAVY },
           columnStyles: { 1: { halign: "center" }, 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" }, 5: { halign: "right" } },
         })
       }
@@ -839,12 +843,14 @@ export default function ReportsPage() {
     // ANEXOS TÉCNICOS (parte contable) — separados de la lectura simple
     // ════════════════════════════════════════════════════════════════════════
     doc.addPage()
-    doc.setFillColor(...PDF_NAVY)
-    doc.rect(0, 0, pageWidth, 297, "F")
-    doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(26)
+    // Línea azul de marca sobre el título (fondo blanco para imprimir)
+    doc.setDrawColor(...PDF_AZUL); doc.setLineWidth(1)
+    doc.line((pageWidth - 80) / 2, 128, (pageWidth + 80) / 2, 128)
+    doc.setLineWidth(0.2)
+    doc.setTextColor(...PDF_NAVY); doc.setFont("helvetica", "bold"); doc.setFontSize(26)
     doc.text("Anexos técnicos", pageWidth / 2, 140, { align: "center" })
     doc.setFont("helvetica", "normal"); doc.setFontSize(12)
-    doc.setTextColor(200, 210, 225)
+    doc.setTextColor(...PDF_GRIS)
     doc.text("Detalle contable e indicadores de gestión", pageWidth / 2, 152, { align: "center" })
 
     // ── Resumen Ejecutivo (KPIs) + comparación con mes anterior ───────────────
@@ -873,7 +879,7 @@ export default function ReportsPage() {
       ],
       theme: "grid",
       styles: { fontSize: 8 },
-      headStyles: { fillColor: PDF_NAVY },
+      headStyles: { fillColor: PDF_HEAD, textColor: PDF_NAVY },
       columnStyles: { 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" } },
     })
 
@@ -894,7 +900,7 @@ export default function ReportsPage() {
         ["= Utilidad neta", fmtCLP(k.utilidadNeta)],
       ],
       theme: "striped",
-      headStyles: { fillColor: PDF_NAVY },
+      headStyles: { fillColor: PDF_HEAD, textColor: PDF_NAVY },
       columnStyles: { 1: { halign: "right" } },
     })
 
@@ -946,7 +952,7 @@ export default function ReportsPage() {
         {
           content: `${g.estado.toUpperCase()} — ${g.items.length} servicio${g.items.length !== 1 ? "s" : ""}`,
           colSpan: 6,
-          styles: { fillColor: [37, 99, 235], textColor: 255, fontStyle: "bold", fontSize: 8 },
+          styles: { fillColor: [219, 234, 254], textColor: [30, 64, 175], fontStyle: "bold", fontSize: 8 },
         },
       ])
       for (const s of g.items) {
@@ -971,9 +977,9 @@ export default function ReportsPage() {
       {
         content: `TOTAL ${servicios.length} servicios`,
         colSpan: 5,
-        styles: { halign: "right", fontStyle: "bold", fillColor: [15, 23, 42], textColor: 255 },
+        styles: { halign: "right", fontStyle: "bold", fillColor: PDF_HEAD, textColor: PDF_NAVY },
       },
-      { content: fmtCLP(totalGeneral), styles: { halign: "right", fontStyle: "bold", fillColor: [15, 23, 42], textColor: 255 } },
+      { content: fmtCLP(totalGeneral), styles: { halign: "right", fontStyle: "bold", fillColor: PDF_HEAD, textColor: PDF_NAVY } },
     ])
 
     autoTable(doc, {
@@ -982,7 +988,7 @@ export default function ReportsPage() {
       body: bodyServicios,
       theme: "striped",
       styles: { fontSize: 7 },
-      headStyles: { fillColor: [15, 23, 42] },
+      headStyles: { fillColor: PDF_HEAD, textColor: PDF_NAVY },
       columnStyles: { 5: { halign: "right" } },
       margin: { top: 28 },
     })
@@ -1017,7 +1023,7 @@ export default function ReportsPage() {
           {
             content: `${c.categoria.toUpperCase()} — ${c.items.length} ítem${c.items.length !== 1 ? "s" : ""}`,
             colSpan: 5,
-            styles: { fillColor: [245, 158, 11], textColor: 255, fontStyle: "bold", fontSize: 8 },
+            styles: { fillColor: [254, 243, 199], textColor: [146, 64, 14], fontStyle: "bold", fontSize: 8 },
           },
         ])
         for (const g of c.items) {
@@ -1039,9 +1045,9 @@ export default function ReportsPage() {
         {
           content: `TOTAL ${gastos.length} gastos`,
           colSpan: 4,
-          styles: { halign: "right", fontStyle: "bold", fillColor: [15, 23, 42], textColor: 255 },
+          styles: { halign: "right", fontStyle: "bold", fillColor: PDF_HEAD, textColor: PDF_NAVY },
         },
-        { content: fmtCLP(totalGastos), styles: { halign: "right", fontStyle: "bold", fillColor: [15, 23, 42], textColor: 255 } },
+        { content: fmtCLP(totalGastos), styles: { halign: "right", fontStyle: "bold", fillColor: PDF_HEAD, textColor: PDF_NAVY } },
       ])
 
       autoTable(doc, {
@@ -1050,7 +1056,7 @@ export default function ReportsPage() {
         body: bodyGastos,
         theme: "striped",
         styles: { fontSize: 7 },
-        headStyles: { fillColor: [15, 23, 42] },
+        headStyles: { fillColor: PDF_HEAD, textColor: PDF_NAVY },
         columnStyles: { 4: { halign: "right" } },
         margin: { top: 28 },
       })
