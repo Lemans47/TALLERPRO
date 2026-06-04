@@ -58,7 +58,14 @@ export async function GET() {
       gastos_mes AS (
         SELECT
           date_trunc('month', fecha::date)::date AS mes,
-          COALESCE(SUM(monto), 0) AS total
+          -- Gastos fijos de la tabla (Luz, Agua, etc.)
+          COALESCE(SUM(monto) FILTER (WHERE categoria = 'Gastos Fijos'), 0) AS fijos,
+          -- Resto de gastos (misceláneos, pintura, sin categoría): todo lo que no es
+          -- Sueldos ni Gastos Fijos cae en operativos, incluso categorías futuras.
+          COALESCE(SUM(monto) FILTER (
+            WHERE categoria IS DISTINCT FROM 'Sueldos'
+              AND categoria IS DISTINCT FROM 'Gastos Fijos'
+          ), 0) AS operativos
         FROM gastos
         WHERE categoria IS DISTINCT FROM 'Sueldos'
           AND fecha::date >= (date_trunc('month', CURRENT_DATE) - INTERVAL '5 months')::date
@@ -74,7 +81,8 @@ export async function GET() {
         COALESCE(s.facturado, 0)::float AS facturado,
         COALESCE(s.cobrado, 0)::float AS cobrado,
         COALESCE(s.costos_internos, 0)::float AS costos_internos,
-        COALESCE(g.total, 0)::float AS gastos_operativos,
+        COALESCE(g.fijos, 0)::float AS gastos_fijos_tabla,
+        COALESCE(g.operativos, 0)::float AS gastos_operativos_tabla,
         sueldos.total::float AS sueldos_comprometidos,
         COALESCE(s.count_servicios, 0)::int AS count_servicios
       FROM meses m

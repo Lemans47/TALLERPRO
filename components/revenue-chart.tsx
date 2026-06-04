@@ -9,6 +9,46 @@ type Modo = "facturado" | "cobrado"
 const MONTH_NAMES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
 const START = "2026-04"
 
+const fmtCLP = (v: number) => `$${Math.round(v).toLocaleString("es-CL")}`
+
+interface RevenueDatum {
+  mes: string
+  ingresos: number
+  gastosFijos: number
+  gastosOperativos: number
+  gastosTotal: number
+  margen: number
+}
+
+function RevenueTooltip({ active, payload }: { active?: boolean; payload?: { payload: RevenueDatum }[] }) {
+  if (!active || !payload?.length) return null
+  const d = payload[0].payload
+  const Row = ({ color, label, value }: { color: string; label: string; value: string }) => (
+    <div className="flex items-center justify-between gap-6">
+      <span className="flex items-center gap-2 text-muted-foreground">
+        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
+        {label}
+      </span>
+      <span className="font-medium text-foreground tabular-nums">{value}</span>
+    </div>
+  )
+  return (
+    <div
+      className="rounded-xl bg-white p-3 text-xs space-y-1.5"
+      style={{ border: "1px solid #e1e8f4", boxShadow: "0 4px 12px rgb(13 27 62 / 0.08)" }}
+    >
+      <div className="font-semibold text-sm mb-1" style={{ color: "#0d1b3e" }}>{d.mes}</div>
+      <Row color="#1a4ed8" label="Ingresos" value={fmtCLP(d.ingresos)} />
+      <Row color="#b91c1c" label="Gastos Fijos" value={fmtCLP(d.gastosFijos)} />
+      <Row color="#f59e0b" label="Gastos Operativos" value={fmtCLP(d.gastosOperativos)} />
+      <div className="pt-1 mt-1 border-t border-border">
+        <Row color="#94a3b8" label="Gastos Total" value={fmtCLP(d.gastosTotal)} />
+      </div>
+      <Row color="#16a34a" label="Margen" value={`${d.margen}%`} />
+    </div>
+  )
+}
+
 export function RevenueChart() {
   const [modo, setModo] = useState<Modo>("facturado")
   const [rows, setRows] = useState<ChartMonthlyRow[]>([])
@@ -34,10 +74,14 @@ export function RevenueChart() {
       .filter((r) => r.mes >= START)
       .map((r) => {
         const ingresos = Math.round(modo === "facturado" ? Number(r.facturado) : Number(r.cobrado))
-        const gastosVal = Math.round(Number(r.costos_internos) + Number(r.gastos_operativos) + Number(r.sueldos_comprometidos))
-        const margen = ingresos > 0 ? Math.round(((ingresos - gastosVal) / ingresos) * 100) : 0
+        // Fijos = sueldos devengados + gastos fijos de la tabla.
+        const gastosFijos = Math.round(Number(r.sueldos_comprometidos) + Number(r.gastos_fijos_tabla))
+        // Operativos = costos por servicio + gastos misceláneos/pintura.
+        const gastosOperativos = Math.round(Number(r.costos_internos) + Number(r.gastos_operativos_tabla))
+        const gastosTotal = gastosFijos + gastosOperativos
+        const margen = ingresos > 0 ? Math.round(((ingresos - gastosTotal) / ingresos) * 100) : 0
         const monthNum = Number.parseInt(r.mes.split("-")[1])
-        return { mes: MONTH_NAMES[monthNum - 1], ingresos, gastos: gastosVal, margen }
+        return { mes: MONTH_NAMES[monthNum - 1], ingresos, gastosFijos, gastosOperativos, gastosTotal, margen }
       })
   }, [rows, modo])
 
@@ -75,15 +119,19 @@ export function RevenueChart() {
         </div>
         <div className="flex items-center gap-4 text-sm">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-primary" />
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "#1a4ed8" }} />
             <span className="text-muted-foreground">Ingresos</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-destructive" />
-            <span className="text-muted-foreground">Gastos</span>
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "#b91c1c" }} />
+            <span className="text-muted-foreground">Gastos Fijos</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-success" />
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "#f59e0b" }} />
+            <span className="text-muted-foreground">Gastos Operativos</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "#16a34a" }} />
             <span className="text-muted-foreground">Margen %</span>
           </div>
         </div>
@@ -126,24 +174,10 @@ export function RevenueChart() {
               axisLine={false}
               tickLine={false}
             />
-            <Tooltip
-              formatter={(value, name) => {
-                const v = Number(value)
-                if (name === "margen") return [`${v}%`, "Margen"]
-                if (name === "ingresos") return [`$${v.toLocaleString("es-CL")}`, "Ingresos"]
-                return [`$${v.toLocaleString("es-CL")}`, "Gastos"]
-              }}
-              contentStyle={{
-                backgroundColor: "#ffffff",
-                border: "1px solid #e1e8f4",
-                borderRadius: "12px",
-                boxShadow: "0 4px 12px rgb(13 27 62 / 0.08)",
-              }}
-              labelStyle={{ color: "#0d1b3e", fontWeight: 600 }}
-              cursor={{ fill: "#e1e8f4", opacity: 0.5 }}
-            />
+            <Tooltip content={<RevenueTooltip />} cursor={{ fill: "#e1e8f4", opacity: 0.5 }} />
             <Bar yAxisId="left" dataKey="ingresos" fill="#1a4ed8" radius={[6, 6, 0, 0]} />
-            <Bar yAxisId="left" dataKey="gastos" fill="#dc2626" radius={[6, 6, 0, 0]} />
+            <Bar yAxisId="left" dataKey="gastosFijos" stackId="gastos" fill="#b91c1c" />
+            <Bar yAxisId="left" dataKey="gastosOperativos" stackId="gastos" fill="#f59e0b" radius={[6, 6, 0, 0]} />
             <Line
               yAxisId="right"
               dataKey="margen"
