@@ -35,8 +35,11 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   try {
     const body = await request.json()
-    const { id, cantidad_piezas } = body
-    const updated = await updatePiezaPintura(id, cantidad_piezas)
+    const { id, cantidad_piezas, nombre } = body
+    if (nombre !== undefined && !String(nombre).trim()) {
+      return NextResponse.json({ error: "El nombre de la pieza es requerido" }, { status: 400 })
+    }
+    const updated = await updatePiezaPintura(id, { cantidad_piezas, nombre })
     return NextResponse.json(updated)
   } catch (error: any) {
     console.error("Error updating pieza pintura:", error)

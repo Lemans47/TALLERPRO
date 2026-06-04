@@ -58,6 +58,7 @@ export default function ConfiguracionPage() {
   const [aplicandoPromedio, setAplicandoPromedio] = useState(false)
   const [nuevaPieza, setNuevaPieza] = useState({ nombre: "", cantidad_piezas: "1" })
   const [savingPiezas, setSavingPiezas] = useState(false)
+  const [editingNombrePieza, setEditingNombrePieza] = useState<Record<string, string>>({})
   const { toast } = useToast()
   const router = useRouter()
   const { role: myRole } = useAuth()
@@ -237,10 +238,23 @@ export default function ConfiguracionPage() {
 
   const handleUpdateCantidadPieza = async (id: string, cantidad: number) => {
     try {
-      await api.piezasPintura.update(id, cantidad)
+      await api.piezasPintura.update(id, { cantidad_piezas: cantidad })
       await loadData()
     } catch (error) {
       toast({ title: "Error", description: "No se pudo actualizar la cantidad", variant: "destructive" })
+    }
+  }
+
+  const handleSaveNombrePieza = async (id: string, nombreActual: string) => {
+    const nombre = editingNombrePieza[id]?.trim()
+    setEditingNombrePieza((p) => { const n = { ...p }; delete n[id]; return n })
+    if (!nombre || nombre === nombreActual) return
+    try {
+      await api.piezasPintura.update(id, { nombre })
+      await loadData()
+      toast({ title: "Pieza actualizada" })
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "No se pudo actualizar el nombre", variant: "destructive" })
     }
   }
 
@@ -653,7 +667,21 @@ export default function ConfiguracionPage() {
                       key={pieza.id}
                       className="flex items-center gap-3 p-3 bg-secondary/30 rounded-lg border border-border"
                     >
-                      <span className="flex-1 font-medium text-sm text-foreground">{pieza.nombre}</span>
+                      <Input
+                        value={editingNombrePieza[pieza.id] ?? pieza.nombre}
+                        onChange={(e) =>
+                          setEditingNombrePieza((p) => ({ ...p, [pieza.id]: e.target.value }))
+                        }
+                        onBlur={() => handleSaveNombrePieza(pieza.id, pieza.nombre)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") e.currentTarget.blur()
+                          if (e.key === "Escape") {
+                            setEditingNombrePieza((p) => { const n = { ...p }; delete n[pieza.id]; return n })
+                            e.currentTarget.blur()
+                          }
+                        }}
+                        className="flex-1 bg-background border-border font-medium text-sm text-foreground"
+                      />
                       <div className="flex items-center gap-2">
                         <Label className="text-xs text-muted-foreground">Cantidad:</Label>
                         <Input

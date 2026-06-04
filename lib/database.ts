@@ -1042,18 +1042,46 @@ export async function createPiezaPintura(nombre: string, cantidad_piezas: number
   }
 }
 
-export async function updatePiezaPintura(id: string, cantidad_piezas: number) {
+export async function updatePiezaPintura(
+  id: string,
+  patch: { cantidad_piezas?: number; nombre?: string },
+) {
   try {
     const db = getSQL()
-    const data = await db`
-      UPDATE piezas_pintura 
-      SET cantidad_piezas = ${cantidad_piezas}, updated_at = NOW() 
-      WHERE id = ${id} 
-      RETURNING *
-    `
+    const hasCantidad = patch.cantidad_piezas !== undefined
+    const hasNombre = patch.nombre !== undefined
+    if (!hasCantidad && !hasNombre) {
+      return await getPiezaPintura(id)
+    }
+    let data
+    if (hasCantidad && hasNombre) {
+      data = await db`
+        UPDATE piezas_pintura
+        SET cantidad_piezas = ${patch.cantidad_piezas!}, nombre = ${patch.nombre!.trim()}, updated_at = NOW()
+        WHERE id = ${id}
+        RETURNING *
+      `
+    } else if (hasNombre) {
+      data = await db`
+        UPDATE piezas_pintura
+        SET nombre = ${patch.nombre!.trim()}, updated_at = NOW()
+        WHERE id = ${id}
+        RETURNING *
+      `
+    } else {
+      data = await db`
+        UPDATE piezas_pintura
+        SET cantidad_piezas = ${patch.cantidad_piezas!}, updated_at = NOW()
+        WHERE id = ${id}
+        RETURNING *
+      `
+    }
     return data[0] as PiezaPintura
   } catch (error: any) {
     console.error("[v0] Error updating pieza_pintura:", error?.message)
+    if (error?.code === "23505") {
+      throw new Error("Ya existe una pieza con ese nombre")
+    }
     throw error
   }
 }
