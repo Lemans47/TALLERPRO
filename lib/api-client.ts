@@ -81,9 +81,10 @@ export interface ChartMonthlyRow {
   mes: string // YYYY-MM
   facturado: number
   cobrado: number
-  costos_internos: number
-  gastos_operativos: number
-  sueldos_comprometidos: number
+  costos_internos: number // costos por servicio (operativo)
+  gastos_fijos_tabla: number // gastos.categoria = 'Gastos Fijos'
+  gastos_operativos_tabla: number // gastos no-Sueldos no-Fijos (misceláneos, pintura, etc.)
+  sueldos_comprometidos: number // sueldos devengados (fijo)
   count_servicios: number
 }
 
