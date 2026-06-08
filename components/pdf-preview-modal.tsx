@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useEffect, useState, useCallback } from "react"
+import { useRef, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Download, Printer, X } from "lucide-react"
 
@@ -10,31 +10,18 @@ interface PDFPreviewModalProps {
   onClose: () => void
 }
 
-function isMobileOrTablet() {
-  if (typeof navigator === "undefined") return false
-  return /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-    (navigator.userAgent.includes("Macintosh") && "ontouchend" in document)
-}
-
 export function PDFPreviewModal({ url, fileName, onClose }: PDFPreviewModalProps) {
-  const iframeRef = useRef<HTMLIFrameElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const [isMobile, setIsMobile] = useState(false)
   const [pages, setPages] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Render PDF pages to canvas images on every platform.
+  // Relying on the browser's native <iframe> PDF viewer is unreliable: when the
+  // browser is configured to download PDFs (or PDFium is disabled) the iframe shows
+  // a generic "open file" placeholder instead of the document. Rendering with pdf.js
+  // guarantees a consistent preview regardless of browser settings.
   useEffect(() => {
-    setIsMobile(isMobileOrTablet())
-  }, [])
-
-  // Render PDF pages to canvas images on mobile
-  useEffect(() => {
-    if (!isMobile) {
-      setLoading(false)
-      return
-    }
-
     let cancelled = false
 
     async function renderPDF() {
@@ -77,7 +64,7 @@ export function PDFPreviewModal({ url, fileName, onClose }: PDFPreviewModalProps
 
     renderPDF()
     return () => { cancelled = true }
-  }, [isMobile, url])
+  }, [url])
 
   // Revoke blob URL on unmount
   useEffect(() => {
@@ -94,11 +81,30 @@ export function PDFPreviewModal({ url, fileName, onClose }: PDFPreviewModalProps
   }
 
   const handlePrint = () => {
-    if (isMobile) {
-      // On mobile, open blob URL in new tab for native print
+    // Print via a temporary hidden iframe so it works regardless of the visible
+    // viewer being canvas-based. Falls back to opening the PDF in a new tab.
+    try {
+      const frame = document.createElement("iframe")
+      frame.style.position = "fixed"
+      frame.style.right = "0"
+      frame.style.bottom = "0"
+      frame.style.width = "0"
+      frame.style.height = "0"
+      frame.style.border = "0"
+      frame.src = url
+      frame.onload = () => {
+        try {
+          frame.contentWindow?.focus()
+          frame.contentWindow?.print()
+        } catch {
+          window.open(url, "_blank")
+        }
+        // Clean up after the print dialog has had time to open
+        setTimeout(() => frame.remove(), 60000)
+      }
+      document.body.appendChild(frame)
+    } catch {
       window.open(url, "_blank")
-    } else {
-      iframeRef.current?.contentWindow?.print()
     }
   }
 
@@ -140,41 +146,32 @@ export function PDFPreviewModal({ url, fileName, onClose }: PDFPreviewModalProps
 
       {/* PDF Viewer */}
       <div className="flex-1 bg-muted/30 overflow-auto" ref={containerRef}>
-        {isMobile ? (
-          loading ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center space-y-3">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
-                <p className="text-sm text-muted-foreground">Cargando PDF...</p>
-              </div>
+        {loading ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center space-y-3">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
+              <p className="text-sm text-muted-foreground">Cargando PDF...</p>
             </div>
-          ) : error ? (
-            <div className="flex flex-col items-center justify-center h-full gap-4">
-              <p className="text-sm text-muted-foreground">{error}</p>
-              <Button size="sm" onClick={handleDownload}>
-                <Download className="w-4 h-4 mr-2" />
-                Descargar PDF
-              </Button>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-4 p-4">
-              {pages.map((src, i) => (
-                <img
-                  key={i}
-                  src={src}
-                  alt={`Página ${i + 1}`}
-                  className="w-full max-w-[600px] shadow-lg rounded"
-                />
-              ))}
-            </div>
-          )
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center h-full gap-4">
+            <p className="text-sm text-muted-foreground">{error}</p>
+            <Button size="sm" onClick={handleDownload}>
+              <Download className="w-4 h-4 mr-2" />
+              Descargar PDF
+            </Button>
+          </div>
         ) : (
-          <iframe
-            ref={iframeRef}
-            src={url}
-            className="w-full h-full border-0"
-            title="Vista previa del PDF"
-          />
+          <div className="flex flex-col items-center gap-4 p-4">
+            {pages.map((src, i) => (
+              <img
+                key={i}
+                src={src}
+                alt={`Página ${i + 1}`}
+                className="w-full max-w-[800px] shadow-lg rounded bg-white"
+              />
+            ))}
+          </div>
         )}
       </div>
     </div>
