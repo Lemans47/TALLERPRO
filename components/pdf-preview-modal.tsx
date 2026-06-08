@@ -33,7 +33,10 @@ export function PDFPreviewModal({ url, fileName, onClose }: PDFPreviewModalProps
         const pdf = await loadingTask.promise
 
         const rendered: string[] = []
-        const scale = window.devicePixelRatio >= 2 ? 2 : 1.5
+        // Render at high resolution so the preview stays sharp. The images are
+        // displayed at ~800px CSS width, so we render well above that and let the
+        // browser downscale. Cap by devicePixelRatio to avoid oversized canvases.
+        const scale = Math.min(3, 2 * (window.devicePixelRatio || 1))
 
         for (let i = 1; i <= pdf.numPages; i++) {
           if (cancelled) return
@@ -46,6 +49,7 @@ export function PDFPreviewModal({ url, fileName, onClose }: PDFPreviewModalProps
           const ctx = canvas.getContext("2d")!
 
           await page.render({ canvas, canvasContext: ctx, viewport } as any).promise
+          // PNG keeps text/line edges crisp; JPEG would blur thin table rules.
           rendered.push(canvas.toDataURL("image/png"))
         }
 
