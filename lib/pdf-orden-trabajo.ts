@@ -143,7 +143,7 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
     { h: "MODELO", w: 32, v: servicio.modelo || "" },
     { h: "COLOR", w: 22, v: servicio.color || "" },
     { h: "A\xD1O", w: 18, v: servicio.año?.toString() || "" },
-    { h: "KILOMETRAJE", w: 30, v: servicio.kilometraje?.toString() || "" },
+    { h: "KILOMETRAJE", w: 30, v: servicio.kilometraje != null ? Number(servicio.kilometraje).toLocaleString("es-CL") : "" },
     { h: "N\xB0 MOTOR", w: CW - 158, v: "" },
   ]
   let vx = ML
