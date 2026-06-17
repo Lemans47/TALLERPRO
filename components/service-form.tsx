@@ -1427,12 +1427,14 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                   <div className="space-y-1">
                     <Label className="text-xs">Kilometraje</Label>
                     <Input
-                      type="number"
-                      value={formData.kilometraje || ""}
-                      onChange={(e) =>
-                        setFormData({ ...formData, kilometraje: e.target.value ? Number(e.target.value) : undefined })
-                      }
-                      placeholder="50000"
+                      type="text"
+                      inputMode="numeric"
+                      value={formData.kilometraje != null ? formData.kilometraje.toLocaleString("es-CL") : ""}
+                      onChange={(e) => {
+                        const digits = e.target.value.replace(/\D/g, "")
+                        setFormData({ ...formData, kilometraje: digits ? Number(digits) : undefined })
+                      }}
+                      placeholder="50.000"
                       className="bg-background/50 h-9"
                     />
                   </div>
