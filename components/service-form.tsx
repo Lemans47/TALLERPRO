@@ -148,6 +148,9 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
     año: undefined as number | undefined,
     cliente: "",
     telefono: "",
+    rut: "",
+    domicilio: "",
+    comuna: "",
     observaciones: "",
     estado: estadoDefault,
     iva: "sin",
@@ -251,6 +254,9 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         año: servicioAEditar.año,
         cliente: servicioAEditar.cliente,
         telefono: servicioAEditar.telefono || "",
+        rut: (servicioAEditar as any).rut || "",
+        domicilio: (servicioAEditar as any).domicilio || "",
+        comuna: (servicioAEditar as any).comuna || "",
         observaciones: servicioAEditar.observaciones || "",
         estado: servicioAEditar.estado || estadoDefault,
         iva: servicioAEditar.iva || "sin",
@@ -435,6 +441,9 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       año: undefined,
       cliente: "",
       telefono: "",
+      rut: "",
+      domicilio: "",
+      comuna: "",
       observaciones: "",
       estado: estadoDefault,
       iva: "sin",
@@ -769,6 +778,9 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       kilometraje: s.kilometraje ? Number(s.kilometraje) : prev.kilometraje,
       cliente: s.cliente || prev.cliente,
       telefono: s.telefono || prev.telefono,
+      rut: s.rut || prev.rut,
+      domicilio: s.domicilio || prev.domicilio,
+      comuna: s.comuna || prev.comuna,
     }))
     setPatenteSugerencias([])
     setMostrarSugerencias(false)
@@ -856,6 +868,9 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         año: formData.año,
         cliente: formData.cliente,
         telefono: formData.telefono,
+        rut: formData.rut,
+        domicilio: formData.domicilio,
+        comuna: formData.comuna,
         observaciones: formData.observaciones,
         mano_obra_pintura: manoObraConfig,
         cobros: cobrosArray,
@@ -977,6 +992,9 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         año: formData.año,
         cliente: formData.cliente,
         telefono: formData.telefono,
+        rut: formData.rut,
+        domicilio: formData.domicilio,
+        comuna: formData.comuna,
         observaciones: formData.observaciones,
         mano_obra_pintura: manoObraConfig,
         cobros: cobrosArray,
@@ -1409,12 +1427,14 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                   <div className="space-y-1">
                     <Label className="text-xs">Kilometraje</Label>
                     <Input
-                      type="number"
-                      value={formData.kilometraje || ""}
-                      onChange={(e) =>
-                        setFormData({ ...formData, kilometraje: e.target.value ? Number(e.target.value) : undefined })
-                      }
-                      placeholder="50000"
+                      type="text"
+                      inputMode="numeric"
+                      value={formData.kilometraje != null ? formData.kilometraje.toLocaleString("es-CL") : ""}
+                      onChange={(e) => {
+                        const digits = e.target.value.replace(/\D/g, "")
+                        setFormData({ ...formData, kilometraje: digits ? Number(digits) : undefined })
+                      }}
+                      placeholder="50.000"
                       className="bg-background/50 h-9"
                     />
                   </div>
@@ -1479,6 +1499,33 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                       value={formData.telefono}
                       onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
                       placeholder="+56 9 1234 5678"
+                      className="bg-background/50 h-9"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">R.U.T.</Label>
+                    <Input
+                      value={formData.rut}
+                      onChange={(e) => setFormData({ ...formData, rut: e.target.value })}
+                      placeholder="12.345.678-9"
+                      className="bg-background/50 h-9"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Domicilio</Label>
+                    <Input
+                      value={formData.domicilio}
+                      onChange={(e) => setFormData({ ...formData, domicilio: e.target.value })}
+                      placeholder="Calle 123"
+                      className="bg-background/50 h-9"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Comuna</Label>
+                    <Input
+                      value={formData.comuna}
+                      onChange={(e) => setFormData({ ...formData, comuna: e.target.value })}
+                      placeholder="Santiago"
                       className="bg-background/50 h-9"
                     />
                   </div>
