@@ -134,8 +134,16 @@ export async function generarPDFPresupuesto(
   doc.text("COMUNA", MID + 2, y + rh * 2 + 4)
   doc.text("OBSERV.", ML + 1, y + rh * 3 + 4)
   normal()
+  const s: any = servicio
+  const leftValW = MID - (ML + 24)   // ancho disponible para valores de la columna izquierda
+  const rightValW = MR - (MID + 18)  // ancho disponible para valores de la columna derecha
+  const fitL = (v: string) => doc.splitTextToSize(up(v || ""), leftValW)[0] || ""
+  const fitR = (v: string) => doc.splitTextToSize(up(v || ""), rightValW)[0] || ""
   doc.text(up(servicio.cliente), ML + 22, y + 4)
-  doc.text(up(servicio.telefono || ""), ML + 22, y + rh + 4)
+  doc.text(fitL(s.atencion || servicio.telefono || ""), ML + 24, y + rh + 4)
+  doc.text(fitR(s.rut || ""), MID + 18, y + rh + 4)
+  doc.text(fitL(s.domicilio || ""), ML + 24, y + rh * 2 + 4)
+  doc.text(fitR(s.comuna || ""), MID + 18, y + rh * 2 + 4)
   if (servicio.observaciones) {
     const obs = doc.splitTextToSize(up(servicio.observaciones), CW - 22)
     doc.text(obs[0] || "", ML + 22, y + rh * 3 + 4)

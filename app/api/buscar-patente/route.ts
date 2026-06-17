@@ -16,6 +16,7 @@ export async function GET(request: Request) {
     const rows = await db`
       SELECT DISTINCT ON (patente)
         patente, marca, modelo, color, año, kilometraje, cliente, telefono,
+        atencion, rut, domicilio, comuna,
         fecha_ingreso
       FROM servicios
       WHERE UPPER(patente) LIKE ${`%${q}%`}

@@ -68,6 +68,10 @@ export interface Servicio {
   año?: number
   cliente: string
   telefono: string
+  atencion?: string | null
+  rut?: string | null
+  domicilio?: string | null
+  comuna?: string | null
   observaciones: string | null
   mano_obra_pintura: number
   cobros: { categoria: string; descripcion: string; monto: number; isAuto?: boolean }[]
@@ -106,6 +110,10 @@ export interface Presupuesto {
   año?: number
   cliente: string
   telefono: string
+  atencion?: string | null
+  rut?: string | null
+  domicilio?: string | null
+  comuna?: string | null
   observaciones: string | null
   mano_obra_pintura: number
   cobros: { categoria: string; descripcion: string; monto: number; isAuto?: boolean }[]
@@ -362,7 +370,8 @@ export async function createServicio(servicio: Omit<Servicio, "id" | "created_at
 
   const data = await db`
     INSERT INTO servicios (
-      fecha_ingreso, patente, marca, modelo, color, kilometraje, año, cliente, telefono, observaciones,
+      fecha_ingreso, patente, marca, modelo, color, kilometraje, año, cliente, telefono,
+      atencion, rut, domicilio, comuna, observaciones,
       mano_obra_pintura, cobros, costos, piezas_pintura, estado, iva,
       anticipo, saldo_pendiente, monto_total, monto_total_sin_iva, observaciones_checkboxes,
       fotos_ingreso, fotos_entrega, abonos, numero_ot, detalle_pendiente, fecha_facturacion,
@@ -370,7 +379,9 @@ export async function createServicio(servicio: Omit<Servicio, "id" | "created_at
     ) VALUES (
       ${servicio.fecha_ingreso}, ${servicio.patente}, ${servicio.marca}, ${servicio.modelo},
       ${servicio.color || null}, ${servicio.kilometraje || null}, ${servicio.año || null},
-      ${servicio.cliente}, ${servicio.telefono}, ${servicio.observaciones},
+      ${servicio.cliente}, ${servicio.telefono},
+      ${servicio.atencion || null}, ${servicio.rut || null}, ${servicio.domicilio || null}, ${servicio.comuna || null},
+      ${servicio.observaciones},
       ${servicio.mano_obra_pintura}, ${safeJson(servicio.cobros)}, ${safeJson(servicio.costos)},
       ${safeJson(servicio.piezas_pintura)}, ${servicio.estado}, ${servicio.iva},
       ${servicio.anticipo}, ${servicio.saldo_pendiente}, ${servicio.monto_total},
@@ -405,6 +416,10 @@ export async function updateServicio(id: string, servicio: Partial<Servicio>) {
       año = COALESCE(${servicio.año ?? null}, año),
       cliente = COALESCE(${servicio.cliente ?? null}, cliente),
       telefono = COALESCE(${servicio.telefono ?? null}, telefono),
+      atencion = COALESCE(${servicio.atencion ?? null}, atencion),
+      rut = COALESCE(${servicio.rut ?? null}, rut),
+      domicilio = COALESCE(${servicio.domicilio ?? null}, domicilio),
+      comuna = COALESCE(${servicio.comuna ?? null}, comuna),
       observaciones = COALESCE(${servicio.observaciones ?? null}, observaciones),
       mano_obra_pintura = COALESCE(${servicio.mano_obra_pintura ?? null}, mano_obra_pintura),
       cobros = COALESCE(${servicio.cobros != null ? safeJson(servicio.cobros) : null}::jsonb, cobros),
@@ -479,13 +494,16 @@ export async function createPresupuesto(presupuesto: Omit<Presupuesto, "id" | "c
   const db = getSQL()
   const data = await db`
     INSERT INTO presupuestos (
-      fecha_ingreso, patente, marca, modelo, color, kilometraje, año, cliente, telefono, observaciones,
+      fecha_ingreso, patente, marca, modelo, color, kilometraje, año, cliente, telefono,
+      atencion, rut, domicilio, comuna, observaciones,
       mano_obra_pintura, cobros, costos, piezas_pintura, iva,
       monto_total, monto_total_sin_iva, observaciones_checkboxes, fotos_ingreso, source, leida
     ) VALUES (
       ${presupuesto.fecha_ingreso}, ${presupuesto.patente}, ${presupuesto.marca}, ${presupuesto.modelo},
       ${presupuesto.color || null}, ${presupuesto.kilometraje || null}, ${presupuesto.año || null},
-      ${presupuesto.cliente}, ${presupuesto.telefono}, ${presupuesto.observaciones},
+      ${presupuesto.cliente}, ${presupuesto.telefono},
+      ${presupuesto.atencion || null}, ${presupuesto.rut || null}, ${presupuesto.domicilio || null}, ${presupuesto.comuna || null},
+      ${presupuesto.observaciones},
       ${presupuesto.mano_obra_pintura}, ${safeJson(presupuesto.cobros)}, ${safeJson(presupuesto.costos)},
       ${safeJson(presupuesto.piezas_pintura)}, ${presupuesto.iva},
       ${presupuesto.monto_total}, ${presupuesto.monto_total_sin_iva}, ${safeJson(presupuesto.observaciones_checkboxes)},
@@ -509,6 +527,10 @@ export async function updatePresupuesto(id: string, presupuesto: Partial<Presupu
       año = COALESCE(${presupuesto.año ?? null}, año),
       cliente = COALESCE(${presupuesto.cliente ?? null}, cliente),
       telefono = COALESCE(${presupuesto.telefono ?? null}, telefono),
+      atencion = COALESCE(${presupuesto.atencion ?? null}, atencion),
+      rut = COALESCE(${presupuesto.rut ?? null}, rut),
+      domicilio = COALESCE(${presupuesto.domicilio ?? null}, domicilio),
+      comuna = COALESCE(${presupuesto.comuna ?? null}, comuna),
       observaciones = COALESCE(${presupuesto.observaciones ?? null}, observaciones),
       mano_obra_pintura = COALESCE(${presupuesto.mano_obra_pintura ?? null}, mano_obra_pintura),
       cobros = COALESCE(${presupuesto.cobros != null ? safeJson(presupuesto.cobros) : null}::jsonb, cobros),
@@ -575,14 +597,17 @@ export async function convertPresupuestoToServicio(presupuestoId: string) {
     // Create servicio from presupuesto (atomically)
     const newServicio = await sql`
       INSERT INTO servicios (
-        fecha_ingreso, patente, marca, modelo, color, kilometraje, año, cliente, telefono, observaciones,
+        fecha_ingreso, patente, marca, modelo, color, kilometraje, año, cliente, telefono,
+        atencion, rut, domicilio, comuna, observaciones,
         mano_obra_pintura, cobros, costos, piezas_pintura, estado, iva,
         anticipo, saldo_pendiente, monto_total, monto_total_sin_iva, observaciones_checkboxes,
         fotos_ingreso, fotos_entrega, numero_ot
       ) VALUES (
         NOW(), ${presupuesto.patente}, ${presupuesto.marca}, ${presupuesto.modelo},
         ${presupuesto.color || null}, ${presupuesto.kilometraje || null}, ${presupuesto.año || null},
-        ${presupuesto.cliente}, ${presupuesto.telefono || ""}, ${presupuesto.observaciones || ""},
+        ${presupuesto.cliente}, ${presupuesto.telefono || ""},
+        ${presupuesto.atencion || null}, ${presupuesto.rut || null}, ${presupuesto.domicilio || null}, ${presupuesto.comuna || null},
+        ${presupuesto.observaciones || ""},
         ${presupuesto.mano_obra_pintura || 0},
         ${safeJson(presupuesto.cobros)}, ${safeJson(presupuesto.costos)},
         ${safeJson(presupuesto.piezas_pintura)}, ${estadoInicial}, ${presupuesto.iva || "sin"},
