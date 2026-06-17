@@ -134,9 +134,12 @@ export async function generarPDFPresupuesto(
   doc.text("DOMICILIO:", ML + 1, y + rh * 2 + 4)
   doc.text("COMUNA", MID + 2, y + rh * 2 + 4)
   doc.text("OBSERV.", ML + 1, y + rh * 3 + 4)
+  // Separación etiqueta→valor igual a la de COMUNA, calculada sobre la etiqueta
+  // más larga de la columna izquierda ("DOMICILIO:") para mantener la alineación.
+  const comunaGap = (MID + 18) - (MID + 2 + doc.getTextWidth("COMUNA"))
+  const leftValX = ML + 1 + doc.getTextWidth("DOMICILIO:") + comunaGap
   normal()
   const s: any = servicio
-  const leftValX = ML + 24            // X fija de la columna izquierda (alinea nombre/telefono/domicilio/observ)
   const leftValW = MID - leftValX     // ancho disponible para valores de la columna izquierda
   const rightValW = MR - (MID + 18)  // ancho disponible para valores de la columna derecha
   const fitW = (v: string, w: number) => doc.splitTextToSize(up(v || ""), w)[0] || ""
