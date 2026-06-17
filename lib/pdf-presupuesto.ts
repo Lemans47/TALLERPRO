@@ -127,7 +127,7 @@ export async function generarPDFPresupuesto(
   doc.line(MID, y + rh, MID, y + rh * 3)
 
   black(); bold(); doc.setFontSize(8)
-  const telLabel = "N\xB0 TELEFONO:"
+  const telLabel = "TELEFONO:"
   doc.text("NOMBRE:", ML + 1, y + 4)
   doc.text(telLabel, ML + 1, y + rh + 4)
   doc.text("R.U.T.", MID + 2, y + rh + 4)
@@ -160,7 +160,7 @@ export async function generarPDFPresupuesto(
     { h: "MODELO", w: 30, v: servicio.modelo || "" },
     { h: "COLOR", w: 22, v: servicio.color || "" },
     { h: "PATENTE", w: 25, v: servicio.patente || "" },
-    { h: "KILOMETRAJE", w: 28, v: servicio.kilometraje?.toString() || "" },
+    { h: "KILOMETRAJE", w: 28, v: servicio.kilometraje != null ? Number(servicio.kilometraje).toLocaleString("es-CL") : "" },
     { h: "A\xD1O", w: 17, v: servicio.año?.toString() || "" },
     { h: "NUMERO MOTOR", w: CW - 28 - 30 - 22 - 25 - 28 - 17, v: "" },
   ]
