@@ -127,20 +127,23 @@ export async function generarPDFPresupuesto(
   doc.line(MID, y + rh, MID, y + rh * 3)
 
   black(); bold(); doc.setFontSize(8)
+  const telLabel = "N\xB0 TELEFONO:"
   doc.text("NOMBRE:", ML + 1, y + 4)
-  doc.text("Atencion:", ML + 1, y + rh + 4)
+  doc.text(telLabel, ML + 1, y + rh + 4)
   doc.text("R.U.T.", MID + 2, y + rh + 4)
   doc.text("DOMICILIO:", ML + 1, y + rh * 2 + 4)
   doc.text("COMUNA", MID + 2, y + rh * 2 + 4)
   doc.text("OBSERV.", ML + 1, y + rh * 3 + 4)
+  const telValX = ML + 2 + doc.getTextWidth(telLabel)  // valor del telefono va tras su etiqueta
   normal()
   const s: any = servicio
   const leftValW = MID - (ML + 24)   // ancho disponible para valores de la columna izquierda
   const rightValW = MR - (MID + 18)  // ancho disponible para valores de la columna derecha
-  const fitL = (v: string) => doc.splitTextToSize(up(v || ""), leftValW)[0] || ""
-  const fitR = (v: string) => doc.splitTextToSize(up(v || ""), rightValW)[0] || ""
+  const fitW = (v: string, w: number) => doc.splitTextToSize(up(v || ""), w)[0] || ""
+  const fitL = (v: string) => fitW(v, leftValW)
+  const fitR = (v: string) => fitW(v, rightValW)
   doc.text(up(servicio.cliente), ML + 22, y + 4)
-  doc.text(fitL(s.atencion || servicio.telefono || ""), ML + 24, y + rh + 4)
+  doc.text(fitW(servicio.telefono || "", MID - telValX), telValX, y + rh + 4)
   doc.text(fitR(s.rut || ""), MID + 18, y + rh + 4)
   doc.text(fitL(s.domicilio || ""), ML + 24, y + rh * 2 + 4)
   doc.text(fitR(s.comuna || ""), MID + 18, y + rh * 2 + 4)

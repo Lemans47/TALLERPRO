@@ -68,7 +68,6 @@ export interface Servicio {
   año?: number
   cliente: string
   telefono: string
-  atencion?: string | null
   rut?: string | null
   domicilio?: string | null
   comuna?: string | null
@@ -110,7 +109,6 @@ export interface Presupuesto {
   año?: number
   cliente: string
   telefono: string
-  atencion?: string | null
   rut?: string | null
   domicilio?: string | null
   comuna?: string | null
@@ -371,7 +369,7 @@ export async function createServicio(servicio: Omit<Servicio, "id" | "created_at
   const data = await db`
     INSERT INTO servicios (
       fecha_ingreso, patente, marca, modelo, color, kilometraje, año, cliente, telefono,
-      atencion, rut, domicilio, comuna, observaciones,
+      rut, domicilio, comuna, observaciones,
       mano_obra_pintura, cobros, costos, piezas_pintura, estado, iva,
       anticipo, saldo_pendiente, monto_total, monto_total_sin_iva, observaciones_checkboxes,
       fotos_ingreso, fotos_entrega, abonos, numero_ot, detalle_pendiente, fecha_facturacion,
@@ -380,7 +378,7 @@ export async function createServicio(servicio: Omit<Servicio, "id" | "created_at
       ${servicio.fecha_ingreso}, ${servicio.patente}, ${servicio.marca}, ${servicio.modelo},
       ${servicio.color || null}, ${servicio.kilometraje || null}, ${servicio.año || null},
       ${servicio.cliente}, ${servicio.telefono},
-      ${servicio.atencion || null}, ${servicio.rut || null}, ${servicio.domicilio || null}, ${servicio.comuna || null},
+      ${servicio.rut || null}, ${servicio.domicilio || null}, ${servicio.comuna || null},
       ${servicio.observaciones},
       ${servicio.mano_obra_pintura}, ${safeJson(servicio.cobros)}, ${safeJson(servicio.costos)},
       ${safeJson(servicio.piezas_pintura)}, ${servicio.estado}, ${servicio.iva},
@@ -416,7 +414,6 @@ export async function updateServicio(id: string, servicio: Partial<Servicio>) {
       año = COALESCE(${servicio.año ?? null}, año),
       cliente = COALESCE(${servicio.cliente ?? null}, cliente),
       telefono = COALESCE(${servicio.telefono ?? null}, telefono),
-      atencion = COALESCE(${servicio.atencion ?? null}, atencion),
       rut = COALESCE(${servicio.rut ?? null}, rut),
       domicilio = COALESCE(${servicio.domicilio ?? null}, domicilio),
       comuna = COALESCE(${servicio.comuna ?? null}, comuna),
@@ -495,14 +492,14 @@ export async function createPresupuesto(presupuesto: Omit<Presupuesto, "id" | "c
   const data = await db`
     INSERT INTO presupuestos (
       fecha_ingreso, patente, marca, modelo, color, kilometraje, año, cliente, telefono,
-      atencion, rut, domicilio, comuna, observaciones,
+      rut, domicilio, comuna, observaciones,
       mano_obra_pintura, cobros, costos, piezas_pintura, iva,
       monto_total, monto_total_sin_iva, observaciones_checkboxes, fotos_ingreso, source, leida
     ) VALUES (
       ${presupuesto.fecha_ingreso}, ${presupuesto.patente}, ${presupuesto.marca}, ${presupuesto.modelo},
       ${presupuesto.color || null}, ${presupuesto.kilometraje || null}, ${presupuesto.año || null},
       ${presupuesto.cliente}, ${presupuesto.telefono},
-      ${presupuesto.atencion || null}, ${presupuesto.rut || null}, ${presupuesto.domicilio || null}, ${presupuesto.comuna || null},
+      ${presupuesto.rut || null}, ${presupuesto.domicilio || null}, ${presupuesto.comuna || null},
       ${presupuesto.observaciones},
       ${presupuesto.mano_obra_pintura}, ${safeJson(presupuesto.cobros)}, ${safeJson(presupuesto.costos)},
       ${safeJson(presupuesto.piezas_pintura)}, ${presupuesto.iva},
@@ -527,7 +524,6 @@ export async function updatePresupuesto(id: string, presupuesto: Partial<Presupu
       año = COALESCE(${presupuesto.año ?? null}, año),
       cliente = COALESCE(${presupuesto.cliente ?? null}, cliente),
       telefono = COALESCE(${presupuesto.telefono ?? null}, telefono),
-      atencion = COALESCE(${presupuesto.atencion ?? null}, atencion),
       rut = COALESCE(${presupuesto.rut ?? null}, rut),
       domicilio = COALESCE(${presupuesto.domicilio ?? null}, domicilio),
       comuna = COALESCE(${presupuesto.comuna ?? null}, comuna),
@@ -598,7 +594,7 @@ export async function convertPresupuestoToServicio(presupuestoId: string) {
     const newServicio = await sql`
       INSERT INTO servicios (
         fecha_ingreso, patente, marca, modelo, color, kilometraje, año, cliente, telefono,
-        atencion, rut, domicilio, comuna, observaciones,
+        rut, domicilio, comuna, observaciones,
         mano_obra_pintura, cobros, costos, piezas_pintura, estado, iva,
         anticipo, saldo_pendiente, monto_total, monto_total_sin_iva, observaciones_checkboxes,
         fotos_ingreso, fotos_entrega, numero_ot
@@ -606,7 +602,7 @@ export async function convertPresupuestoToServicio(presupuestoId: string) {
         NOW(), ${presupuesto.patente}, ${presupuesto.marca}, ${presupuesto.modelo},
         ${presupuesto.color || null}, ${presupuesto.kilometraje || null}, ${presupuesto.año || null},
         ${presupuesto.cliente}, ${presupuesto.telefono || ""},
-        ${presupuesto.atencion || null}, ${presupuesto.rut || null}, ${presupuesto.domicilio || null}, ${presupuesto.comuna || null},
+        ${presupuesto.rut || null}, ${presupuesto.domicilio || null}, ${presupuesto.comuna || null},
         ${presupuesto.observaciones || ""},
         ${presupuesto.mano_obra_pintura || 0},
         ${safeJson(presupuesto.cobros)}, ${safeJson(presupuesto.costos)},

@@ -148,7 +148,6 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
     año: undefined as number | undefined,
     cliente: "",
     telefono: "",
-    atencion: "",
     rut: "",
     domicilio: "",
     comuna: "",
@@ -255,7 +254,6 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         año: servicioAEditar.año,
         cliente: servicioAEditar.cliente,
         telefono: servicioAEditar.telefono || "",
-        atencion: (servicioAEditar as any).atencion || "",
         rut: (servicioAEditar as any).rut || "",
         domicilio: (servicioAEditar as any).domicilio || "",
         comuna: (servicioAEditar as any).comuna || "",
@@ -443,7 +441,6 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       año: undefined,
       cliente: "",
       telefono: "",
-      atencion: "",
       rut: "",
       domicilio: "",
       comuna: "",
@@ -781,7 +778,6 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       kilometraje: s.kilometraje ? Number(s.kilometraje) : prev.kilometraje,
       cliente: s.cliente || prev.cliente,
       telefono: s.telefono || prev.telefono,
-      atencion: s.atencion || prev.atencion,
       rut: s.rut || prev.rut,
       domicilio: s.domicilio || prev.domicilio,
       comuna: s.comuna || prev.comuna,
@@ -872,7 +868,6 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         año: formData.año,
         cliente: formData.cliente,
         telefono: formData.telefono,
-        atencion: formData.atencion,
         rut: formData.rut,
         domicilio: formData.domicilio,
         comuna: formData.comuna,
@@ -997,7 +992,6 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         año: formData.año,
         cliente: formData.cliente,
         telefono: formData.telefono,
-        atencion: formData.atencion,
         rut: formData.rut,
         domicilio: formData.domicilio,
         comuna: formData.comuna,
@@ -1503,15 +1497,6 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                       value={formData.telefono}
                       onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
                       placeholder="+56 9 1234 5678"
-                      className="bg-background/50 h-9"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Atención</Label>
-                    <Input
-                      value={formData.atencion}
-                      onChange={(e) => setFormData({ ...formData, atencion: e.target.value })}
-                      placeholder="Persona de contacto"
                       className="bg-background/50 h-9"
                     />
                   </div>
