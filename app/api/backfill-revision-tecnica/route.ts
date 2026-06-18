@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { getSQL } from "@/lib/database"
+import { requireRole } from "@/lib/auth-server"
 
 export const maxDuration = 300
 export const dynamic = "force-dynamic"
@@ -9,6 +10,8 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 const cleanPatente = (p: string) => p.replace(/[^a-zA-Z0-9]/g, "").toUpperCase()
 
 export async function POST() {
+  const denied = await requireRole(["admin"])
+  if (denied) return denied
   const apiKey = process.env.GETAPI_API_KEY
   if (!apiKey) {
     return NextResponse.json({ error: "API Key no configurada" }, { status: 500 })

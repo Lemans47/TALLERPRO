@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server"
 import { getPlantillasServicio, createPlantillaServicio, deletePlantillaServicio } from "@/lib/database"
+import { requireRole } from "@/lib/auth-server"
 
+// Las plantillas de servicio se usan dentro del formulario de servicios (todos
+// los roles operativos pueden crearlas/borrarlas), por eso solo exigimos sesión.
 export async function GET() {
   try {
+    const denied = await requireRole()
+    if (denied) return denied
     const data = await getPlantillasServicio()
     return NextResponse.json(data)
   } catch (error) {
@@ -13,6 +18,8 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const denied = await requireRole()
+    if (denied) return denied
     const body = await req.json()
     if (!body.nombre?.trim()) {
       return NextResponse.json({ error: "Nombre requerido" }, { status: 400 })
@@ -27,6 +34,8 @@ export async function POST(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
+    const denied = await requireRole()
+    if (denied) return denied
     const { searchParams } = new URL(req.url)
     const id = searchParams.get("id")
     if (!id) return NextResponse.json({ error: "ID requerido" }, { status: 400 })

@@ -9,9 +9,12 @@ import {
   convertPresupuestoToServicio,
 } from "@/lib/database"
 import { parseYearMonth } from "@/lib/utils"
+import { requireRole } from "@/lib/auth-server"
 
 export async function GET(request: Request) {
   try {
+    const denied = await requireRole()
+    if (denied) return denied
     const { searchParams } = new URL(request.url)
 
     if (searchParams.get("no_leidas") === "1") {
@@ -33,6 +36,8 @@ export async function GET(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
+    const denied = await requireRole()
+    if (denied) return denied
     const { id } = await request.json()
     if (!id) {
       return NextResponse.json({ error: "ID required" }, { status: 400 })
@@ -53,6 +58,9 @@ export async function PATCH(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    // El formulario público usa /api/solicitudes; aquí exigimos sesión.
+    const denied = await requireRole()
+    if (denied) return denied
     const data = await request.json()
     const presupuesto = await createPresupuesto(data)
     return NextResponse.json(presupuesto)
@@ -64,6 +72,8 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
+    const denied = await requireRole()
+    if (denied) return denied
     const data = await request.json()
     const { id, ...updateData } = data
     const presupuesto = await updatePresupuesto(id, updateData)
@@ -76,6 +86,8 @@ export async function PUT(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const denied = await requireRole()
+    if (denied) return denied
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
     if (!id) {

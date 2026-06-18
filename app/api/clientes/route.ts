@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server"
 import { getClientes, createCliente, updateCliente, deleteCliente, getVehiculosConCliente } from "@/lib/database"
+import { requireRole } from "@/lib/auth-server"
 
 export async function GET(request: Request) {
   try {
+    const denied = await requireRole()
+    if (denied) return denied
     const { searchParams } = new URL(request.url)
     const withVehiculos = searchParams.get("withVehiculos")
 
@@ -21,6 +24,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const denied = await requireRole()
+    if (denied) return denied
     const data = await request.json()
     const cliente = await createCliente(data)
     return NextResponse.json(cliente)
@@ -32,6 +37,8 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
+    const denied = await requireRole()
+    if (denied) return denied
     const data = await request.json()
     const { id, ...updateData } = data
     const cliente = await updateCliente(id, updateData)
@@ -44,6 +51,8 @@ export async function PUT(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const denied = await requireRole()
+    if (denied) return denied
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
     if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 })

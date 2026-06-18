@@ -7,9 +7,15 @@ import {
   getGastosByMonth,
   createGasto,
 } from "@/lib/database"
+import { requireRole } from "@/lib/auth-server"
+
+// Plantillas de gastos fijos = sección Gastos (admin/operador).
+const ROLES = ["admin", "operador"] as const
 
 export async function GET() {
   try {
+    const denied = await requireRole([...ROLES])
+    if (denied) return denied
     const data = await getPlantillas()
     return NextResponse.json(data)
   } catch (e) {
@@ -19,6 +25,8 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const denied = await requireRole([...ROLES])
+    if (denied) return denied
     const { searchParams } = new URL(request.url)
     const action = searchParams.get("action")
 
@@ -87,6 +95,8 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
+    const denied = await requireRole([...ROLES])
+    if (denied) return denied
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
     if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 })
@@ -100,6 +110,8 @@ export async function PUT(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const denied = await requireRole([...ROLES])
+    if (denied) return denied
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
     if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 })

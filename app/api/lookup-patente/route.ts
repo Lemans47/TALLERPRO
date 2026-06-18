@@ -10,6 +10,9 @@ async function ensureColumn(db: any) {
   } catch { migrated = true }
 }
 
+// Endpoint usado por la página pública /solicitar-presupuesto para autocompletar
+// marca/modelo desde el registro vehicular, por eso NO exige sesión. No expone
+// datos de clientes (eso es /api/buscar-patente, que sí requiere sesión).
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)

@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server"
 import { getSQL } from "@/lib/database"
+import { requireRole } from "@/lib/auth-server"
 
 export async function GET(request: Request) {
   try {
+    const denied = await requireRole()
+    if (denied) return denied
     const { searchParams } = new URL(request.url)
     const q = searchParams.get("q")?.trim().toUpperCase()
 

@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server"
 import { getAbonosByMonth, createAbono, deleteAbonoWithGastos } from "@/lib/database"
+import { requireRole } from "@/lib/auth-server"
+
+// Abonos/pagos a empleados = sección Empleados (admin/supervisor).
+const ROLES = ["admin", "supervisor"] as const
 
 export async function GET(request: Request) {
   try {
+    const denied = await requireRole([...ROLES])
+    if (denied) return denied
     const { searchParams } = new URL(request.url)
     const year = Number(searchParams.get("year"))
     const month = Number(searchParams.get("month"))
@@ -15,6 +21,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const denied = await requireRole([...ROLES])
+    if (denied) return denied
     const data = await request.json()
     const abono = await createAbono({
       empleado_id: data.empleado_id,
@@ -32,6 +40,8 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const denied = await requireRole([...ROLES])
+    if (denied) return denied
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
     if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 })

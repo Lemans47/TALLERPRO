@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server"
 import { getProveedores, createProveedor, updateProveedor, deleteProveedor } from "@/lib/database"
+import { requireRole } from "@/lib/auth-server"
+
+// Proveedores se gestionan desde la sección Gastos (admin/operador).
+const ROLES = ["admin", "operador"] as const
 
 export async function GET() {
   try {
+    const denied = await requireRole([...ROLES])
+    if (denied) return denied
     const data = await getProveedores()
     return NextResponse.json(data)
   } catch (error) {
@@ -13,6 +19,8 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const denied = await requireRole([...ROLES])
+    if (denied) return denied
     const data = await request.json()
     if (!data.nombre?.trim()) {
       return NextResponse.json({ error: "El nombre es requerido" }, { status: 400 })
@@ -27,6 +35,8 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
+    const denied = await requireRole([...ROLES])
+    if (denied) return denied
     const { id, ...data } = await request.json()
     if (!id) return NextResponse.json({ error: "ID requerido" }, { status: 400 })
     const proveedor = await updateProveedor(id, data)
@@ -39,6 +49,8 @@ export async function PUT(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const denied = await requireRole([...ROLES])
+    if (denied) return denied
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
     if (!id) return NextResponse.json({ error: "ID requerido" }, { status: 400 })

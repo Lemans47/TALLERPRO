@@ -1,18 +1,20 @@
 import { NextResponse } from "next/server"
 import { getServicios, getServiciosByMonth, getServiciosActivosParaLista, createServicio, updateServicio, deleteServicio, getServicioById, upsertClienteYVehiculo } from "@/lib/database"
 import { parseYearMonth } from "@/lib/utils"
+import { requireRole } from "@/lib/auth-server"
 import crypto from "crypto"
 
 const CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME
 const API_KEY = process.env.CLOUDINARY_API_KEY
 const API_SECRET = process.env.CLOUDINARY_API_SECRET
 
-async function deleteCloudinaryImage(publicId: string) {
+async function deleteCloudinaryAsset(publicId: string, tipo: "image" | "video" = "image") {
   if (!CLOUD_NAME || !API_KEY || !API_SECRET) return
   const timestamp = Math.floor(Date.now() / 1000)
   const signature = crypto.createHash("sha1").update(`public_id=${publicId}&timestamp=${timestamp}${API_SECRET}`).digest("hex")
   const body = new URLSearchParams({ public_id: publicId, api_key: API_KEY, timestamp: timestamp.toString(), signature })
-  await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/destroy`, {
+  const kind = tipo === "video" ? "video" : "image"
+  await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${kind}/destroy`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: body.toString(),
@@ -21,6 +23,8 @@ async function deleteCloudinaryImage(publicId: string) {
 
 export async function GET(request: Request) {
   try {
+    const denied = await requireRole()
+    if (denied) return denied
     const { searchParams } = new URL(request.url)
     const activos = searchParams.get("activos")
     const ym = parseYearMonth(searchParams)
@@ -41,6 +45,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const denied = await requireRole()
+    if (denied) return denied
     const data = await request.json()
     const servicio = await createServicio(data)
     // Sincronizar cliente y vehículo en sus tablas
@@ -58,6 +64,8 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
+    const denied = await requireRole()
+    if (denied) return denied
     const data = await request.json()
     const { id, ...updateData } = data
     const servicio = await updateServicio(id, updateData)
@@ -76,6 +84,8 @@ export async function PUT(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const denied = await requireRole()
+    if (denied) return denied
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
     if (!id) {
@@ -86,7 +96,7 @@ export async function DELETE(request: Request) {
     const servicio = await getServicioById(id)
     if (servicio) {
       const fotos = [...(servicio.fotos_ingreso || []), ...(servicio.fotos_entrega || [])]
-      await Promise.allSettled(fotos.map((f) => deleteCloudinaryImage(f.publicId)))
+      await Promise.allSettled(fotos.map((f) => deleteCloudinaryAsset(f.publicId, f.tipo ?? "image")))
     }
 
     await deleteServicio(id)

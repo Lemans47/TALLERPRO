@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getHistorialByPatente, getHistorialByCliente } from "@/lib/database"
+import { requireRole } from "@/lib/auth-server"
 
 export async function GET(req: NextRequest) {
+  const denied = await requireRole()
+  if (denied) return denied
   const { searchParams } = new URL(req.url)
   const patente = searchParams.get("patente")
   const cliente = searchParams.get("cliente")

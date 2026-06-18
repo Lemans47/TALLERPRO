@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { requireRole } from "@/lib/auth-server"
 
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -10,6 +11,8 @@ function getAdminClient() {
 
 export async function GET() {
   try {
+    const denied = await requireRole(["admin"])
+    if (denied) return denied
     const admin = getAdminClient()
     // List all auth users
     const { data: { users }, error: usersError } = await admin.auth.admin.listUsers()
@@ -36,6 +39,8 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const denied = await requireRole(["admin"])
+    if (denied) return denied
     const { email, role } = await req.json()
     if (!email || !role) return NextResponse.json({ error: "Faltan datos" }, { status: 400 })
     const admin = getAdminClient()
@@ -53,6 +58,8 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
+    const denied = await requireRole(["admin"])
+    if (denied) return denied
     const { userId, role } = await req.json()
     if (!userId || !role) return NextResponse.json({ error: "Faltan datos" }, { status: 400 })
     const admin = getAdminClient()

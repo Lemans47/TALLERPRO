@@ -14,6 +14,7 @@ import {
 } from "@/lib/database"
 import { computeKpisMes } from "@/lib/reportes/kpis"
 import { parseYearMonth } from "@/lib/utils"
+import { requireRole } from "@/lib/auth-server"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
@@ -92,6 +93,8 @@ async function loadDashboardData(year: number, month: number) {
 
 export async function GET(request: Request) {
   try {
+    const denied = await requireRole()
+    if (denied) return denied
     const { searchParams } = new URL(request.url)
     const ym = parseYearMonth(searchParams)
     const now = new Date()

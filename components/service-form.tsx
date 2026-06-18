@@ -35,6 +35,8 @@ import {
   Camera,
   Upload,
   ImageIcon,
+  Play,
+  Video,
   AlignJustify,
   List,
   ListChecks,
@@ -482,16 +484,76 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   }
 
   // Funciones para fotos
+  const esVideo = (f: FotoServicio) => (f.tipo ?? "image") === "video"
+
+  const MAX_VIDEO_SEGUNDOS = 60
+  const MAX_IMAGEN_MB = 15
+  const MAX_VIDEO_MB = 100
+
+  // Lee la duración (segundos) de un video en el navegador, sin subirlo.
+  const getVideoDuration = (file: File) =>
+    new Promise<number>((resolve) => {
+      try {
+        const v = document.createElement("video")
+        v.preload = "metadata"
+        v.onloadedmetadata = () => {
+          URL.revokeObjectURL(v.src)
+          resolve(Number.isFinite(v.duration) ? v.duration : 0)
+        }
+        v.onerror = () => {
+          URL.revokeObjectURL(v.src)
+          resolve(0)
+        }
+        v.src = URL.createObjectURL(file)
+      } catch {
+        resolve(0)
+      }
+    })
+
   const handleUploadFotos = async (files: File[], tipo: "ingreso" | "entrega") => {
     const MAX = tipo === "ingreso" ? 15 : 8
     const current = tipo === "ingreso" ? fotosIngreso : fotosEntrega
-    const restantes = MAX - current.length
-    if (restantes <= 0) {
-      toast({ title: "Límite alcanzado", description: `Máximo ${MAX} fotos de ${tipo}`, variant: "destructive" })
-      return
+
+    // Separar imágenes y videos. Video: solo en Ingreso y máximo 1 por orden
+    // (contando ambas secciones). Las fotos mantienen su límite (15/8), contando
+    // solo imágenes.
+    const incomingVideos = files.filter((f) => f.type.startsWith("video/"))
+    const incomingImages = files.filter((f) => !f.type.startsWith("video/"))
+    const videosExistentes = [...fotosIngreso, ...fotosEntrega].filter(esVideo).length
+
+    let videosASubir: File[] = []
+    if (incomingVideos.length > 0) {
+      if (tipo !== "ingreso") {
+        toast({ title: "Solo fotos aquí", description: "Los videos solo se permiten en Fotos de Ingreso.", variant: "destructive" })
+      } else if (videosExistentes >= 1) {
+        toast({ title: "Ya hay un video", description: "Solo se permite 1 video por orden.", variant: "destructive" })
+      } else {
+        const vid = incomingVideos[0]
+        if (incomingVideos.length > 1) {
+          toast({ title: "Solo 1 video", description: "Se subirá únicamente el primer video.", variant: "destructive" })
+        }
+        if (vid.size > MAX_VIDEO_MB * 1024 * 1024) {
+          toast({ title: "Video muy pesado", description: `El video supera ${MAX_VIDEO_MB} MB.`, variant: "destructive" })
+        } else {
+          const dur = await getVideoDuration(vid)
+          if (dur > MAX_VIDEO_SEGUNDOS + 0.5) {
+            toast({ title: "Video muy largo", description: `Dura ${Math.round(dur)}s. El máximo es ${MAX_VIDEO_SEGUNDOS} segundos.`, variant: "destructive" })
+          } else {
+            videosASubir = [vid]
+          }
+        }
+      }
     }
-    const aSubir = files.slice(0, restantes)
-    const descartadas = files.length - aSubir.length
+
+    const imagenesActuales = current.filter((f) => !esVideo(f)).length
+    const restantes = Math.max(0, MAX - imagenesActuales)
+    const imagenesValidas = incomingImages.filter((f) => f.size <= MAX_IMAGEN_MB * 1024 * 1024)
+    const pesadas = incomingImages.length - imagenesValidas.length
+    if (pesadas > 0) {
+      toast({ title: "Foto muy pesada", description: `${pesadas} foto${pesadas === 1 ? "" : "s"} supera${pesadas === 1 ? "" : "n"} ${MAX_IMAGEN_MB} MB.`, variant: "destructive" })
+    }
+    const imagenesASubir = imagenesValidas.slice(0, restantes)
+    const descartadas = imagenesValidas.length - imagenesASubir.length
     if (descartadas > 0) {
       toast({
         title: "Algunas fotos no se subirán",
@@ -499,36 +561,50 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         variant: "destructive",
       })
     }
+
+    const aSubir = [...imagenesASubir, ...videosASubir]
+    if (aSubir.length === 0) return
+
     setUploadingFoto(true)
     try {
-      const uploadOne = async (file: File) => {
+      const uploadOne = async (file: File): Promise<FotoServicio | { error: string }> => {
         try {
+          // Subida directa navegador→Cloudinary (unsigned). En Vercel no podemos
+          // pasar archivos grandes (video) por la función serverless por su límite
+          // de 4.5 MB, por eso van directo. /auto/ detecta si es foto o video.
           const form = new FormData()
           form.append("file", file)
           form.append("upload_preset", "tallerpro")
           form.append("folder", `tallerpro/${tipo}`)
-          const res = await fetch("https://api.cloudinary.com/v1_1/dzjtujwor/image/upload", {
+          const res = await fetch("https://api.cloudinary.com/v1_1/dzjtujwor/auto/upload", {
             method: "POST",
             body: form,
           })
           const data = await res.json()
-          if (!res.ok || data.error) throw new Error(data.error?.message || "Upload failed")
-          return { url: data.secure_url as string, publicId: data.public_id as string }
-        } catch {
-          return null
+          if (!res.ok || data.error) throw new Error(data.error?.message || "No se pudo subir")
+          const t: "image" | "video" = data.resource_type === "video" ? "video" : "image"
+          return {
+            url: data.secure_url as string,
+            publicId: data.public_id as string,
+            tipo: t,
+            ...(t === "video" ? { poster: (data.secure_url as string).replace(/\.[^.]+$/, ".jpg") } : {}),
+          }
+        } catch (e: any) {
+          return { error: e?.message || "No se pudo subir" }
         }
       }
       const resultados = await Promise.all(aSubir.map(uploadOne))
-      const exitosas = resultados.filter((r): r is { url: string; publicId: string } => r !== null)
-      const fallidas = resultados.length - exitosas.length
+      const exitosas = resultados.filter((r): r is FotoServicio => !("error" in r))
+      const errores = resultados.filter((r): r is { error: string } => "error" in r)
       if (exitosas.length > 0) {
         const setter = tipo === "ingreso" ? setFotosIngreso : setFotosEntrega
         setter((prev) => [...prev, ...exitosas])
       }
-      if (fallidas > 0) {
+      if (errores.length > 0) {
         toast({
-          title: "Error",
-          description: `${fallidas} foto${fallidas === 1 ? "" : "s"} no se pudo subir`,
+          title: "Error al subir",
+          // Mostramos el motivo del primer error.
+          description: errores[0].error,
           variant: "destructive",
         })
       }
@@ -538,16 +614,18 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   }
 
   const handleDeleteFoto = async (publicId: string, tipo: "ingreso" | "entrega") => {
+    const lista = tipo === "ingreso" ? fotosIngreso : fotosEntrega
+    const foto = lista.find((f) => f.publicId === publicId)
     try {
       await fetch("/api/upload", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ publicId }),
+        body: JSON.stringify({ publicId, resourceType: foto?.tipo ?? "image" }),
       })
       const setter = tipo === "ingreso" ? setFotosIngreso : setFotosEntrega
       setter((prev) => prev.filter((f) => f.publicId !== publicId))
     } catch {
-      toast({ title: "Error", description: "No se pudo eliminar la foto", variant: "destructive" })
+      toast({ title: "Error", description: "No se pudo eliminar el archivo", variant: "destructive" })
     }
   }
 
@@ -1621,21 +1699,22 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
 
               {/* Tab: Fotos */}
               <TabsContent value="fotos" className="space-y-6 pt-2">
-                {/* Fotos de Ingreso */}
+                {/* Fotos de Ingreso (admite 1 video corto de hasta 1 minuto) */}
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
                     <ImageIcon className="w-4 h-4 text-primary shrink-0" />
                     <h4 className="text-sm font-medium">Fotos de Ingreso</h4>
-                    <span className="text-xs text-muted-foreground">({fotosIngreso.length}/15)</span>
+                    <span className="text-xs text-muted-foreground">({fotosIngreso.filter((f) => !esVideo(f)).length}/15 fotos · 1 video)</span>
                   </div>
-                  {fotosIngreso.length < 15 && (
-                    <div className="grid grid-cols-2 gap-2">
-                      <label className={`cursor-pointer flex items-center justify-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-primary/50 text-primary hover:bg-primary/10 transition-colors ${uploadingFoto ? "opacity-50 pointer-events-none" : ""}`}>
+                  {(fotosIngreso.filter((f) => !esVideo(f)).length < 15 || !fotosIngreso.some(esVideo)) && (
+                    <div className="flex flex-wrap gap-2">
+                      {/* Galería: fotos y/o video */}
+                      <label className={`cursor-pointer flex-1 min-w-[130px] flex items-center justify-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-primary/50 text-primary hover:bg-primary/10 transition-colors ${uploadingFoto ? "opacity-50 pointer-events-none" : ""}`}>
                         <Upload className="w-3.5 h-3.5 shrink-0" />
-                        <span className="truncate">{uploadingFoto ? "Subiendo..." : "Agregar fotos"}</span>
+                        <span className="truncate">{uploadingFoto ? "Subiendo..." : "Agregar"}</span>
                         <input
                           type="file"
-                          accept="image/*"
+                          accept="image/*,video/*"
                           multiple
                           className="hidden"
                           onChange={(e) => {
@@ -1645,7 +1724,8 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                           }}
                         />
                       </label>
-                      <label className={`cursor-pointer flex items-center justify-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-primary/50 text-primary hover:bg-primary/10 transition-colors ${uploadingFoto ? "opacity-50 pointer-events-none" : ""}`}>
+                      {/* Cámara de fotos (captura directa) */}
+                      <label className={`cursor-pointer flex-1 min-w-[130px] flex items-center justify-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-primary/50 text-primary hover:bg-primary/10 transition-colors ${uploadingFoto ? "opacity-50 pointer-events-none" : ""}`}>
                         <Camera className="w-3.5 h-3.5 shrink-0" />
                         <span className="truncate">Tomar foto</span>
                         <input
@@ -1660,22 +1740,58 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                           }}
                         />
                       </label>
+                      {/* Cámara de video (captura directa) — solo si no hay video aún */}
+                      {!fotosIngreso.some(esVideo) && (
+                        <label className={`cursor-pointer flex-1 min-w-[130px] flex items-center justify-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-primary/50 text-primary hover:bg-primary/10 transition-colors ${uploadingFoto ? "opacity-50 pointer-events-none" : ""}`}>
+                          <Video className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">Grabar video</span>
+                          <input
+                            type="file"
+                            accept="video/*"
+                            capture="environment"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0]
+                              if (file) handleUploadFotos([file], "ingreso")
+                              e.target.value = ""
+                            }}
+                          />
+                        </label>
+                      )}
                     </div>
                   )}
                   {fotosIngreso.length === 0 ? (
                     <div className="text-center py-6 text-muted-foreground text-xs border border-dashed border-border rounded-lg bg-secondary/20">
-                      Sin fotos de ingreso. Máximo 15.
+                      Sin fotos de ingreso. Hasta 15 fotos y 1 video (máx. 1 minuto).
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
                       {fotosIngreso.map((foto, i) => (
                         <div key={foto.publicId} className="relative group rounded-lg overflow-hidden border border-border aspect-square">
-                          <img
-                            src={foto.url}
-                            alt="Foto ingreso"
-                            className="w-full h-full object-cover cursor-pointer"
-                            onClick={() => setLightbox({ fotos: fotosIngreso, index: i })}
-                          />
+                          {esVideo(foto) ? (
+                            <div
+                              className="w-full h-full cursor-pointer bg-black"
+                              onClick={() => setLightbox({ fotos: fotosIngreso, index: i })}
+                            >
+                              {foto.poster ? (
+                                <img src={foto.poster} alt="Video ingreso" className="w-full h-full object-cover" />
+                              ) : (
+                                <video src={foto.url} muted playsInline preload="metadata" className="w-full h-full object-cover" />
+                              )}
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                <div className="w-9 h-9 rounded-full bg-black/55 flex items-center justify-center">
+                                  <Play className="w-4 h-4 text-white fill-white ml-0.5" />
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <img
+                              src={foto.url}
+                              alt="Foto ingreso"
+                              className="w-full h-full object-cover cursor-pointer"
+                              onClick={() => setLightbox({ fotos: fotosIngreso, index: i })}
+                            />
+                          )}
                           <button
                             type="button"
                             onClick={(e) => {
