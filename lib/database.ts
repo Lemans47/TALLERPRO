@@ -50,6 +50,10 @@ export function getSQL() {
 export interface FotoServicio {
   url: string
   publicId: string
+  /** "image" (default si falta, por compatibilidad con registros antiguos) o "video". */
+  tipo?: "image" | "video"
+  /** Para videos: URL de la miniatura (frame de portada) generada por Cloudinary. */
+  poster?: string
 }
 
 export interface Abono {

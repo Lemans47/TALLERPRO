@@ -22,6 +22,7 @@ export function PhotoLightbox({ fotos, initialIndex, onClose }: PhotoLightboxPro
 
   const total = fotos.length
   const foto = fotos[index]
+  const isVideo = !!foto && (foto.tipo ?? "image") === "video"
 
   const resetView = useCallback(() => {
     setZoom(1)
@@ -138,8 +139,9 @@ export function PhotoLightbox({ fotos, initialIndex, onClose }: PhotoLightboxPro
       const blob = await res.blob()
       const blobUrl = URL.createObjectURL(blob)
       const a = document.createElement("a")
+      const ext = isVideo ? (foto.url.split(".").pop()?.split("?")[0] || "mp4") : "jpg"
+      a.download = `${foto.publicId?.split("/").pop() || (isVideo ? "video" : "foto")}.${ext}`
       a.href = blobUrl
-      a.download = `${foto.publicId?.split("/").pop() || "foto"}.jpg`
       a.click()
       URL.revokeObjectURL(blobUrl)
     } catch {
@@ -158,24 +160,29 @@ export function PhotoLightbox({ fotos, initialIndex, onClose }: PhotoLightboxPro
           {index + 1} / {total}
         </span>
         <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={zoomOut}
-            disabled={zoom <= MIN_ZOOM}
-            className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/15 disabled:opacity-40 transition-colors"
-            aria-label="Alejar"
-          >
-            <ZoomOut className="w-5 h-5" />
-          </button>
-          <button
-            type="button"
-            onClick={zoomIn}
-            disabled={zoom >= MAX_ZOOM}
-            className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/15 disabled:opacity-40 transition-colors"
-            aria-label="Acercar"
-          >
-            <ZoomIn className="w-5 h-5" />
-          </button>
+          {/* El zoom solo aplica a imágenes; en video se ocultan. */}
+          {!isVideo && (
+            <>
+              <button
+                type="button"
+                onClick={zoomOut}
+                disabled={zoom <= MIN_ZOOM}
+                className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/15 disabled:opacity-40 transition-colors"
+                aria-label="Alejar"
+              >
+                <ZoomOut className="w-5 h-5" />
+              </button>
+              <button
+                type="button"
+                onClick={zoomIn}
+                disabled={zoom >= MAX_ZOOM}
+                className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/15 disabled:opacity-40 transition-colors"
+                aria-label="Acercar"
+              >
+                <ZoomIn className="w-5 h-5" />
+              </button>
+            </>
+          )}
           <button
             type="button"
             onClick={handleDownload}
@@ -213,22 +220,33 @@ export function PhotoLightbox({ fotos, initialIndex, onClose }: PhotoLightboxPro
           </button>
         )}
 
-        <img
-          src={foto.url}
-          alt={`Foto ${index + 1}`}
-          draggable={false}
-          onDoubleClick={toggleZoom}
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
-          onMouseDown={onMouseDown}
-          style={{
-            transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
-            cursor: zoom > 1 ? (dragging ? "grabbing" : "grab") : "zoom-in",
-            transition: dragging ? "none" : "transform 0.15s ease-out",
-          }}
-          className="max-w-full max-h-full object-contain touch-none"
-        />
+        {isVideo ? (
+          <video
+            key={foto.publicId}
+            src={foto.url}
+            controls
+            autoPlay
+            playsInline
+            className="max-w-full max-h-full object-contain"
+          />
+        ) : (
+          <img
+            src={foto.url}
+            alt={`Foto ${index + 1}`}
+            draggable={false}
+            onDoubleClick={toggleZoom}
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+            onMouseDown={onMouseDown}
+            style={{
+              transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
+              cursor: zoom > 1 ? (dragging ? "grabbing" : "grab") : "zoom-in",
+              transition: dragging ? "none" : "transform 0.15s ease-out",
+            }}
+            className="max-w-full max-h-full object-contain touch-none"
+          />
+        )}
 
         {total > 1 && (
           <button

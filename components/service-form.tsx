@@ -35,6 +35,7 @@ import {
   Camera,
   Upload,
   ImageIcon,
+  Play,
   AlignJustify,
   List,
   ListChecks,
@@ -473,16 +474,37 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   }
 
   // Funciones para fotos
+  const esVideo = (f: FotoServicio) => (f.tipo ?? "image") === "video"
+
   const handleUploadFotos = async (files: File[], tipo: "ingreso" | "entrega") => {
     const MAX = tipo === "ingreso" ? 15 : 8
     const current = tipo === "ingreso" ? fotosIngreso : fotosEntrega
-    const restantes = MAX - current.length
-    if (restantes <= 0) {
-      toast({ title: "Límite alcanzado", description: `Máximo ${MAX} fotos de ${tipo}`, variant: "destructive" })
-      return
+
+    // Separar imágenes y videos. Video: solo en Ingreso y máximo 1 por orden
+    // (contando ambas secciones). Las fotos mantienen su límite (15/8), contando
+    // solo imágenes.
+    const incomingVideos = files.filter((f) => f.type.startsWith("video/"))
+    const incomingImages = files.filter((f) => !f.type.startsWith("video/"))
+    const videosExistentes = [...fotosIngreso, ...fotosEntrega].filter(esVideo).length
+
+    let videosASubir: File[] = []
+    if (incomingVideos.length > 0) {
+      if (tipo !== "ingreso") {
+        toast({ title: "Solo fotos aquí", description: "Los videos solo se permiten en Fotos de Ingreso.", variant: "destructive" })
+      } else if (videosExistentes >= 1) {
+        toast({ title: "Ya hay un video", description: "Solo se permite 1 video por orden.", variant: "destructive" })
+      } else {
+        videosASubir = incomingVideos.slice(0, 1)
+        if (incomingVideos.length > 1) {
+          toast({ title: "Solo 1 video", description: "Se subirá únicamente el primer video.", variant: "destructive" })
+        }
+      }
     }
-    const aSubir = files.slice(0, restantes)
-    const descartadas = files.length - aSubir.length
+
+    const imagenesActuales = current.filter((f) => !esVideo(f)).length
+    const restantes = Math.max(0, MAX - imagenesActuales)
+    const imagenesASubir = incomingImages.slice(0, restantes)
+    const descartadas = incomingImages.length - imagenesASubir.length
     if (descartadas > 0) {
       toast({
         title: "Algunas fotos no se subirán",
@@ -490,34 +512,44 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         variant: "destructive",
       })
     }
+
+    const aSubir = [...imagenesASubir, ...videosASubir]
+    if (aSubir.length === 0) return
+
     setUploadingFoto(true)
     try {
-      const uploadOne = async (file: File) => {
+      const uploadOne = async (file: File): Promise<FotoServicio | { error: string }> => {
         try {
           // Subimos a través de nuestro servidor (/api/upload), que exige sesión
-          // y valida tipo/tamaño, en vez de ir directo a Cloudinary sin firma.
+          // y valida tipo/tamaño/duración, en vez de ir directo a Cloudinary.
           const form = new FormData()
           form.append("file", file)
           form.append("folder", `tallerpro/${tipo}`)
           const res = await fetch("/api/upload", { method: "POST", body: form })
           const data = await res.json()
           if (!res.ok) throw new Error(data.error || "Upload failed")
-          return { url: data.url as string, publicId: data.publicId as string }
-        } catch {
-          return null
+          return {
+            url: data.url as string,
+            publicId: data.publicId as string,
+            tipo: (data.tipo as "image" | "video") ?? "image",
+            ...(data.poster ? { poster: data.poster as string } : {}),
+          }
+        } catch (e: any) {
+          return { error: e?.message || "No se pudo subir" }
         }
       }
       const resultados = await Promise.all(aSubir.map(uploadOne))
-      const exitosas = resultados.filter((r): r is { url: string; publicId: string } => r !== null)
-      const fallidas = resultados.length - exitosas.length
+      const exitosas = resultados.filter((r): r is FotoServicio => !("error" in r))
+      const errores = resultados.filter((r): r is { error: string } => "error" in r)
       if (exitosas.length > 0) {
         const setter = tipo === "ingreso" ? setFotosIngreso : setFotosEntrega
         setter((prev) => [...prev, ...exitosas])
       }
-      if (fallidas > 0) {
+      if (errores.length > 0) {
         toast({
-          title: "Error",
-          description: `${fallidas} foto${fallidas === 1 ? "" : "s"} no se pudo subir`,
+          title: "Error al subir",
+          // Mostramos el motivo del primer error (p. ej. video supera 1 minuto).
+          description: errores[0].error,
           variant: "destructive",
         })
       }
@@ -527,16 +559,18 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   }
 
   const handleDeleteFoto = async (publicId: string, tipo: "ingreso" | "entrega") => {
+    const lista = tipo === "ingreso" ? fotosIngreso : fotosEntrega
+    const foto = lista.find((f) => f.publicId === publicId)
     try {
       await fetch("/api/upload", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ publicId }),
+        body: JSON.stringify({ publicId, resourceType: foto?.tipo ?? "image" }),
       })
       const setter = tipo === "ingreso" ? setFotosIngreso : setFotosEntrega
       setter((prev) => prev.filter((f) => f.publicId !== publicId))
     } catch {
-      toast({ title: "Error", description: "No se pudo eliminar la foto", variant: "destructive" })
+      toast({ title: "Error", description: "No se pudo eliminar el archivo", variant: "destructive" })
     }
   }
 
@@ -1572,21 +1606,21 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
 
               {/* Tab: Fotos */}
               <TabsContent value="fotos" className="space-y-6 pt-2">
-                {/* Fotos de Ingreso */}
+                {/* Fotos de Ingreso (admite 1 video corto de hasta 1 minuto) */}
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
                     <ImageIcon className="w-4 h-4 text-primary shrink-0" />
                     <h4 className="text-sm font-medium">Fotos de Ingreso</h4>
-                    <span className="text-xs text-muted-foreground">({fotosIngreso.length}/15)</span>
+                    <span className="text-xs text-muted-foreground">({fotosIngreso.filter((f) => !esVideo(f)).length}/15 fotos · 1 video)</span>
                   </div>
-                  {fotosIngreso.length < 15 && (
+                  {(fotosIngreso.filter((f) => !esVideo(f)).length < 15 || !fotosIngreso.some(esVideo)) && (
                     <div className="grid grid-cols-2 gap-2">
                       <label className={`cursor-pointer flex items-center justify-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-primary/50 text-primary hover:bg-primary/10 transition-colors ${uploadingFoto ? "opacity-50 pointer-events-none" : ""}`}>
                         <Upload className="w-3.5 h-3.5 shrink-0" />
-                        <span className="truncate">{uploadingFoto ? "Subiendo..." : "Agregar fotos"}</span>
+                        <span className="truncate">{uploadingFoto ? "Subiendo..." : "Agregar fotos/video"}</span>
                         <input
                           type="file"
-                          accept="image/*"
+                          accept="image/*,video/*"
                           multiple
                           className="hidden"
                           onChange={(e) => {
@@ -1598,10 +1632,10 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                       </label>
                       <label className={`cursor-pointer flex items-center justify-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-primary/50 text-primary hover:bg-primary/10 transition-colors ${uploadingFoto ? "opacity-50 pointer-events-none" : ""}`}>
                         <Camera className="w-3.5 h-3.5 shrink-0" />
-                        <span className="truncate">Tomar foto</span>
+                        <span className="truncate">Tomar foto/video</span>
                         <input
                           type="file"
-                          accept="image/*"
+                          accept="image/*,video/*"
                           capture="environment"
                           className="hidden"
                           onChange={(e) => {
@@ -1615,18 +1649,36 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                   )}
                   {fotosIngreso.length === 0 ? (
                     <div className="text-center py-6 text-muted-foreground text-xs border border-dashed border-border rounded-lg bg-secondary/20">
-                      Sin fotos de ingreso. Máximo 15.
+                      Sin fotos de ingreso. Hasta 15 fotos y 1 video (máx. 1 minuto).
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
                       {fotosIngreso.map((foto, i) => (
                         <div key={foto.publicId} className="relative group rounded-lg overflow-hidden border border-border aspect-square">
-                          <img
-                            src={foto.url}
-                            alt="Foto ingreso"
-                            className="w-full h-full object-cover cursor-pointer"
-                            onClick={() => setLightbox({ fotos: fotosIngreso, index: i })}
-                          />
+                          {esVideo(foto) ? (
+                            <div
+                              className="w-full h-full cursor-pointer bg-black"
+                              onClick={() => setLightbox({ fotos: fotosIngreso, index: i })}
+                            >
+                              {foto.poster ? (
+                                <img src={foto.poster} alt="Video ingreso" className="w-full h-full object-cover" />
+                              ) : (
+                                <video src={foto.url} muted playsInline preload="metadata" className="w-full h-full object-cover" />
+                              )}
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                <div className="w-9 h-9 rounded-full bg-black/55 flex items-center justify-center">
+                                  <Play className="w-4 h-4 text-white fill-white ml-0.5" />
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <img
+                              src={foto.url}
+                              alt="Foto ingreso"
+                              className="w-full h-full object-cover cursor-pointer"
+                              onClick={() => setLightbox({ fotos: fotosIngreso, index: i })}
+                            />
+                          )}
                           <button
                             type="button"
                             onClick={(e) => {
