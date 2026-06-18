@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server"
 import { getPrecioPintura, updatePrecioPintura, initPrecioPintura, getPromedioMaterialesMesAnterior } from "@/lib/database"
+import { requireRole } from "@/lib/auth-server"
 
 export const dynamic = "force-dynamic"
 
 export async function GET() {
   try {
+    // Lectura: cualquier sesión (el formulario de servicios usa el precio).
+    const denied = await requireRole()
+    if (denied) return denied
     let precio = await getPrecioPintura()
     if (!precio) {
       precio = await initPrecioPintura()
@@ -22,6 +26,9 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   try {
+    // Escritura: solo admin (configuración).
+    const denied = await requireRole(["admin"])
+    if (denied) return denied
     const body = await request.json()
     const { precio_por_pieza, mano_obra_default, materiales_default } = body
     const updated = await updatePrecioPintura({ precio_por_pieza, mano_obra_default, materiales_default })

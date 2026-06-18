@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server"
 import { markPresupuestoLeido } from "@/lib/database"
+import { requireRole } from "@/lib/auth-server"
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const denied = await requireRole()
+    if (denied) return denied
     const { id } = await params
     if (!id) {
       return NextResponse.json({ error: "ID required" }, { status: 400 })

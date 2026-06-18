@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { getServicios, getServiciosByMonth, getServiciosActivosParaLista, createServicio, updateServicio, deleteServicio, getServicioById, upsertClienteYVehiculo } from "@/lib/database"
 import { parseYearMonth } from "@/lib/utils"
+import { requireRole } from "@/lib/auth-server"
 import crypto from "crypto"
 
 const CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME
@@ -21,6 +22,8 @@ async function deleteCloudinaryImage(publicId: string) {
 
 export async function GET(request: Request) {
   try {
+    const denied = await requireRole()
+    if (denied) return denied
     const { searchParams } = new URL(request.url)
     const activos = searchParams.get("activos")
     const ym = parseYearMonth(searchParams)
@@ -41,6 +44,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const denied = await requireRole()
+    if (denied) return denied
     const data = await request.json()
     const servicio = await createServicio(data)
     // Sincronizar cliente y vehículo en sus tablas
@@ -58,6 +63,8 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
+    const denied = await requireRole()
+    if (denied) return denied
     const data = await request.json()
     const { id, ...updateData } = data
     const servicio = await updateServicio(id, updateData)
@@ -76,6 +83,8 @@ export async function PUT(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const denied = await requireRole()
+    if (denied) return denied
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
     if (!id) {

@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server"
 import { getEmpleados, createEmpleado, updateEmpleado, deleteEmpleado } from "@/lib/database"
+import { requireRole } from "@/lib/auth-server"
+
+// Empleados = sección visible para admin y supervisor (no operador).
+const ROLES = ["admin", "supervisor"] as const
 
 export async function GET() {
   try {
+    const denied = await requireRole([...ROLES])
+    if (denied) return denied
     const data = await getEmpleados()
     return NextResponse.json(data)
   } catch (e) {
@@ -12,6 +18,8 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const denied = await requireRole([...ROLES])
+    if (denied) return denied
     const data = await request.json()
     const result = await createEmpleado(data)
     return NextResponse.json(result)
@@ -22,6 +30,8 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
+    const denied = await requireRole([...ROLES])
+    if (denied) return denied
     const { id, ...data } = await request.json()
     const result = await updateEmpleado(id, data)
     return NextResponse.json(result)
@@ -32,6 +42,8 @@ export async function PUT(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const denied = await requireRole([...ROLES])
+    if (denied) return denied
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
     if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 })

@@ -6,12 +6,16 @@ import {
   deleteEstadoServicio,
   type EstadoTipo,
 } from "@/lib/database"
-import { isAdminUser } from "@/lib/auth-server"
+import { isAdminUser, requireRole } from "@/lib/auth-server"
 
 const TIPOS_VALIDOS: EstadoTipo[] = ["activo", "por_cobrar", "cerrado"]
 
 export async function GET() {
   try {
+    // Lectura: cualquier sesión (los estados se usan en toda la app). Las
+    // escrituras (POST/PUT/DELETE) siguen exigiendo admin más abajo.
+    const denied = await requireRole()
+    if (denied) return denied
     const estados = await getEstadosServicio()
     return NextResponse.json(estados)
   } catch (error: any) {

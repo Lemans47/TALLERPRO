@@ -125,31 +125,19 @@ export default function SolicitarPresupuestoPage() {
     if (!validate()) return
     setSubmitting(true)
     try {
-      const res = await fetch("/api/presupuestos", {
+      const res = await fetch("/api/solicitudes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          fecha_ingreso:        new Date().toISOString().split("T")[0],
           patente:              form.patente.trim().toUpperCase(),
           marca:                form.marca.trim(),
           modelo:               form.modelo.trim(),
           color:                form.color.trim() || null,
           año:                  form.año ? parseInt(form.año) : null,
-          kilometraje:          null,
           cliente:              form.cliente.trim(),
           telefono:             form.telefono.trim(),
           observaciones:        form.observaciones.trim(),
-          iva:                  "sin",
-          mano_obra_pintura:    0,
-          cobros:               [],
-          costos:               [],
-          piezas_pintura:       [],
-          observaciones_checkboxes: [],
           fotos_ingreso:        photos.map(p => ({ url: p.url, publicId: p.publicId })),
-          monto_total:          0,
-          monto_total_sin_iva:  0,
-          source:               "public",
-          leida:                false,
         }),
       })
       if (!res.ok) throw new Error()

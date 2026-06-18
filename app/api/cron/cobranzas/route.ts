@@ -11,12 +11,15 @@ export const dynamic = "force-dynamic"
 // "Authorization: Bearer <CRON_SECRET>". Exigimos que coincida para que nadie
 // más pueda disparar el envío llamando la URL.
 export async function GET(request: Request) {
+  // Fallar-cerrado: sin CRON_SECRET configurada nadie puede disparar el envío.
   const secret = process.env.CRON_SECRET
-  if (secret) {
-    const auth = request.headers.get("authorization")
-    if (auth !== `Bearer ${secret}`) {
-      return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 })
-    }
+  if (!secret) {
+    console.error("Cron cobranzas: CRON_SECRET no configurada — endpoint deshabilitado")
+    return NextResponse.json({ ok: false, error: "cron not configured" }, { status: 503 })
+  }
+  const auth = request.headers.get("authorization")
+  if (auth !== `Bearer ${secret}`) {
+    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 })
   }
 
   try {

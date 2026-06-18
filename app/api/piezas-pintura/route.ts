@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server"
 import { getPiezasPintura, createPiezaPintura, updatePiezaPintura, deletePiezaPintura } from "@/lib/database"
+import { requireRole } from "@/lib/auth-server"
 
 export async function GET() {
   try {
+    // Lectura: cualquier sesión (el formulario de servicios lista las piezas).
+    const denied = await requireRole()
+    if (denied) return denied
     const piezas = await getPiezasPintura()
     return NextResponse.json(piezas || [])
   } catch (error: any) {
@@ -13,6 +17,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    // Escritura: solo admin (configuración).
+    const denied = await requireRole(["admin"])
+    if (denied) return denied
     const body = await request.json()
     const { nombre, cantidad_piezas } = body
 
@@ -34,6 +41,8 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
+    const denied = await requireRole(["admin"])
+    if (denied) return denied
     const body = await request.json()
     const { id, cantidad_piezas, nombre } = body
     if (nombre !== undefined && !String(nombre).trim()) {
@@ -49,6 +58,8 @@ export async function PUT(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const denied = await requireRole(["admin"])
+    if (denied) return denied
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
     if (!id) {

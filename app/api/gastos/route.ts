@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server"
 import { getGastos, getGastosByMonth, createGasto, updateGasto, deleteGasto } from "@/lib/database"
 import { parseYearMonth } from "@/lib/utils"
+import { requireRole } from "@/lib/auth-server"
+
+// Gastos = sección visible para admin y operador (no supervisor).
+const ROLES = ["admin", "operador"] as const
 
 export async function GET(request: Request) {
   try {
+    const denied = await requireRole([...ROLES])
+    if (denied) return denied
     const { searchParams } = new URL(request.url)
     const ym = parseYearMonth(searchParams)
 
@@ -20,6 +26,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const denied = await requireRole([...ROLES])
+    if (denied) return denied
     const data = await request.json()
     const gasto = await createGasto(data)
     return NextResponse.json(gasto)
@@ -31,6 +39,8 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
+    const denied = await requireRole([...ROLES])
+    if (denied) return denied
     const data = await request.json()
     const { id, ...updateData } = data
     const gasto = await updateGasto(id, updateData)
@@ -43,6 +53,8 @@ export async function PUT(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const denied = await requireRole([...ROLES])
+    if (denied) return denied
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
     if (!id) {

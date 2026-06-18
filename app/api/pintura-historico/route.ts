@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { getSQL } from "@/lib/database"
+import { requireRole } from "@/lib/auth-server"
 
 export const dynamic = "force-dynamic"
 
@@ -11,6 +12,8 @@ const TARIFA_DEFAULT = 24000
 
 export async function GET() {
   try {
+    const denied = await requireRole()
+    if (denied) return denied
     const db = getSQL()
 
     const rows = await db`

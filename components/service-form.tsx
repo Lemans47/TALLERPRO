@@ -494,17 +494,15 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
     try {
       const uploadOne = async (file: File) => {
         try {
+          // Subimos a través de nuestro servidor (/api/upload), que exige sesión
+          // y valida tipo/tamaño, en vez de ir directo a Cloudinary sin firma.
           const form = new FormData()
           form.append("file", file)
-          form.append("upload_preset", "tallerpro")
           form.append("folder", `tallerpro/${tipo}`)
-          const res = await fetch("https://api.cloudinary.com/v1_1/dzjtujwor/image/upload", {
-            method: "POST",
-            body: form,
-          })
+          const res = await fetch("/api/upload", { method: "POST", body: form })
           const data = await res.json()
-          if (!res.ok || data.error) throw new Error(data.error?.message || "Upload failed")
-          return { url: data.secure_url as string, publicId: data.public_id as string }
+          if (!res.ok) throw new Error(data.error || "Upload failed")
+          return { url: data.url as string, publicId: data.publicId as string }
         } catch {
           return null
         }

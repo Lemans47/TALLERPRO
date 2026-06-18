@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { getSQL, getNombresEstadosPorTipo } from "@/lib/database"
+import { requireRole } from "@/lib/auth-server"
 
 export const dynamic = "force-dynamic"
 
@@ -7,6 +8,8 @@ export const dynamic = "force-dynamic"
 // Antes traía TODOS los servicios/gastos/empleados y los charts hacían el cálculo en el cliente.
 export async function GET() {
   try {
+    const denied = await requireRole()
+    if (denied) return denied
     const db = getSQL()
     // Resolver nombres de estados "cerrado" dinámicamente para que el rename desde
     // configuración no haga que el cobrado quede en 0.
