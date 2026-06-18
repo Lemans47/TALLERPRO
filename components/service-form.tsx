@@ -36,6 +36,7 @@ import {
   Upload,
   ImageIcon,
   Play,
+  Video,
   AlignJustify,
   List,
   ListChecks,
@@ -476,6 +477,30 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   // Funciones para fotos
   const esVideo = (f: FotoServicio) => (f.tipo ?? "image") === "video"
 
+  const MAX_VIDEO_SEGUNDOS = 60
+  const MAX_IMAGEN_MB = 15
+  const MAX_VIDEO_MB = 100
+
+  // Lee la duración (segundos) de un video en el navegador, sin subirlo.
+  const getVideoDuration = (file: File) =>
+    new Promise<number>((resolve) => {
+      try {
+        const v = document.createElement("video")
+        v.preload = "metadata"
+        v.onloadedmetadata = () => {
+          URL.revokeObjectURL(v.src)
+          resolve(Number.isFinite(v.duration) ? v.duration : 0)
+        }
+        v.onerror = () => {
+          URL.revokeObjectURL(v.src)
+          resolve(0)
+        }
+        v.src = URL.createObjectURL(file)
+      } catch {
+        resolve(0)
+      }
+    })
+
   const handleUploadFotos = async (files: File[], tipo: "ingreso" | "entrega") => {
     const MAX = tipo === "ingreso" ? 15 : 8
     const current = tipo === "ingreso" ? fotosIngreso : fotosEntrega
@@ -494,17 +519,32 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       } else if (videosExistentes >= 1) {
         toast({ title: "Ya hay un video", description: "Solo se permite 1 video por orden.", variant: "destructive" })
       } else {
-        videosASubir = incomingVideos.slice(0, 1)
+        const vid = incomingVideos[0]
         if (incomingVideos.length > 1) {
           toast({ title: "Solo 1 video", description: "Se subirá únicamente el primer video.", variant: "destructive" })
+        }
+        if (vid.size > MAX_VIDEO_MB * 1024 * 1024) {
+          toast({ title: "Video muy pesado", description: `El video supera ${MAX_VIDEO_MB} MB.`, variant: "destructive" })
+        } else {
+          const dur = await getVideoDuration(vid)
+          if (dur > MAX_VIDEO_SEGUNDOS + 0.5) {
+            toast({ title: "Video muy largo", description: `Dura ${Math.round(dur)}s. El máximo es ${MAX_VIDEO_SEGUNDOS} segundos.`, variant: "destructive" })
+          } else {
+            videosASubir = [vid]
+          }
         }
       }
     }
 
     const imagenesActuales = current.filter((f) => !esVideo(f)).length
     const restantes = Math.max(0, MAX - imagenesActuales)
-    const imagenesASubir = incomingImages.slice(0, restantes)
-    const descartadas = incomingImages.length - imagenesASubir.length
+    const imagenesValidas = incomingImages.filter((f) => f.size <= MAX_IMAGEN_MB * 1024 * 1024)
+    const pesadas = incomingImages.length - imagenesValidas.length
+    if (pesadas > 0) {
+      toast({ title: "Foto muy pesada", description: `${pesadas} foto${pesadas === 1 ? "" : "s"} supera${pesadas === 1 ? "" : "n"} ${MAX_IMAGEN_MB} MB.`, variant: "destructive" })
+    }
+    const imagenesASubir = imagenesValidas.slice(0, restantes)
+    const descartadas = imagenesValidas.length - imagenesASubir.length
     if (descartadas > 0) {
       toast({
         title: "Algunas fotos no se subirán",
@@ -520,19 +560,25 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
     try {
       const uploadOne = async (file: File): Promise<FotoServicio | { error: string }> => {
         try {
-          // Subimos a través de nuestro servidor (/api/upload), que exige sesión
-          // y valida tipo/tamaño/duración, en vez de ir directo a Cloudinary.
+          // Subida directa navegador→Cloudinary (unsigned). En Vercel no podemos
+          // pasar archivos grandes (video) por la función serverless por su límite
+          // de 4.5 MB, por eso van directo. /auto/ detecta si es foto o video.
           const form = new FormData()
           form.append("file", file)
+          form.append("upload_preset", "tallerpro")
           form.append("folder", `tallerpro/${tipo}`)
-          const res = await fetch("/api/upload", { method: "POST", body: form })
+          const res = await fetch("https://api.cloudinary.com/v1_1/dzjtujwor/auto/upload", {
+            method: "POST",
+            body: form,
+          })
           const data = await res.json()
-          if (!res.ok) throw new Error(data.error || "Upload failed")
+          if (!res.ok || data.error) throw new Error(data.error?.message || "No se pudo subir")
+          const t: "image" | "video" = data.resource_type === "video" ? "video" : "image"
           return {
-            url: data.url as string,
-            publicId: data.publicId as string,
-            tipo: (data.tipo as "image" | "video") ?? "image",
-            ...(data.poster ? { poster: data.poster as string } : {}),
+            url: data.secure_url as string,
+            publicId: data.public_id as string,
+            tipo: t,
+            ...(t === "video" ? { poster: (data.secure_url as string).replace(/\.[^.]+$/, ".jpg") } : {}),
           }
         } catch (e: any) {
           return { error: e?.message || "No se pudo subir" }
@@ -548,7 +594,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       if (errores.length > 0) {
         toast({
           title: "Error al subir",
-          // Mostramos el motivo del primer error (p. ej. video supera 1 minuto).
+          // Mostramos el motivo del primer error.
           description: errores[0].error,
           variant: "destructive",
         })
@@ -1614,10 +1660,11 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                     <span className="text-xs text-muted-foreground">({fotosIngreso.filter((f) => !esVideo(f)).length}/15 fotos · 1 video)</span>
                   </div>
                   {(fotosIngreso.filter((f) => !esVideo(f)).length < 15 || !fotosIngreso.some(esVideo)) && (
-                    <div className="grid grid-cols-2 gap-2">
-                      <label className={`cursor-pointer flex items-center justify-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-primary/50 text-primary hover:bg-primary/10 transition-colors ${uploadingFoto ? "opacity-50 pointer-events-none" : ""}`}>
+                    <div className="flex flex-wrap gap-2">
+                      {/* Galería: fotos y/o video */}
+                      <label className={`cursor-pointer flex-1 min-w-[130px] flex items-center justify-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-primary/50 text-primary hover:bg-primary/10 transition-colors ${uploadingFoto ? "opacity-50 pointer-events-none" : ""}`}>
                         <Upload className="w-3.5 h-3.5 shrink-0" />
-                        <span className="truncate">{uploadingFoto ? "Subiendo..." : "Agregar fotos/video"}</span>
+                        <span className="truncate">{uploadingFoto ? "Subiendo..." : "Agregar"}</span>
                         <input
                           type="file"
                           accept="image/*,video/*"
@@ -1630,12 +1677,13 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                           }}
                         />
                       </label>
-                      <label className={`cursor-pointer flex items-center justify-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-primary/50 text-primary hover:bg-primary/10 transition-colors ${uploadingFoto ? "opacity-50 pointer-events-none" : ""}`}>
+                      {/* Cámara de fotos (captura directa) */}
+                      <label className={`cursor-pointer flex-1 min-w-[130px] flex items-center justify-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-primary/50 text-primary hover:bg-primary/10 transition-colors ${uploadingFoto ? "opacity-50 pointer-events-none" : ""}`}>
                         <Camera className="w-3.5 h-3.5 shrink-0" />
-                        <span className="truncate">Tomar foto/video</span>
+                        <span className="truncate">Tomar foto</span>
                         <input
                           type="file"
-                          accept="image/*,video/*"
+                          accept="image/*"
                           capture="environment"
                           className="hidden"
                           onChange={(e) => {
@@ -1645,6 +1693,24 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                           }}
                         />
                       </label>
+                      {/* Cámara de video (captura directa) — solo si no hay video aún */}
+                      {!fotosIngreso.some(esVideo) && (
+                        <label className={`cursor-pointer flex-1 min-w-[130px] flex items-center justify-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-primary/50 text-primary hover:bg-primary/10 transition-colors ${uploadingFoto ? "opacity-50 pointer-events-none" : ""}`}>
+                          <Video className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">Grabar video</span>
+                          <input
+                            type="file"
+                            accept="video/*"
+                            capture="environment"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0]
+                              if (file) handleUploadFotos([file], "ingreso")
+                              e.target.value = ""
+                            }}
+                          />
+                        </label>
+                      )}
                     </div>
                   )}
                   {fotosIngreso.length === 0 ? (
