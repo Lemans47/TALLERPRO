@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { getGastos, getGastosByMonth, createGasto, updateGasto, deleteGasto } from "@/lib/database"
-import { parseYearMonth } from "@/lib/utils"
+import { parseYearMonth, montoValido } from "@/lib/utils"
 import { requireRole } from "@/lib/auth-server"
 
 // Gastos = sección visible para admin y operador (no supervisor).
@@ -29,6 +29,9 @@ export async function POST(request: Request) {
     const denied = await requireRole([...ROLES])
     if (denied) return denied
     const data = await request.json()
+    if (!montoValido(data.monto)) {
+      return NextResponse.json({ error: "Monto inválido" }, { status: 400 })
+    }
     const gasto = await createGasto(data)
     return NextResponse.json(gasto)
   } catch (error) {
@@ -43,6 +46,9 @@ export async function PUT(request: Request) {
     if (denied) return denied
     const data = await request.json()
     const { id, ...updateData } = data
+    if (!montoValido(updateData.monto)) {
+      return NextResponse.json({ error: "Monto inválido" }, { status: 400 })
+    }
     const gasto = await updateGasto(id, updateData)
     return NextResponse.json(gasto)
   } catch (error) {

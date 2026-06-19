@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server"
 import { getServicios, getServiciosByMonth, getServiciosActivosParaLista, createServicio, updateServicio, deleteServicio, getServicioById, upsertClienteYVehiculo } from "@/lib/database"
-import { parseYearMonth } from "@/lib/utils"
+import { parseYearMonth, montoValido } from "@/lib/utils"
 import { requireRole } from "@/lib/auth-server"
 import crypto from "crypto"
+
+// Campos monetarios de nivel superior que deben ser números finitos ≥ 0.
+const CAMPOS_MONTO = ["monto_total", "monto_total_sin_iva", "anticipo", "saldo_pendiente"] as const
+function montosServicioValidos(data: Record<string, unknown>): boolean {
+  return CAMPOS_MONTO.every((c) => montoValido(data[c]))
+}
 
 const CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME
 const API_KEY = process.env.CLOUDINARY_API_KEY
@@ -48,6 +54,9 @@ export async function POST(request: Request) {
     const denied = await requireRole()
     if (denied) return denied
     const data = await request.json()
+    if (!montosServicioValidos(data)) {
+      return NextResponse.json({ error: "Monto inválido" }, { status: 400 })
+    }
     const servicio = await createServicio(data)
     // Sincronizar cliente y vehículo en sus tablas
     if (servicio.cliente && servicio.patente) {
@@ -68,6 +77,9 @@ export async function PUT(request: Request) {
     if (denied) return denied
     const data = await request.json()
     const { id, ...updateData } = data
+    if (!montosServicioValidos(updateData)) {
+      return NextResponse.json({ error: "Monto inválido" }, { status: 400 })
+    }
     const servicio = await updateServicio(id, updateData)
     // Sincronizar cliente y vehículo en sus tablas
     if (servicio.cliente && servicio.patente) {

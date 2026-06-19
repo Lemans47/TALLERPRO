@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createPresupuesto } from "@/lib/database"
+import { hoyChile } from "@/lib/utils"
 
 // Endpoint PÚBLICO (sin sesión) para el formulario `/solicitar-presupuesto`.
 // A diferencia de `/api/presupuestos` (que exige sesión), aquí solo se aceptan
@@ -41,8 +42,8 @@ export async function POST(request: Request) {
     const año = Number.isFinite(añoNum) && añoNum > 1900 && añoNum < 3000 ? Math.trunc(añoNum) : null
 
     const solicitud = await createPresupuesto({
-      // Fecha del servidor; no confiamos en la del cliente.
-      fecha_ingreso: new Date().toISOString().split("T")[0],
+      // Fecha del servidor en horario de Chile; no confiamos en la del cliente.
+      fecha_ingreso: hoyChile(),
       patente,
       marca,
       modelo,

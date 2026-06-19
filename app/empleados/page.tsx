@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/lib/auth-context"
 import { useMonth } from "@/lib/month-context"
 import { api, type Empleado, type AbonoEmpleado } from "@/lib/api-client"
-import { formatFechaDMA } from "@/lib/utils"
+import { formatFechaDMA, hoyChile } from "@/lib/utils"
 import { Users, Plus, Pencil, Trash2, RefreshCw, ChevronDown, ChevronUp, CheckCircle } from "lucide-react"
 
 const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"]
@@ -36,7 +36,7 @@ export default function EmpleadosPage() {
   const [abonoDialog, setAbonoDialog] = useState(false)
   const [abonoEmpleado, setAbonoEmpleado] = useState<Empleado | null>(null)
   const [abonoMonto, setAbonoMonto] = useState("")
-  const [abonoFecha, setAbonoFecha] = useState(new Date().toISOString().split("T")[0])
+  const [abonoFecha, setAbonoFecha] = useState(hoyChile())
   const [abonoNota, setAbonoNota] = useState("")
 
   const canEdit = role === "admin"
@@ -104,7 +104,7 @@ export default function EmpleadosPage() {
     setAbonoEmpleado(emp)
     const pendiente = Number(emp.sueldo_base) - totalAbonado(emp.id)
     setAbonoMonto(String(pendiente > 0 ? pendiente : ""))
-    setAbonoFecha(new Date().toISOString().split("T")[0])
+    setAbonoFecha(hoyChile())
     setAbonoNota("")
     setAbonoDialog(true)
   }
