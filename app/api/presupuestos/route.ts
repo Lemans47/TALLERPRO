@@ -10,6 +10,7 @@ import {
 } from "@/lib/database"
 import { parseYearMonth } from "@/lib/utils"
 import { requireRole } from "@/lib/auth-server"
+import { invalidateDashboardCache } from "@/lib/dashboard-cache"
 
 export async function GET(request: Request) {
   try {
@@ -44,6 +45,7 @@ export async function PATCH(request: Request) {
     }
 
     const servicio = await convertPresupuestoToServicio(id)
+    invalidateDashboardCache()
 
     return NextResponse.json({
       success: true,

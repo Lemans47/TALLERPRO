@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { getServicios, getServiciosByMonth, getServiciosActivosParaLista, createServicio, updateServicio, deleteServicio, getServicioById, upsertClienteYVehiculo } from "@/lib/database"
 import { parseYearMonth, montoValido } from "@/lib/utils"
 import { requireRole } from "@/lib/auth-server"
+import { invalidateDashboardCache } from "@/lib/dashboard-cache"
 import crypto from "crypto"
 
 // Campos monetarios de nivel superior que deben ser números finitos ≥ 0.
@@ -58,6 +59,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Monto inválido" }, { status: 400 })
     }
     const servicio = await createServicio(data)
+    invalidateDashboardCache()
     // Sincronizar cliente y vehículo en sus tablas
     if (servicio.cliente && servicio.patente) {
       await upsertClienteYVehiculo(servicio.cliente, servicio.telefono || "", servicio.patente, {
@@ -81,6 +83,7 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "Monto inválido" }, { status: 400 })
     }
     const servicio = await updateServicio(id, updateData)
+    invalidateDashboardCache()
     // Sincronizar cliente y vehículo en sus tablas
     if (servicio.cliente && servicio.patente) {
       await upsertClienteYVehiculo(servicio.cliente, servicio.telefono || "", servicio.patente, {
@@ -112,6 +115,7 @@ export async function DELETE(request: Request) {
     }
 
     await deleteServicio(id)
+    invalidateDashboardCache()
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Servicios DELETE error:", error)

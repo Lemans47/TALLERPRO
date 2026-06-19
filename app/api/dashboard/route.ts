@@ -15,6 +15,7 @@ import {
 import { computeKpisMes } from "@/lib/reportes/kpis"
 import { parseYearMonth } from "@/lib/utils"
 import { requireRole } from "@/lib/auth-server"
+import { getDashboardCache } from "@/lib/dashboard-cache"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
@@ -22,16 +23,8 @@ export const revalidate = 0
 // ── Cache en memoria del proceso ────────────────────────────────────────────
 // Las queries del dashboard son pesadas (latencia Chile→Supabase + 11 queries
 // paralelas). Recargas repetidas en 30s devuelven la misma respuesta sin pegar
-// a la DB. Si el usuario edita un servicio y vuelve, espera ≤30s para refrescar.
-// Cache es global para sobrevivir hot-reload de Next en dev.
-declare global {
-  // eslint-disable-next-line no-var
-  var _dashboardCache: Map<string, { value: unknown; expires: number; inFlight?: Promise<unknown> }> | undefined
-}
-function getCache() {
-  if (!global._dashboardCache) global._dashboardCache = new Map()
-  return global._dashboardCache
-}
+// a la DB. El accesor y la invalidación viven en lib/dashboard-cache para que las
+// rutas de mutación puedan limpiarla y no mostrar datos viejos tras guardar.
 const TTL_MS = 30_000
 
 async function loadDashboardData(year: number, month: number) {
@@ -102,7 +95,7 @@ export async function GET(request: Request) {
     const month = ym?.month ?? now.getMonth() + 1
     const skipCache = searchParams.get("nocache") === "1"
 
-    const cache = getCache()
+    const cache = getDashboardCache()
     const key = `${year}-${month}`
     const tNow = Date.now()
     const hit = cache.get(key)

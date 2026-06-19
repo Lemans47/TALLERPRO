@@ -30,6 +30,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // que llegan después de un cambio de sesión.
   const inFlightUserRef = useRef<string | null>(null)
   const mountedRef = useRef(true)
+  // Timer del reintento de carga de rol (backoff), para poder cancelarlo.
+  const roleRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const supabase = createClient()
 
@@ -50,7 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return null
   }
 
-  const loadRoleInBackground = (userId: string) => {
+  const loadRoleInBackground = (userId: string, attempt = 0) => {
     inFlightUserRef.current = userId
     fetchRole(userId).then((r) => {
       // Descartar si el componente se desmontó o si la sesión cambió mientras
@@ -60,6 +62,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (r) {
         roleLoadedForRef.current = userId
         setRole(r)
+        return
+      }
+      // El rol no cargó (timeout/red intermitente). Reintentar con backoff para
+      // que el menú no quede vacío indefinidamente. También reintentamos al
+      // recuperar el foco de la ventana (ver listener en el efecto).
+      if (attempt < 6) {
+        const delay = Math.min(20_000, 1_500 * 2 ** attempt)
+        if (roleRetryRef.current) clearTimeout(roleRetryRef.current)
+        roleRetryRef.current = setTimeout(() => {
+          if (mountedRef.current && inFlightUserRef.current === userId && roleLoadedForRef.current !== userId) {
+            loadRoleInBackground(userId, attempt + 1)
+          }
+        }, delay)
       }
     })
   }
@@ -101,9 +116,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     })
 
+    // Si el rol no alcanzó a cargar (red intermitente), reintentar al volver el
+    // foco a la pestaña para que el menú no quede vacío.
+    const onFocus = () => {
+      const uid = inFlightUserRef.current
+      if (uid && roleLoadedForRef.current !== uid) {
+        loadRoleInBackground(uid, 0)
+      }
+    }
+    window.addEventListener("focus", onFocus)
+
     return () => {
       mountedRef.current = false
       subscription.unsubscribe()
+      window.removeEventListener("focus", onFocus)
+      if (roleRetryRef.current) clearTimeout(roleRetryRef.current)
     }
   }, [])
 

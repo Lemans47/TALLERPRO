@@ -109,11 +109,12 @@ export default function ServicesPage() {
   }
 
   const handleSaved = () => {
-    setTimeout(() => {
-      loadData()
-    }, 500)
+    // El formulario llama onSaved() recién después de que la API confirma el
+    // guardado, así que recargamos de inmediato (sin esperas fijas que dejaban
+    // la lista desactualizada en redes lentas).
     setServicioAEditar(null)
     setShowFormDialog(false)
+    loadData()
   }
 
   const filterBySearch = <T extends { patente: string; cliente: string; marca: string; modelo: string }>(

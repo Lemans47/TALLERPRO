@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { getGastos, getGastosByMonth, createGasto, updateGasto, deleteGasto } from "@/lib/database"
 import { parseYearMonth, montoValido } from "@/lib/utils"
 import { requireRole } from "@/lib/auth-server"
+import { invalidateDashboardCache } from "@/lib/dashboard-cache"
 
 // Gastos = sección visible para admin y operador (no supervisor).
 const ROLES = ["admin", "operador"] as const
@@ -33,6 +34,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Monto inválido" }, { status: 400 })
     }
     const gasto = await createGasto(data)
+    invalidateDashboardCache()
     return NextResponse.json(gasto)
   } catch (error) {
     console.error("Gastos POST error:", error)
@@ -50,6 +52,7 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "Monto inválido" }, { status: 400 })
     }
     const gasto = await updateGasto(id, updateData)
+    invalidateDashboardCache()
     return NextResponse.json(gasto)
   } catch (error) {
     console.error("Gastos PUT error:", error)
@@ -67,6 +70,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "ID required" }, { status: 400 })
     }
     await deleteGasto(id)
+    invalidateDashboardCache()
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Gastos DELETE error:", error)
