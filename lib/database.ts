@@ -172,12 +172,15 @@ export async function getServicioById(id: string) {
 
 export async function getHistorialByPatente(patente: string) {
   const db = getSQL()
+  // Normalizamos igual que la columna generada patente_norm para que "AA-1234",
+  // "AA 1234" y "AA1234" se traten como la misma patente (y se use el índice).
+  const norm = patente.replace(/[^A-Za-z0-9]/g, "").toUpperCase()
   const data = await db`
     SELECT id, fecha_ingreso, patente, marca, modelo, color, cliente, telefono,
            observaciones, estado, monto_total, monto_total_sin_iva, cobros,
            piezas_pintura, anticipo, saldo_pendiente, numero_ot
     FROM servicios
-    WHERE UPPER(TRIM(patente)) = UPPER(TRIM(${patente}))
+    WHERE patente_norm = ${norm}
     ORDER BY fecha_ingreso DESC
   `
   return data as Servicio[]
@@ -871,9 +874,13 @@ export async function getDashboardKPIs(year: number, month: number) {
 // Vehicle History
 export async function getVehicleHistory(patente: string) {
   const db = getSQL()
+  // Coincidencia exacta por patente normalizada (sin guiones/espacios). servicios
+  // tiene la columna generada patente_norm; presupuestos no, así que normalizamos
+  // inline con el mismo criterio.
+  const norm = patente.replace(/[^A-Za-z0-9]/g, "").toUpperCase()
   const [serviciosData, presupuestosData] = await Promise.all([
-    db`SELECT * FROM servicios WHERE LOWER(patente) LIKE ${`%${patente.toLowerCase()}%`} ORDER BY fecha_ingreso DESC`,
-    db`SELECT * FROM presupuestos WHERE LOWER(patente) LIKE ${`%${patente.toLowerCase()}%`} ORDER BY fecha_ingreso DESC`,
+    db`SELECT * FROM servicios WHERE patente_norm = ${norm} ORDER BY fecha_ingreso DESC`,
+    db`SELECT * FROM presupuestos WHERE UPPER(REGEXP_REPLACE(patente, '[^A-Za-z0-9]', '', 'g')) = ${norm} ORDER BY fecha_ingreso DESC`,
   ])
 
   return {
@@ -1365,7 +1372,9 @@ export interface Vehiculo {
 
 export async function getVehiculoByPatente(patente: string): Promise<Vehiculo | null> {
   const db = getSQL()
-  const data = await db`SELECT * FROM vehiculos WHERE patente = ${patente.toUpperCase()} LIMIT 1`
+  // patente_norm (columna generada) normaliza guiones/espacios y permite el índice.
+  const norm = patente.replace(/[^A-Za-z0-9]/g, "").toUpperCase()
+  const data = await db`SELECT * FROM vehiculos WHERE patente_norm = ${norm} LIMIT 1`
   return (data[0] as Vehiculo) || null
 }
 

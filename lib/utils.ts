@@ -141,3 +141,23 @@ export function formatFechaDMA(value: Date | string | null | undefined): string 
   const y = value.getFullYear()
   return `${d}/${m}/${y}`
 }
+
+/**
+ * Fecha de hoy en formato YYYY-MM-DD en horario de Chile (America/Santiago).
+ * Robusta tanto en el navegador como en el servidor (que corre en UTC): evita el
+ * bug de `new Date().toISOString().split("T")[0]`, que después de las ~21:00 de
+ * Chile devuelve la fecha del día siguiente. `en-CA` formatea como YYYY-MM-DD.
+ */
+export function hoyChile(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Santiago" }).format(new Date())
+}
+
+/**
+ * Valida un monto en pesos: acepta nulo/vacío (se trata como 0) o un número
+ * finito ≥ 0. Rechaza NaN, Infinity y negativos, que corromperían los KPIs.
+ */
+export function montoValido(v: unknown): boolean {
+  if (v == null || v === "") return true
+  const n = Number(v)
+  return Number.isFinite(n) && n >= 0
+}

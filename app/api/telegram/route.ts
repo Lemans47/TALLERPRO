@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createGasto } from "@/lib/database"
+import { hoyChile } from "@/lib/utils"
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || ""
 const ALLOWED_IDS = (process.env.TELEGRAM_ALLOWED_CHAT_IDS || "").split(",").map((s) => s.trim())
@@ -88,7 +89,7 @@ export async function POST(request: Request) {
       const categoria = parts[1]
       const monto = Number(parts[2])
       const descripcion = parts.slice(3).join("|")
-      const fecha = new Date().toISOString().split("T")[0]
+      const fecha = hoyChile()
 
       await createGasto({ fecha, categoria, descripcion, monto })
 
