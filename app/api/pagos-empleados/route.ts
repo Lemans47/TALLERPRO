@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { getAbonosByMonth, createAbono, deleteAbonoWithGastos } from "@/lib/database"
 import { requireRole } from "@/lib/auth-server"
+import { invalidateDashboardCache } from "@/lib/dashboard-cache"
 
 // Abonos/pagos a empleados = sección Empleados (admin/supervisor).
 const ROLES = ["admin", "supervisor"] as const
@@ -32,6 +33,7 @@ export async function POST(request: Request) {
       fecha: data.fecha,
       notas: data.notas,
     })
+    invalidateDashboardCache()
     return NextResponse.json(abono)
   } catch (e) {
     return NextResponse.json({ error: "Error creating abono" }, { status: 500 })
@@ -46,6 +48,7 @@ export async function DELETE(request: Request) {
     const id = searchParams.get("id")
     if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 })
     await deleteAbonoWithGastos(id)
+    invalidateDashboardCache()
     return NextResponse.json({ success: true })
   } catch (e) {
     return NextResponse.json({ error: "Error deleting abono" }, { status: 500 })
