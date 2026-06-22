@@ -1,4 +1,4 @@
-import { getServiciosPorCobrar } from "@/lib/database"
+import { getServiciosActivosCobranza, getServiciosPorCobrar } from "@/lib/database"
 
 // Lógica compartida del bot de cobranzas de Telegram. La usan tanto el webhook
 // (app/api/telegram-cobranzas) como el cron del reporte diario
@@ -71,6 +71,45 @@ export async function buildCobranzasMessage(): Promise<string> {
       `👤 <b>${esc(s.cliente)}</b>\n` +
       `🚗 ${esc(s.patente)}${ot}\n` +
       `💵 ${fmtCLP(Number(s.saldo_pendiente))}${antig}`
+    )
+  })
+
+  let msg = header + "\n\n" + bloques.join("\n\n")
+  if (servicios.length > MAX) {
+    msg += `\n\n… y ${servicios.length - MAX} más. Revisá el panel para el detalle completo.`
+  }
+  return msg
+}
+
+// Servicios activos en el taller (todo lo que no está entregado/por cobrar ni
+// cerrado), con el total a cobrar de cada uno y lo abonado hasta ahora. Mismo
+// formato aireado que buildCobranzasMessage.
+export async function buildActivosMessage(): Promise<string> {
+  const servicios = await getServiciosActivosCobranza()
+  if (!servicios.length) {
+    return "🔧 <b>No hay servicios activos en el taller.</b>"
+  }
+
+  const totalCobrado = servicios.reduce((acc, s) => acc + (Number(s.monto_total) || 0), 0)
+  const totalAbonado = servicios.reduce((acc, s) => acc + (Number(s.anticipo) || 0), 0)
+  const totalSaldo = servicios.reduce((acc, s) => acc + (Number(s.saldo_pendiente) || 0), 0)
+  const header =
+    `🔧 <b>Servicios activos en taller</b>\n` +
+    `${servicios.length} servicio(s)\n` +
+    `Cobrado: <b>${fmtCLP(totalCobrado)}</b> · Abonado: <b>${fmtCLP(totalAbonado)}</b>\n` +
+    `Saldo: <b>${fmtCLP(totalSaldo)}</b>\n` +
+    `━━━━━━━━━━━━━━`
+
+  const MAX = 30
+  const bloques = servicios.slice(0, MAX).map((s) => {
+    const dias = diasDesde(s.fecha_ingreso)
+    const antig = dias !== null ? ` · ${dias} días` : ""
+    const ot = s.numero_ot ? ` · OT ${esc(s.numero_ot)}` : ""
+    return (
+      `👤 <b>${esc(s.cliente)}</b>\n` +
+      `🚗 ${esc(s.patente)}${ot} · ${esc(s.estado)}\n` +
+      `💵 Cobrado: ${fmtCLP(Number(s.monto_total))}  |  Abonado: ${fmtCLP(Number(s.anticipo))}\n` +
+      `⏳ Saldo: ${fmtCLP(Number(s.saldo_pendiente))}${antig}`
     )
   })
 
