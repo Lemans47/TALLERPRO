@@ -82,11 +82,16 @@ interface ItemsPorCategoria {
 }
 
 interface PiezaPintura {
+  id?: string
   nombre: string
   precio: number
   seleccionada: boolean
   cantidad_piezas?: number
 }
+
+// Key estable para casar/identificar una pieza en el estado del formulario: usa el id del
+// catálogo (no cambia al renombrar) y cae al nombre solo para piezas legacy sin id.
+const piezaKey = (p: { id?: string; nombre: string }) => p.id ?? p.nombre
 
 const isAutoItem = (desc: string | null | undefined) => {
   if (!desc) return false
@@ -211,6 +216,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
           new Map(piezas.map((p) => [String(p.nombre || "").trim().toUpperCase(), p])).values()
         )
         const piezasConPrecio = piezasUnicas.map((p) => ({
+          id: p.id,
           nombre: p.nombre,
           precio: precioGlobal,
           cantidad_piezas: Number(p.cantidad_piezas) || 1,
@@ -379,35 +385,63 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         try {
           const [precio, piezas] = await Promise.all([api.precioPintura.get(), api.piezasPintura.getAll()])
           const precioGlobal = precio?.precio_por_pieza || 0
-          const piezasData = Array.isArray(servicioAEditar.piezas_pintura) ? servicioAEditar.piezas_pintura : (typeof servicioAEditar.piezas_pintura === "string" ? JSON.parse(servicioAEditar.piezas_pintura) : [])
-          
+          const rawPiezasData = Array.isArray(servicioAEditar.piezas_pintura)
+            ? servicioAEditar.piezas_pintura
+            : (typeof servicioAEditar.piezas_pintura === "string" ? JSON.parse(servicioAEditar.piezas_pintura) : [])
+          const piezasData = (Array.isArray(rawPiezasData) ? rawPiezasData : []) as Array<{
+            nombre: string; cantidad?: number; precio_unitario?: number; precio?: number; pieza_id?: string
+          }>
+          const norm = (s: string | null | undefined) => String(s || "").trim().toUpperCase()
+
           if (Array.isArray(piezas) && piezas.length > 0) {
             // Dedup defensivo por nombre (ver loadPreciosYPiezasPintura).
             const piezasUnicas = Array.from(
-              new Map(piezas.map((p) => [String(p.nombre || "").trim().toUpperCase(), p])).values()
+              new Map(piezas.map((p) => [norm(p.nombre), p])).values()
             )
+            // Casa cada pieza guardada contra el catálogo por pieza_id (estable ante
+            // renombrados) y, si es legacy sin id, por nombre normalizado (insensible a
+            // mayúsculas/espacios). Se registra el índice usado para no asignar el mismo
+            // snapshot a dos piezas del catálogo.
+            const usados = new Set<number>()
+            const tomarSaved = (cat: { id: string; nombre: string }) => {
+              let idx = piezasData.findIndex((pd, i) => !usados.has(i) && !!pd.pieza_id && pd.pieza_id === cat.id)
+              if (idx === -1) idx = piezasData.findIndex((pd, i) => !usados.has(i) && norm(pd.nombre) === norm(cat.nombre))
+              if (idx === -1) return undefined
+              usados.add(idx)
+              return piezasData[idx]
+            }
+            // Preferir precio_unitario guardado (snapshot). Para servicios viejos sin él,
+            // derivar de precio/cantidad o caer al global como último recurso.
+            const precioUnitDe = (pd: { cantidad?: number; precio_unitario?: number; precio?: number }) => {
+              const cant = Number(pd.cantidad) || 1
+              if (pd.precio_unitario != null) return Number(pd.precio_unitario) || 0
+              if (pd.precio != null && cant > 0) return Number(pd.precio) / cant
+              return precioGlobal
+            }
             const piezasConPrecio = piezasUnicas.map((p) => {
-              const saved = piezasData.find((pd: { nombre: string; cantidad: number; precio_unitario?: number; precio?: number }) => pd.nombre === p.nombre)
-              // Preferir precio_unitario guardado en este servicio (snapshot). Para
-              // servicios viejos sin precio_unitario, derivar de precio/cantidad o
-              // caer al global como último recurso.
-              let precioUnit = precioGlobal
-              if (saved) {
-                const cant = Number(saved.cantidad) || 1
-                if (saved.precio_unitario != null) {
-                  precioUnit = Number(saved.precio_unitario) || 0
-                } else if (saved.precio != null && cant > 0) {
-                  precioUnit = Number(saved.precio) / cant
-                }
-              }
+              const saved = tomarSaved(p)
               return {
+                id: p.id,
                 nombre: p.nombre,
-                precio: precioUnit,
+                precio: saved ? precioUnitDe(saved) : precioGlobal,
                 cantidad_piezas: saved ? Number(saved.cantidad) || 1 : Number(p.cantidad_piezas) || 1,
                 seleccionada: !!saved,
               }
             })
-            setPiezasSeleccionadas(piezasConPrecio)
+            // Piezas guardadas que ya no existen en el catálogo (no calzaron por id ni por
+            // nombre, p.ej. eliminadas del catálogo): se conservan seleccionadas para no
+            // perder su aporte al total.
+            const huerfanas = piezasData
+              .map((pd, i) => ({ pd, i }))
+              .filter(({ i }) => !usados.has(i))
+              .map(({ pd }) => ({
+                id: pd.pieza_id || undefined,
+                nombre: pd.nombre,
+                precio: precioUnitDe(pd),
+                cantidad_piezas: Number(pd.cantidad) || 1,
+                seleccionada: true,
+              }))
+            setPiezasSeleccionadas([...piezasConPrecio, ...huerfanas])
           }
         } catch (error) {
           console.error("Error loading piezas for edit:", error)
@@ -927,6 +961,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       const piezasPinturaArray = piezasSeleccionadas
         .filter((p) => p.seleccionada)
         .map((p) => ({
+          pieza_id: p.id,
           nombre: p.nombre,
           cantidad: p.cantidad_piezas || 1,
           precio_unitario: p.precio,
@@ -1054,6 +1089,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       const piezasPinturaArray = piezasSeleccionadas
         .filter((p) => p.seleccionada)
         .map((p) => ({
+          pieza_id: p.id,
           nombre: p.nombre,
           cantidad: p.cantidad_piezas || 1,
           precio_unitario: p.precio,
@@ -1237,7 +1273,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                       const isSelected = pieza.seleccionada
                       return (
                         <div
-                          key={pieza.nombre}
+                          key={piezaKey(pieza)}
                           className={`grid grid-cols-[minmax(0,1fr)_5rem_7rem_6rem] items-center gap-3 p-3 rounded-lg border transition-colors ${
                             isSelected
                               ? "bg-primary/10 border-primary/30"
@@ -1246,18 +1282,18 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                         >
                           <div className="flex items-center gap-3 min-w-0">
                             <Checkbox
-                              id={`edit-pieza-${pieza.nombre}`}
+                              id={`edit-pieza-${piezaKey(pieza)}`}
                               checked={isSelected}
                               onCheckedChange={(checked) => {
                                 setPiezasSeleccionadas((prev) =>
                                   prev.map((p) =>
-                                    p.nombre === pieza.nombre ? { ...p, seleccionada: checked as boolean } : p,
+                                    piezaKey(p) === piezaKey(pieza) ? { ...p, seleccionada: checked as boolean } : p,
                                   ),
                                 )
                               }}
                             />
                             <Label
-                              htmlFor={`edit-pieza-${pieza.nombre}`}
+                              htmlFor={`edit-pieza-${piezaKey(pieza)}`}
                               className="text-sm cursor-pointer break-words"
                             >
                               {pieza.nombre}
@@ -1271,7 +1307,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                             onChange={(e) => {
                               setPiezasSeleccionadas((prev) =>
                                 prev.map((p) =>
-                                  p.nombre === pieza.nombre
+                                  piezaKey(p) === piezaKey(pieza)
                                     ? { ...p, cantidad_piezas: Number(e.target.value) || 1 }
                                     : p,
                                 ),
@@ -1290,7 +1326,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                               const nuevo = Number(e.target.value) || 0
                               setPiezasSeleccionadas((prev) =>
                                 prev.map((p) =>
-                                  p.nombre === pieza.nombre ? { ...p, precio: nuevo } : p,
+                                  piezaKey(p) === piezaKey(pieza) ? { ...p, precio: nuevo } : p,
                                 ),
                               )
                             }}
@@ -1977,12 +2013,12 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                                     .filter((pieza) => !pieza.seleccionada)
                                     .map((pieza) => (
                                       <CommandItem
-                                        key={pieza.nombre}
+                                        key={piezaKey(pieza)}
                                         value={pieza.nombre}
                                         onSelect={() => {
                                           setPiezasSeleccionadas((prev) =>
                                             prev.map((p) =>
-                                              p.nombre === pieza.nombre ? { ...p, seleccionada: true } : p
+                                              piezaKey(p) === piezaKey(pieza) ? { ...p, seleccionada: true } : p
                                             )
                                           )
                                           setSearchOpen(false)
@@ -2028,7 +2064,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                               .filter((p) => p.seleccionada)
                               .map((pieza) => (
                                 <div
-                                  key={pieza.nombre}
+                                  key={piezaKey(pieza)}
                                   className="flex items-center justify-between p-2 bg-secondary/20 hover:bg-secondary/40 rounded transition-colors"
                                 >
                                   <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -2039,7 +2075,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                                       onClick={() => {
                                         setPiezasSeleccionadas((prev) =>
                                           prev.map((p) =>
-                                            p.nombre === pieza.nombre ? { ...p, seleccionada: false } : p
+                                            piezaKey(p) === piezaKey(pieza) ? { ...p, seleccionada: false } : p
                                           )
                                         )
                                       }}

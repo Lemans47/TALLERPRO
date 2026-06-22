@@ -79,7 +79,7 @@ export interface Servicio {
   mano_obra_pintura: number
   cobros: { categoria: string; descripcion: string; monto: number; isAuto?: boolean }[]
   costos: { categoria?: string; descripcion: string; monto: number; isAuto?: boolean; costoReal?: number | null; tipo_documento?: "boleta" | "factura" }[]
-  piezas_pintura: { nombre: string; cantidad: number; precio: number }[]
+  piezas_pintura: { pieza_id?: string; nombre: string; cantidad: number; precio_unitario?: number; precio: number }[]
   estado: string
   iva: string
   anticipo: number
@@ -120,7 +120,7 @@ export interface Presupuesto {
   mano_obra_pintura: number
   cobros: { categoria: string; descripcion: string; monto: number; isAuto?: boolean }[]
   costos: { categoria?: string; descripcion: string; monto: number; isAuto?: boolean; costoReal?: number | null; tipo_documento?: "boleta" | "factura" }[]
-  piezas_pintura: { nombre: string; cantidad: number; precio: number }[]
+  piezas_pintura: { pieza_id?: string; nombre: string; cantidad: number; precio_unitario?: number; precio: number }[]
   iva: string
   monto_total: number
   monto_total_sin_iva: number
