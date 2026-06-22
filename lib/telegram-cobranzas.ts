@@ -105,9 +105,10 @@ export async function buildActivosMessage(): Promise<string> {
     const dias = diasDesde(s.fecha_ingreso)
     const antig = dias !== null ? ` · ${dias} días` : ""
     const ot = s.numero_ot ? ` · OT ${esc(s.numero_ot)}` : ""
+    const veh = [s.marca, s.modelo].filter(Boolean).map(esc).join(" ")
     return (
       `👤 <b>${esc(s.cliente)}</b>\n` +
-      `🚗 ${esc(s.patente)}${ot} · ${esc(s.estado)}\n` +
+      `🚗 ${esc(s.patente)}${veh ? ` · ${veh}` : ""}${ot} · ${esc(s.estado)}\n` +
       `💵 Cobrado: ${fmtCLP(Number(s.monto_total))}  |  Abonado: ${fmtCLP(Number(s.anticipo))}\n` +
       `⏳ Saldo: ${fmtCLP(Number(s.saldo_pendiente))}${antig}`
     )
