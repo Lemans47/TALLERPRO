@@ -247,6 +247,25 @@ export async function getServiciosPorCobrar() {
   return data as Servicio[]
 }
 
+// Servicios "en taller": estados de tipo `activo`, es decir todo lo que NO está
+// entregado/por cobrar ni cerrado. Devuelve el monto total a cobrar
+// (`monto_total`, ya con IVA solo si el servicio está marcado con IVA), lo
+// abonado hasta ahora (`anticipo`) y el saldo. Se ordena por antigüedad
+// (fecha_ingreso) para priorizar lo que lleva más tiempo en el taller. Usado por
+// el bot de cobranzas (comando /activos).
+export async function getServiciosActivosCobranza() {
+  const db = getSQL()
+  const inactivos = await getNombresEstadosPorTipo(["cerrado", "por_cobrar"])
+  const data = await db`
+    SELECT numero_ot, patente, cliente, estado,
+           monto_total, anticipo, saldo_pendiente, fecha_ingreso
+    FROM servicios
+    WHERE estado <> ALL(${inactivos.length ? inactivos : [""]}::text[])
+    ORDER BY fecha_ingreso::date ASC
+  `
+  return data as Servicio[]
+}
+
 // Servicios "en la vista de taller": estados que el usuario quiere seguir viendo
 // en la pantalla de Servicios aunque sean de meses anteriores. Se usa junto con
 // getServiciosByMonth para mostrar "los del mes + los activos historicos".

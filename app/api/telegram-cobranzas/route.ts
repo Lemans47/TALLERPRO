@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { ALLOWED_IDS, buildCobranzasMessage, sendMessage } from "@/lib/telegram-cobranzas"
+import { ALLOWED_IDS, buildActivosMessage, buildCobranzasMessage, sendMessage } from "@/lib/telegram-cobranzas"
 
 // Webhook del bot de cobranzas. La configuración (token, chats autorizados) y el
 // formato del mensaje viven en lib/telegram-cobranzas para compartirlos con el
@@ -22,8 +22,19 @@ export async function POST(request: Request) {
     if (text === "/start" || text === "/ayuda") {
       await sendMessage(
         chatId,
-        `👋 <b>Bot de Cobranzas - TallerPro</b>\n\nComandos:\n/saldos — ver las cuentas por cobrar (quién debe, cuánto y desde hace cuántos días)\n\n📅 Además recibís este reporte automáticamente todos los días a las 19hs.`
+        `👋 <b>Bot de Cobranzas - TallerPro</b>\n\nComandos:\n/saldos — ver las cuentas por cobrar (quién debe, cuánto y desde hace cuántos días)\n/activos — ver los servicios activos en taller (cuánto se cobra y cuánto se abonó)\n\n📅 Además recibís el reporte de cobranzas automáticamente todos los días a las 19hs.`
       )
+      return NextResponse.json({ ok: true })
+    }
+
+    if (text === "/activos") {
+      try {
+        const msg = await buildActivosMessage()
+        await sendMessage(chatId, msg)
+      } catch (err) {
+        console.error("Telegram cobranzas /activos error:", err)
+        await sendMessage(chatId, "⚠️ No pude consultar los servicios activos. Intentá de nuevo en un momento.")
+      }
       return NextResponse.json({ ok: true })
     }
 
@@ -40,7 +51,7 @@ export async function POST(request: Request) {
 
     await sendMessage(
       chatId,
-      `No entendí. Usá /saldos para ver las cuentas por cobrar.`
+      `No entendí. Usá /saldos para las cuentas por cobrar o /activos para los servicios en taller.`
     )
     return NextResponse.json({ ok: true })
   } catch (error) {
