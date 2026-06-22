@@ -257,7 +257,7 @@ export async function getServiciosActivosCobranza() {
   const db = getSQL()
   const inactivos = await getNombresEstadosPorTipo(["cerrado", "por_cobrar"])
   const data = await db`
-    SELECT numero_ot, patente, cliente, estado,
+    SELECT numero_ot, patente, marca, modelo, cliente, estado,
            monto_total, anticipo, saldo_pendiente, fecha_ingreso
     FROM servicios
     WHERE estado <> ALL(${inactivos.length ? inactivos : [""]}::text[])
