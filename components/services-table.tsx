@@ -492,6 +492,13 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                     </span>
                   </div>
 
+                  {servicio.observaciones && (
+                    <div className="flex items-start gap-1.5 text-sm text-muted-foreground">
+                      <FileText className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                      <span className="break-words">{servicio.observaciones}</span>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
                     <div className="p-2.5 rounded-lg bg-secondary/50 flex flex-col justify-between min-h-[68px]">
                       <p className="text-xs text-muted-foreground">Total</p>
