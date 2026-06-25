@@ -189,7 +189,9 @@ export default function ConfiguracionPage() {
   }
 
   function formatPeriodo(mesInicio: string): string {
-    const inicio = new Date(mesInicio + "T12:00:00")
+    const base = (mesInicio ?? "").substring(0, 10)   // tolera ISO y "YYYY-MM-DD"
+    const inicio = new Date(base + "T12:00:00")
+    if (Number.isNaN(inicio.getTime())) return ""      // nunca muestra "Invalid Date"
     const fin = new Date(inicio)
     fin.setMonth(fin.getMonth() + 2)
     fin.setDate(0)
@@ -605,7 +607,10 @@ export default function ConfiguracionPage() {
               {promedioSugerido && (
                 <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg text-sm space-y-2">
                   <p className="font-medium text-blue-800 dark:text-blue-200">
-                    Promedio real: {formatPeriodo(promedioSugerido.mesInicio)}
+                    {(() => {
+                      const periodo = formatPeriodo(promedioSugerido.mesInicio)
+                      return periodo ? `Promedio real: ${periodo}` : "Promedio real (últimos 2 meses)"
+                    })()}
                   </p>
                   {promedioSugerido.promedioPorPieza !== null ? (
                     <>
