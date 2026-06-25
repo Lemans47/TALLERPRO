@@ -1033,7 +1033,7 @@ export async function getPromedioMaterialesMesAnterior(): Promise<PromedioMateri
         AND s.fecha_ingreso::date < (SELECT fin FROM periodo)
     )
     SELECT
-      (SELECT inicio FROM periodo) AS mes_inicio,
+      TO_CHAR((SELECT inicio FROM periodo), 'YYYY-MM-DD') AS mes_inicio,
       (SELECT total_gastos FROM gastos_pintura) AS gastos,
       (SELECT total_piezas FROM piezas_periodo) AS piezas,
       CASE
