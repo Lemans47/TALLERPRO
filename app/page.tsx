@@ -22,7 +22,7 @@ import { fetchDashboardData, DashboardTimeoutError, fetchPresupuestosNoLeidos } 
 import type { Servicio, Gasto, Empleado, AbonoEmpleado, Presupuesto } from "@/lib/database"
 import { useAuth } from "@/lib/auth-context"
 import { useEstados } from "@/lib/estados"
-import { extraerIvaIncluido, safeLocalStorage } from "@/lib/utils"
+import { extraerIvaIncluido, safeLocalStorage, hoyChile } from "@/lib/utils"
 import { sumarCostosReales } from "@/lib/reportes/kpis"
 
 interface KPIs {
@@ -678,9 +678,7 @@ export default function DashboardPage() {
           sino salarios corrientes pendientes de pago al fin de mes. */}
       {!isVistaSimple && (() => {
         const [selY, selM] = selectedMonth.split("-").map(Number)
-        const hoy = new Date()
-        const mesActualY = hoy.getFullYear()
-        const mesActualM = hoy.getMonth() + 1
+        const [mesActualY, mesActualM] = hoyChile().split("-").map(Number)
         const mesEsPasado = selY < mesActualY || (selY === mesActualY && selM < mesActualM)
         if (!mesEsPasado) return null
 

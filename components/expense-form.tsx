@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
 import { Save, X } from "lucide-react"
 import { api, type Gasto } from "@/lib/api-client"
+import { hoyChile } from "@/lib/utils"
 
 interface ExpenseFormProps {
   defaultCategory: string
@@ -22,10 +23,7 @@ interface ExpenseFormProps {
 export function ExpenseForm({ defaultCategory, gastoAEditar, onSaved, onCancel }: ExpenseFormProps) {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
-  const localToday = () => {
-    const n = new Date()
-    return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}-${String(n.getDate()).padStart(2,"0")}`
-  }
+  const localToday = () => hoyChile()
 
   const toDateStr = (v: any) => {
     if (!v) return localToday()

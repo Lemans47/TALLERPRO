@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, type ReactNode } from "react"
+import { hoyChile } from "@/lib/utils"
 
 interface MonthContextType {
   selectedMonth: string
@@ -10,11 +11,8 @@ interface MonthContextType {
 const MonthContext = createContext<MonthContextType | undefined>(undefined)
 
 export function MonthProvider({ children }: { children: ReactNode }) {
-  // Default to current month (format: YYYY-MM)
-  const [selectedMonth, setSelectedMonth] = useState<string>(() => {
-    const now = new Date()
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
-  })
+  // Default to current month (format: YYYY-MM) en horario de Chile.
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => hoyChile().slice(0, 7))
 
   return <MonthContext.Provider value={{ selectedMonth, setSelectedMonth }}>{children}</MonthContext.Provider>
 }

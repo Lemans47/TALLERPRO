@@ -52,7 +52,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { generarPDFPresupuesto } from "@/lib/pdf-presupuesto"
 import { PDFPreviewModal } from "@/components/pdf-preview-modal"
 import { PhotoLightbox } from "@/components/photo-lightbox"
-import { roundMoney, costoNetoItem, sumCostosNetos } from "@/lib/utils"
+import { roundMoney, costoNetoItem, sumCostosNetos, hoyChile } from "@/lib/utils"
 import { useEstados } from "@/lib/estados"
 
 interface ServiceFormProps {
@@ -145,7 +145,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   const [abonos, setAbonos] = useState<{ fecha: string; monto: number }[]>([])
 
   const [formData, setFormData] = useState({
-    fecha_ingreso: (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}-${String(n.getDate()).padStart(2,"0")}` })(),
+    fecha_ingreso: hoyChile(),
     patente: "",
     marca: "",
     modelo: "",
@@ -467,7 +467,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
 
   const resetForm = () => {
     setFormData({
-      fecha_ingreso: (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}-${String(n.getDate()).padStart(2,"0")}` })(),
+      fecha_ingreso: hoyChile(),
       patente: "",
       marca: "",
       modelo: "",
@@ -1671,8 +1671,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                         const currentAnticipo = abonos.reduce((s, a) => s + (Number(a.monto) || 0), 0)
                         const remaining = montoConIva - currentAnticipo
                         if (remaining > 0) {
-                          const hoy = new Date()
-                          const f = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,"0")}-${String(hoy.getDate()).padStart(2,"0")}`
+                          const f = hoyChile()
                           setAbonos([...abonos, { fecha: f, monto: remaining }])
                         }
                         setFormData({ ...formData, estado: v })
@@ -2526,8 +2525,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                     size="sm"
                     className="h-7 text-xs gap-1 shrink-0"
                     onClick={() => {
-                      const hoy = new Date()
-                      const f = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,"0")}-${String(hoy.getDate()).padStart(2,"0")}`
+                      const f = hoyChile()
                       setAbonos([...abonos, { fecha: f, monto: 0 }])
                     }}
                   >
