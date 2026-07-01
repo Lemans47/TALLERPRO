@@ -41,7 +41,14 @@ export function getSQL() {
     // postgres.js requiere pasar statement_timeout vía options string ("-c key=val"),
     // no como propiedad directa. Si una query supera 30s se aborta y la conexión se libera.
     // 30s es generoso para latencia Chile→Supabase US + LATERAL joins que pueden ser lentos.
-    connection: { options: "-c statement_timeout=30000" },
+    //
+    // timezone=America/Santiago: la app corre en UTC (Vercel + Supabase), pero el negocio
+    // opera en horario de Chile. Fijar la zona de sesión hace que CURRENT_DATE, NOW()::date
+    // y date_trunc(...) se calculen en hora de Chile, evitando el corrimiento de "día+1"
+    // en la tarde/noche (Chile va detrás de UTC). Esto corrige de raíz: el DEFAULT
+    // CURRENT_DATE del esquema, fecha_entregado, la conversión presupuesto→servicio (NOW()::date)
+    // y los rangos de "materiales de pintura" (date_trunc('month', CURRENT_DATE)).
+    connection: { options: "-c statement_timeout=30000 -c timezone=America/Santiago" },
   })
   return global._pgSql as any
 }
@@ -625,7 +632,7 @@ export async function convertPresupuestoToServicio(presupuestoId: string) {
         anticipo, saldo_pendiente, monto_total, monto_total_sin_iva, observaciones_checkboxes,
         fotos_ingreso, fotos_entrega, numero_ot
       ) VALUES (
-        NOW(), ${presupuesto.patente}, ${presupuesto.marca}, ${presupuesto.modelo},
+        CURRENT_DATE, ${presupuesto.patente}, ${presupuesto.marca}, ${presupuesto.modelo},
         ${presupuesto.color || null}, ${presupuesto.kilometraje || null}, ${presupuesto.año || null},
         ${presupuesto.cliente}, ${presupuesto.telefono || ""},
         ${presupuesto.rut || null}, ${presupuesto.domicilio || null}, ${presupuesto.comuna || null},

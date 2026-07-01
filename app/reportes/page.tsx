@@ -498,7 +498,7 @@ export default function ReportsPage() {
     const k = kpis
     const doc = new jsPDF()
     const pageWidth = doc.internal.pageSize.getWidth()
-    const today = new Date().toLocaleDateString("es-CL")
+    const today = new Date().toLocaleDateString("es-CL", { timeZone: "America/Santiago" })
     const periodo = capitalize(monthName)
 
     // Cargar logo y capturar gráficos (degradan a null/"" sin romper el PDF).

@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { api, type Servicio } from "@/lib/api-client"
-import { formatFechaDMA, sumCostosNetos } from "@/lib/utils"
+import { formatFechaDMA, sumCostosNetos, hoyChile } from "@/lib/utils"
 import { useEstados } from "@/lib/estados"
 import { useAuth } from "@/lib/auth-context"
 import { FileText, Trash2, Edit, Calendar, User, Car, Wrench, ClipboardList, List, AlignJustify, ListChecks, TrendingUp, Receipt, ChevronDown, ChevronRight, AlertTriangle, CheckCircle2 } from "lucide-react"
@@ -34,8 +34,7 @@ function parseAbonos(s: Servicio): { fecha: string; monto: number }[] {
 }
 
 function fechaHoy(): string {
-  const hoy = new Date()
-  return `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,"0")}-${String(hoy.getDate()).padStart(2,"0")}`
+  return hoyChile()
 }
 
 function calcGanancia(servicio: Servicio) {

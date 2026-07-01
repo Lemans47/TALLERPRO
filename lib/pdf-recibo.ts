@@ -1,6 +1,6 @@
 import jsPDF from "jspdf"
 import type { Servicio } from "./database"
-import { formatFechaDMA } from "./utils"
+import { formatFechaDMA, hoyChile } from "./utils"
 
 const LOGO_URL = "/logo-sarmiento.svg"
 
@@ -65,7 +65,7 @@ export async function generarReciboPDF(servicio: Servicio): Promise<{ blobUrl: s
   doc.text("RECIBO DE PAGO", 105, 53, { align: "center" })
 
   // ── Metadatos ────────────────────────────────────────
-  const fechaHoy = formatFechaDMA(new Date())
+  const fechaHoy = formatFechaDMA(hoyChile())
   const otNum = servicio.numero_ot ? `OT-${String(servicio.numero_ot).padStart(4, "0")}` : ""
 
   doc.setFontSize(9)
@@ -227,7 +227,7 @@ export async function generarReciboPDF(servicio: Servicio): Promise<{ blobUrl: s
   // Generar blob para preview
   const blob = doc.output("blob")
   const blobUrl = URL.createObjectURL(blob)
-  const fileName = `Recibo_${servicio.patente}_${new Date().toISOString().split("T")[0]}.pdf`
+  const fileName = `Recibo_${servicio.patente}_${hoyChile()}.pdf`
 
   return { blobUrl, fileName }
 }
