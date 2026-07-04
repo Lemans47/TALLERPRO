@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
-import { Pencil, Trash2, Search, AlertCircle, CheckCircle2, Clock } from "lucide-react"
+import { Pencil, Trash2, Search, AlertCircle, CheckCircle2, Clock, FileText, Receipt } from "lucide-react"
 import { api, type Gasto } from "@/lib/api-client"
 import { formatFechaDMA } from "@/lib/utils"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -117,13 +117,22 @@ export function ExpensesTable({ gastos, onEditGasto, onDeleted, loading }: Expen
                           <CheckCircle2 className="w-3 h-3 mr-1" />Pagado
                         </Badge>
                       )}
+                      {gasto.tipo_documento === "factura" ? (
+                        <Badge className="text-[10px] bg-blue-500/10 text-blue-500 border-blue-500/30 shrink-0">
+                          <FileText className="w-3 h-3 mr-1" />Factura
+                        </Badge>
+                      ) : (
+                        <Badge className="text-[10px] bg-slate-500/10 text-slate-500 border-slate-500/30 shrink-0">
+                          <Receipt className="w-3 h-3 mr-1" />Boleta
+                        </Badge>
+                      )}
                     </div>
                     <p className="text-sm text-muted-foreground">
                       {formatFechaDMA(gasto.fecha)}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className={`font-bold ${isPendiente ? "text-orange-400" : "text-destructive"}`}>
+                    <span className={`font-bold ${isPendiente ? "text-orange-400" : "text-green-500"}`}>
                       ${Number(gasto.monto).toLocaleString("es-CL")}
                     </span>
                     <div className="flex gap-1">
