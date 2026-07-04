@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
-import { Pencil, Trash2, Search, AlertCircle, CheckCircle2, Clock } from "lucide-react"
+import { Pencil, Trash2, Search, AlertCircle, CheckCircle2, Clock, FileText, Receipt } from "lucide-react"
 import { api, type Gasto } from "@/lib/api-client"
 import { formatFechaDMA } from "@/lib/utils"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -115,6 +115,15 @@ export function ExpensesTable({ gastos, onEditGasto, onDeleted, loading }: Expen
                       ) : (
                         <Badge className="text-[10px] bg-green-500/10 text-green-400 border-green-500/30 shrink-0">
                           <CheckCircle2 className="w-3 h-3 mr-1" />Pagado
+                        </Badge>
+                      )}
+                      {gasto.tipo_documento === "factura" ? (
+                        <Badge className="text-[10px] bg-blue-500/10 text-blue-500 border-blue-500/30 shrink-0">
+                          <FileText className="w-3 h-3 mr-1" />Factura
+                        </Badge>
+                      ) : (
+                        <Badge className="text-[10px] bg-slate-500/10 text-slate-500 border-slate-500/30 shrink-0">
+                          <Receipt className="w-3 h-3 mr-1" />Boleta
                         </Badge>
                       )}
                     </div>
