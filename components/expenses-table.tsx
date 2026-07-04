@@ -132,7 +132,7 @@ export function ExpensesTable({ gastos, onEditGasto, onDeleted, loading }: Expen
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className={`font-bold ${isPendiente ? "text-orange-400" : "text-destructive"}`}>
+                    <span className={`font-bold ${isPendiente ? "text-orange-400" : "text-green-500"}`}>
                       ${Number(gasto.monto).toLocaleString("es-CL")}
                     </span>
                     <div className="flex gap-1">
