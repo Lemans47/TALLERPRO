@@ -11,6 +11,7 @@ import {
   getNombresEstadosByTipoMap,
   getServiciosPendientesCobro,
   getGastosPendientesPago,
+  getServiciosConCostosPendientes,
 } from "@/lib/database"
 import { computeKpisMes } from "@/lib/reportes/kpis"
 import { parseYearMonth } from "@/lib/utils"
@@ -21,16 +22,16 @@ export const dynamic = "force-dynamic"
 export const revalidate = 0
 
 // ── Cache en memoria del proceso ────────────────────────────────────────────
-// Las queries del dashboard son pesadas (latencia Chile→Supabase + 11 queries
+// Las queries del dashboard son pesadas (latencia Chile→Supabase + 12 queries
 // paralelas). Recargas repetidas en 30s devuelven la misma respuesta sin pegar
 // a la DB. El accesor y la invalidación viven en lib/dashboard-cache para que las
 // rutas de mutación puedan limpiarla y no mostrar datos viejos tras guardar.
 const TTL_MS = 30_000
 
 async function loadDashboardData(year: number, month: number) {
-  // 11 queries paralelas; el pool de Postgres es max:20. Una sola query a
+  // 12 queries paralelas; el pool de Postgres es max:20. Una sola query a
   // estados_servicio devuelve cerrado + por_cobrar agrupados por tipo, así
-  // evitamos sumar una 12ª.
+  // evitamos sumar una más.
   const [
     servicios,
     gastos,
@@ -43,6 +44,7 @@ async function loadDashboardData(year: number, month: number) {
     estadosMap,
     serviciosPendientesCobro,
     gastosPendientesPago,
+    serviciosConCostosPendientes,
   ] = await Promise.all([
     getServiciosByMonth(year, month),
     getGastosByMonth(year, month),
@@ -55,6 +57,7 @@ async function loadDashboardData(year: number, month: number) {
     getNombresEstadosByTipoMap(["por_cobrar", "cerrado"]),
     getServiciosPendientesCobro(),
     getGastosPendientesPago(),
+    getServiciosConCostosPendientes(),
   ])
   const nombresCerrado = estadosMap.cerrado || []
   const nombresFinalizado = [...(estadosMap.cerrado || []), ...(estadosMap.por_cobrar || [])]
@@ -81,6 +84,7 @@ async function loadDashboardData(year: number, month: number) {
     facturasPendientes,
     serviciosPendientesCobro,
     gastosPendientesPago,
+    serviciosConCostosPendientes,
   }
 }
 

@@ -85,7 +85,7 @@ export interface Servicio {
   observaciones: string | null
   mano_obra_pintura: number
   cobros: { categoria: string; descripcion: string; monto: number; isAuto?: boolean }[]
-  costos: { categoria?: string; descripcion: string; monto: number; isAuto?: boolean; costoReal?: number | null; tipo_documento?: "boleta" | "factura" }[]
+  costos: { categoria?: string; descripcion: string; monto: number; isAuto?: boolean; costoReal?: number | null; tipo_documento?: "boleta" | "factura"; pagado?: boolean }[]
   piezas_pintura: { pieza_id?: string; nombre: string; cantidad: number; precio_unitario?: number; precio: number }[]
   estado: string
   iva: string
@@ -126,7 +126,7 @@ export interface Presupuesto {
   observaciones: string | null
   mano_obra_pintura: number
   cobros: { categoria: string; descripcion: string; monto: number; isAuto?: boolean }[]
-  costos: { categoria?: string; descripcion: string; monto: number; isAuto?: boolean; costoReal?: number | null; tipo_documento?: "boleta" | "factura" }[]
+  costos: { categoria?: string; descripcion: string; monto: number; isAuto?: boolean; costoReal?: number | null; tipo_documento?: "boleta" | "factura"; pagado?: boolean }[]
   piezas_pintura: { pieza_id?: string; nombre: string; cantidad: number; precio_unitario?: number; precio: number }[]
   iva: string
   monto_total: number
@@ -700,6 +700,39 @@ export async function getServiciosPendientesCobro() {
     WHERE saldo_pendiente > 0
       AND estado = ANY(${porCobrar.length ? porCobrar : [""]}::text[])
     ORDER BY fecha_ingreso ASC
+  `
+  return data as Servicio[]
+}
+
+// Todos los servicios con al menos un ítem de costo taller pendiente de pago
+// (costos[].pagado = false, excluyendo pintura y auto-generados), sin filtrar
+// por mes. Usado por la alerta global de "Costos Taller Pendientes" en el
+// dashboard.
+//
+// NOTA: en esta base la columna costos (jsonb) está guardada double-encoded,
+// es decir como un string JSON ('"[{...}]"') en vez de un array nativo. Por eso
+// el CASE la desenvuelve con `#>> '{}'` antes de recorrerla, y NO se puede usar
+// el operador de contención `@>` como prefiltro (no matchea sobre un jsonb
+// string). Con ~100 servicios el seq scan es instantáneo.
+export async function getServiciosConCostosPendientes() {
+  const db = getSQL()
+  const data = await db`
+    SELECT s.* FROM servicios s
+    WHERE EXISTS (
+      SELECT 1 FROM jsonb_array_elements(
+        CASE
+          WHEN jsonb_typeof(s.costos) = 'array'  THEN s.costos
+          WHEN jsonb_typeof(s.costos) = 'string' THEN (s.costos #>> '{}')::jsonb
+          ELSE '[]'::jsonb
+        END
+      ) AS item
+      WHERE item->'pagado' = 'false'::jsonb
+        AND COALESCE(item->>'categoria', '') <> 'pintura'
+        AND COALESCE(item->>'isAuto', 'false') <> 'true'
+        AND jsonb_typeof(item->'monto') = 'number'
+        AND (item->>'monto')::numeric > 0
+    )
+    ORDER BY s.fecha_ingreso ASC
   `
   return data as Servicio[]
 }

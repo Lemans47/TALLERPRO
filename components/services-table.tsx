@@ -12,7 +12,8 @@ import { api, type Servicio } from "@/lib/api-client"
 import { formatFechaDMA, sumCostosNetos, hoyChile } from "@/lib/utils"
 import { useEstados } from "@/lib/estados"
 import { useAuth } from "@/lib/auth-context"
-import { FileText, Trash2, Edit, Calendar, User, Car, Wrench, ClipboardList, List, AlignJustify, ListChecks, TrendingUp, Receipt, ChevronDown, ChevronRight, AlertTriangle, CheckCircle2 } from "lucide-react"
+import { FileText, Trash2, Edit, Calendar, User, Car, Wrench, ClipboardList, List, AlignJustify, ListChecks, TrendingUp, Receipt, ChevronDown, ChevronRight, AlertTriangle, CheckCircle2, Clock } from "lucide-react"
+import { resumenPagosCostos } from "@/lib/costos-pendientes"
 
 const parseArr = (v: any): any[] => {
   let val = v
@@ -478,6 +479,26 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                         Detalle pendiente
                       </Badge>
                     )}
+                    {(() => {
+                      const resumen = resumenPagosCostos(servicio.costos)
+                      if (resumen.estado === "pendiente") {
+                        return (
+                          <Badge className="bg-orange-500/10 text-orange-400 border border-orange-500/30 gap-1 hover:bg-orange-500/20">
+                            <Clock className="w-3 h-3" />
+                            Pagos pendientes · ${resumen.totalPendiente.toLocaleString("es-CL")}
+                          </Badge>
+                        )
+                      }
+                      if (resumen.estado === "pagado") {
+                        return (
+                          <Badge className="bg-green-500/10 text-green-400 border border-green-500/30 gap-1 hover:bg-green-500/20">
+                            <CheckCircle2 className="w-3 h-3" />
+                            Costos pagados
+                          </Badge>
+                        )
+                      }
+                      return null
+                    })()}
                   </div>
 
                   <div className="flex flex-wrap items-center gap-4 text-sm">
