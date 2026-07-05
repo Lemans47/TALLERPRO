@@ -1,13 +1,21 @@
 import postgres from "postgres"
 
-// Unwrap any over-encoded JSONB string values, then re-encode once cleanly.
-// Prevents double/triple encoding when values come back from postgres as strings.
-function safeJson(v: any): string {
+// Normaliza un valor destinado a una columna jsonb y lo devuelve como valor JS
+// crudo (array/objeto), NUNCA pre-stringificado. postgres.js con prepare:false
+// hace describe-first de cada parámetro (connection.js: describeFirst): el server
+// responde que el parámetro es jsonb y el driver serializa con JSON.stringify al
+// hacer Bind. Si le pasáramos un string JSON ya serializado lo stringificaría de
+// nuevo → doble codificación (jsonb_typeof = 'string' en vez de 'array'). Ese era
+// el bug que corrompió la base (backfill: scripts/11-fix-jsonb-double-encoding.sql).
+// El while desenvuelve strings sobre-codificados que llegan de filas legacy aún
+// no migradas (el driver parsea un jsonb-string como string JS y el cliente puede
+// reenviarlo tal cual al editar).
+function safeJson(v: any): any {
   let val = v
   while (typeof val === "string" && val) {
     try { val = JSON.parse(val) } catch { break }
   }
-  return JSON.stringify(val ?? null)
+  return val ?? null
 }
 
 declare global {
@@ -709,11 +717,13 @@ export async function getServiciosPendientesCobro() {
 // por mes. Usado por la alerta global de "Costos Taller Pendientes" en el
 // dashboard.
 //
-// NOTA: en esta base la columna costos (jsonb) está guardada double-encoded,
-// es decir como un string JSON ('"[{...}]"') en vez de un array nativo. Por eso
-// el CASE la desenvuelve con `#>> '{}'` antes de recorrerla, y NO se puede usar
-// el operador de contención `@>` como prefiltro (no matchea sobre un jsonb
-// string). Con ~100 servicios el seq scan es instantáneo.
+// NOTA: filas legacy pueden tener costos (jsonb) guardado double-encoded — un
+// string JSON ('"[{...}]"') en vez de un array nativo (bug de escritura ya
+// corregido en safeJson; backfill en scripts/11-fix-jsonb-double-encoding.sql).
+// El CASE desenvuelve esas filas con `#>> '{}'` antes de recorrerlas. Una vez
+// corrido el backfill en producción (100% array) este CASE puede simplificarse
+// a `s.costos` directo y ahí recién tiene sentido evaluar un prefiltro `@>` con
+// índice GIN. Con ~100 servicios el seq scan es instantáneo.
 export async function getServiciosConCostosPendientes() {
   const db = getSQL()
   const data = await db`

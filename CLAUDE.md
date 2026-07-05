@@ -72,7 +72,7 @@ States are **not hardcoded** — they live in the `estados_servicio` table and a
 
 ### JSONB Fields
 
-`servicios` and `presupuestos` store structured data as JSONB: `cobros`, `costos`, `piezas_pintura`, `abonos`, `fotos_ingreso`, `fotos_entrega`, `observaciones_checkboxes`. Always serialize these via `safeJson()` (from `lib/database.ts`) before inserting/updating — it prevents double-encoding that occurs when Postgres returns values as strings.
+`servicios` and `presupuestos` store structured data as JSONB: `cobros`, `costos`, `piezas_pintura`, `abonos`, `fotos_ingreso`, `fotos_entrega`, `observaciones_checkboxes`. Always pass these through `safeJson()` (from `lib/database.ts`) when inserting/updating: it normalizes the value (unwrapping legacy over-encoded strings) and returns the **raw JS value** for postgres.js to serialize exactly once. Never pass a pre-stringified JSON string as a jsonb parameter — the driver describes the parameter as jsonb and applies `JSON.stringify` itself, so a pre-stringified value gets double-encoded (stored as `jsonb_typeof = 'string'` instead of `'array'`). That bug corrupted historic rows; `scripts/11-fix-jsonb-double-encoding.sql` is the backfill, and `parseJsonbArray()` (lib/reportes/kpis.ts) plus defensive `CASE jsonb_typeof(...)` blocks in SQL remain as safety nets for legacy data.
 
 ### Database Migrations
 
