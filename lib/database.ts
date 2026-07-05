@@ -707,23 +707,31 @@ export async function getServiciosPendientesCobro() {
 // Todos los servicios con al menos un ítem de costo taller pendiente de pago
 // (costos[].pagado = false, excluyendo pintura y auto-generados), sin filtrar
 // por mes. Usado por la alerta global de "Costos Taller Pendientes" en el
-// dashboard. El @> actúa de prefiltro indexable (GIN, ver scripts/11) y el
-// CASE protege jsonb_array_elements de filas legacy con costos string-encoded.
+// dashboard.
+//
+// NOTA: en esta base la columna costos (jsonb) está guardada double-encoded,
+// es decir como un string JSON ('"[{...}]"') en vez de un array nativo. Por eso
+// el CASE la desenvuelve con `#>> '{}'` antes de recorrerla, y NO se puede usar
+// el operador de contención `@>` como prefiltro (no matchea sobre un jsonb
+// string). Con ~100 servicios el seq scan es instantáneo.
 export async function getServiciosConCostosPendientes() {
   const db = getSQL()
   const data = await db`
     SELECT s.* FROM servicios s
-    WHERE s.costos @> '[{"pagado": false}]'::jsonb
-      AND EXISTS (
-        SELECT 1 FROM jsonb_array_elements(
-          CASE WHEN jsonb_typeof(s.costos) = 'array' THEN s.costos ELSE '[]'::jsonb END
-        ) AS item
-        WHERE item->'pagado' = 'false'::jsonb
-          AND COALESCE(item->>'categoria', '') <> 'pintura'
-          AND COALESCE(item->>'isAuto', 'false') <> 'true'
-          AND jsonb_typeof(item->'monto') = 'number'
-          AND (item->>'monto')::numeric > 0
-      )
+    WHERE EXISTS (
+      SELECT 1 FROM jsonb_array_elements(
+        CASE
+          WHEN jsonb_typeof(s.costos) = 'array'  THEN s.costos
+          WHEN jsonb_typeof(s.costos) = 'string' THEN (s.costos #>> '{}')::jsonb
+          ELSE '[]'::jsonb
+        END
+      ) AS item
+      WHERE item->'pagado' = 'false'::jsonb
+        AND COALESCE(item->>'categoria', '') <> 'pintura'
+        AND COALESCE(item->>'isAuto', 'false') <> 'true'
+        AND jsonb_typeof(item->'monto') = 'number'
+        AND (item->>'monto')::numeric > 0
+    )
     ORDER BY s.fecha_ingreso ASC
   `
   return data as Servicio[]
