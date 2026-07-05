@@ -1,13 +1,21 @@
 import postgres from "postgres"
 
-// Unwrap any over-encoded JSONB string values, then re-encode once cleanly.
-// Prevents double/triple encoding when values come back from postgres as strings.
-function safeJson(v: any): string {
+// Normaliza un valor destinado a una columna jsonb y lo devuelve como valor JS
+// crudo (array/objeto), NUNCA pre-stringificado. postgres.js con prepare:false
+// hace describe-first de cada parámetro (connection.js: describeFirst): el server
+// responde que el parámetro es jsonb y el driver serializa con JSON.stringify al
+// hacer Bind. Si le pasáramos un string JSON ya serializado lo stringificaría de
+// nuevo → doble codificación (jsonb_typeof = 'string' en vez de 'array'). Ese era
+// el bug que corrompió la base (backfill: scripts/11-fix-jsonb-double-encoding.sql).
+// El while desenvuelve strings sobre-codificados que llegan de filas legacy aún
+// no migradas (el driver parsea un jsonb-string como string JS y el cliente puede
+// reenviarlo tal cual al editar).
+function safeJson(v: any): any {
   let val = v
   while (typeof val === "string" && val) {
     try { val = JSON.parse(val) } catch { break }
   }
-  return JSON.stringify(val ?? null)
+  return val ?? null
 }
 
 declare global {
@@ -709,23 +717,17 @@ export async function getServiciosPendientesCobro() {
 // por mes. Usado por la alerta global de "Costos Taller Pendientes" en el
 // dashboard.
 //
-// NOTA: en esta base la columna costos (jsonb) está guardada double-encoded,
-// es decir como un string JSON ('"[{...}]"') en vez de un array nativo. Por eso
-// el CASE la desenvuelve con `#>> '{}'` antes de recorrerla, y NO se puede usar
-// el operador de contención `@>` como prefiltro (no matchea sobre un jsonb
-// string). Con ~100 servicios el seq scan es instantáneo.
+// Asume costos como array jsonb nativo: el bug de doble codificación se corrigió
+// en safeJson y las filas legacy se normalizaron con scripts/11 (corrido en
+// producción el 2026-07-05). El prefiltro `@>` es redundante con el EXISTS pero
+// permite usar el índice GIN de scripts/12 cuando la tabla crezca.
 export async function getServiciosConCostosPendientes() {
   const db = getSQL()
   const data = await db`
     SELECT s.* FROM servicios s
-    WHERE EXISTS (
-      SELECT 1 FROM jsonb_array_elements(
-        CASE
-          WHEN jsonb_typeof(s.costos) = 'array'  THEN s.costos
-          WHEN jsonb_typeof(s.costos) = 'string' THEN (s.costos #>> '{}')::jsonb
-          ELSE '[]'::jsonb
-        END
-      ) AS item
+    WHERE s.costos @> '[{"pagado": false}]'
+    AND EXISTS (
+      SELECT 1 FROM jsonb_array_elements(s.costos) AS item
       WHERE item->'pagado' = 'false'::jsonb
         AND COALESCE(item->>'categoria', '') <> 'pintura'
         AND COALESCE(item->>'isAuto', 'false') <> 'true'
@@ -1044,29 +1046,16 @@ export async function getPromedioMaterialesMesAnterior(): Promise<PromedioMateri
     ),
     piezas_periodo AS (
       SELECT COALESCE(SUM(
-        CASE
-          WHEN jsonb_typeof(s.piezas_pintura) = 'array' THEN (
-            SELECT COALESCE(SUM(
-              CASE
-                WHEN (p->>'cantidad') ~ '^-?[0-9]+(\.[0-9]+)?$' THEN (p->>'cantidad')::numeric
-                WHEN (p->>'cantidad_piezas') ~ '^-?[0-9]+(\.[0-9]+)?$' THEN (p->>'cantidad_piezas')::numeric
-                ELSE 1
-              END
-            ), 0)
-            FROM jsonb_array_elements(s.piezas_pintura) p
+        COALESCE((
+          SELECT SUM(
+            CASE
+              WHEN (p->>'cantidad') ~ '^-?[0-9]+(\.[0-9]+)?$' THEN (p->>'cantidad')::numeric
+              WHEN (p->>'cantidad_piezas') ~ '^-?[0-9]+(\.[0-9]+)?$' THEN (p->>'cantidad_piezas')::numeric
+              ELSE 1
+            END
           )
-          WHEN jsonb_typeof(s.piezas_pintura) = 'string' THEN (
-            SELECT COALESCE(SUM(
-              CASE
-                WHEN (p->>'cantidad') ~ '^-?[0-9]+(\.[0-9]+)?$' THEN (p->>'cantidad')::numeric
-                WHEN (p->>'cantidad_piezas') ~ '^-?[0-9]+(\.[0-9]+)?$' THEN (p->>'cantidad_piezas')::numeric
-                ELSE 1
-              END
-            ), 0)
-            FROM jsonb_array_elements((s.piezas_pintura #>> '{}')::jsonb) p
-          )
-          ELSE 0
-        END
+          FROM jsonb_array_elements(s.piezas_pintura) p
+        ), 0)
       ), 0) AS total_piezas
       FROM servicios s
       WHERE s.fecha_ingreso::date >= (SELECT inicio FROM periodo)

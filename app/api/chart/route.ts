@@ -40,13 +40,7 @@ export async function GET() {
                   ELSE 0
                 END
               )
-              FROM jsonb_array_elements(
-                CASE
-                  WHEN jsonb_typeof(costos) = 'array' THEN costos
-                  WHEN jsonb_typeof(costos) = 'string' THEN (costos #>> '{}')::jsonb
-                  ELSE '[]'::jsonb
-                END
-              ) AS item
+              FROM jsonb_array_elements(costos) AS item
               -- Mismo filtro que isCostoRealItem en lib/reportes/kpis.ts:
               -- excluye SOLO "materiales pintura" (ya está en Gastos de Pintura).
               -- La MO de pintura SÍ cuenta porque el pintor es a trato (no empleado).
