@@ -717,25 +717,17 @@ export async function getServiciosPendientesCobro() {
 // por mes. Usado por la alerta global de "Costos Taller Pendientes" en el
 // dashboard.
 //
-// NOTA: filas legacy pueden tener costos (jsonb) guardado double-encoded — un
-// string JSON ('"[{...}]"') en vez de un array nativo (bug de escritura ya
-// corregido en safeJson; backfill en scripts/11-fix-jsonb-double-encoding.sql).
-// El CASE desenvuelve esas filas con `#>> '{}'` antes de recorrerlas. Una vez
-// corrido el backfill en producción (100% array) este CASE puede simplificarse
-// a `s.costos` directo y ahí recién tiene sentido evaluar un prefiltro `@>` con
-// índice GIN. Con ~100 servicios el seq scan es instantáneo.
+// Asume costos como array jsonb nativo: el bug de doble codificación se corrigió
+// en safeJson y las filas legacy se normalizaron con scripts/11 (corrido en
+// producción el 2026-07-05). El prefiltro `@>` es redundante con el EXISTS pero
+// permite usar el índice GIN de scripts/12 cuando la tabla crezca.
 export async function getServiciosConCostosPendientes() {
   const db = getSQL()
   const data = await db`
     SELECT s.* FROM servicios s
-    WHERE EXISTS (
-      SELECT 1 FROM jsonb_array_elements(
-        CASE
-          WHEN jsonb_typeof(s.costos) = 'array'  THEN s.costos
-          WHEN jsonb_typeof(s.costos) = 'string' THEN (s.costos #>> '{}')::jsonb
-          ELSE '[]'::jsonb
-        END
-      ) AS item
+    WHERE s.costos @> '[{"pagado": false}]'
+    AND EXISTS (
+      SELECT 1 FROM jsonb_array_elements(s.costos) AS item
       WHERE item->'pagado' = 'false'::jsonb
         AND COALESCE(item->>'categoria', '') <> 'pintura'
         AND COALESCE(item->>'isAuto', 'false') <> 'true'
@@ -1054,29 +1046,16 @@ export async function getPromedioMaterialesMesAnterior(): Promise<PromedioMateri
     ),
     piezas_periodo AS (
       SELECT COALESCE(SUM(
-        CASE
-          WHEN jsonb_typeof(s.piezas_pintura) = 'array' THEN (
-            SELECT COALESCE(SUM(
-              CASE
-                WHEN (p->>'cantidad') ~ '^-?[0-9]+(\.[0-9]+)?$' THEN (p->>'cantidad')::numeric
-                WHEN (p->>'cantidad_piezas') ~ '^-?[0-9]+(\.[0-9]+)?$' THEN (p->>'cantidad_piezas')::numeric
-                ELSE 1
-              END
-            ), 0)
-            FROM jsonb_array_elements(s.piezas_pintura) p
+        COALESCE((
+          SELECT SUM(
+            CASE
+              WHEN (p->>'cantidad') ~ '^-?[0-9]+(\.[0-9]+)?$' THEN (p->>'cantidad')::numeric
+              WHEN (p->>'cantidad_piezas') ~ '^-?[0-9]+(\.[0-9]+)?$' THEN (p->>'cantidad_piezas')::numeric
+              ELSE 1
+            END
           )
-          WHEN jsonb_typeof(s.piezas_pintura) = 'string' THEN (
-            SELECT COALESCE(SUM(
-              CASE
-                WHEN (p->>'cantidad') ~ '^-?[0-9]+(\.[0-9]+)?$' THEN (p->>'cantidad')::numeric
-                WHEN (p->>'cantidad_piezas') ~ '^-?[0-9]+(\.[0-9]+)?$' THEN (p->>'cantidad_piezas')::numeric
-                ELSE 1
-              END
-            ), 0)
-            FROM jsonb_array_elements((s.piezas_pintura #>> '{}')::jsonb) p
-          )
-          ELSE 0
-        END
+          FROM jsonb_array_elements(s.piezas_pintura) p
+        ), 0)
       ), 0) AS total_piezas
       FROM servicios s
       WHERE s.fecha_ingreso::date >= (SELECT inicio FROM periodo)

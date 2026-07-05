@@ -37,13 +37,7 @@ export async function GET() {
                 ELSE 1
               END
             )
-            FROM jsonb_array_elements(
-              CASE
-                WHEN jsonb_typeof(s.piezas_pintura) = 'array' THEN s.piezas_pintura
-                WHEN jsonb_typeof(s.piezas_pintura) = 'string' THEN (s.piezas_pintura #>> '{}')::jsonb
-                ELSE '[]'::jsonb
-              END
-            ) p
+            FROM jsonb_array_elements(s.piezas_pintura) p
           ), 0) AS piezas,
           COALESCE((
             SELECT SUM(
@@ -53,13 +47,7 @@ export async function GET() {
                 ELSE 0
               END
             )
-            FROM jsonb_array_elements(
-              CASE
-                WHEN jsonb_typeof(s.costos) = 'array' THEN s.costos
-                WHEN jsonb_typeof(s.costos) = 'string' THEN (s.costos #>> '{}')::jsonb
-                ELSE '[]'::jsonb
-              END
-            ) c
+            FROM jsonb_array_elements(s.costos) c
             WHERE COALESCE(c->>'isAuto','false') = 'true'
               AND LOWER(COALESCE(c->>'descripcion','')) LIKE '%mano de obra pintura%'
           ), 0) AS mo_real,
@@ -71,13 +59,7 @@ export async function GET() {
                 ELSE 0
               END
             )
-            FROM jsonb_array_elements(
-              CASE
-                WHEN jsonb_typeof(s.costos) = 'array' THEN s.costos
-                WHEN jsonb_typeof(s.costos) = 'string' THEN (s.costos #>> '{}')::jsonb
-                ELSE '[]'::jsonb
-              END
-            ) c
+            FROM jsonb_array_elements(s.costos) c
             WHERE COALESCE(c->>'isAuto','false') = 'true'
               AND LOWER(COALESCE(c->>'descripcion','')) LIKE '%materiales pintura%'
           ), 0) AS mat_estimado
