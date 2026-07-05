@@ -2388,7 +2388,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                                           />
                                         </div>
                                         {itemCosto && Number(itemCosto.monto) > 0 && (
-                                          <div className="flex items-center justify-end gap-1">
+                                          <div className="flex items-center gap-1 w-32">
                                             {FACTURA_TOGGLE_CATEGORIAS.has(categoria) && (
                                               <button
                                                 type="button"
@@ -2398,7 +2398,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                                                   "tipo_documento",
                                                   itemCosto.tipo_documento === "factura" ? "boleta" : "factura"
                                                 )}
-                                                className={`text-[10px] px-1.5 py-0.5 rounded font-medium transition-colors ${
+                                                className={`flex-1 text-[11px] px-2 py-1 rounded-md font-medium text-center transition-colors ${
                                                   itemCosto.tipo_documento === "factura"
                                                     ? "bg-blue-500/20 text-blue-400 hover:bg-blue-500/30"
                                                     : "bg-secondary/50 text-muted-foreground hover:bg-secondary"
@@ -2416,7 +2416,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                                                 "pagado",
                                                 itemCosto.pagado !== true
                                               )}
-                                              className={`flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded font-medium transition-colors ${
+                                              className={`flex-1 flex items-center justify-center gap-1 text-[11px] px-2 py-1 rounded-md font-medium transition-colors ${
                                                 itemCosto.pagado === true
                                                   ? "bg-green-500/10 text-green-400 hover:bg-green-500/20"
                                                   : "bg-orange-500/10 text-orange-400 hover:bg-orange-500/20"
@@ -2424,9 +2424,9 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
                                               title={itemCosto.pagado === true ? "Marcar como pendiente" : "Marcar como pagado"}
                                             >
                                               {itemCosto.pagado === true ? (
-                                                <CheckCircle2 className="w-2.5 h-2.5" />
+                                                <CheckCircle2 className="w-3 h-3" />
                                               ) : (
-                                                <Clock className="w-2.5 h-2.5" />
+                                                <Clock className="w-3 h-3" />
                                               )}
                                               {itemCosto.pagado === true ? "Pagado" : "Pendiente"}
                                             </button>
