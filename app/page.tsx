@@ -8,6 +8,7 @@ import { KPICard } from "@/components/kpi-card"
 import { RevenueChart } from "@/components/revenue-chart"
 import { PendingPaymentsAlert } from "@/components/pending-payments-alert"
 import { PendingExpensesAlert } from "@/components/pending-expenses-alert"
+import { PendingCostosAlert } from "@/components/pending-costos-alert"
 import { PendingSolicitudesAlert } from "@/components/pending-solicitudes-alert"
 import { VehiclePipeline } from "@/components/vehicle-pipeline"
 import { AverageTicketChart } from "@/components/average-ticket-chart"
@@ -147,6 +148,7 @@ export default function DashboardPage() {
   const [facturasPendientes, setFacturasPendientes] = useState<Servicio[]>([])
   const [serviciosPendientesCobro, setServiciosPendientesCobro] = useState<Servicio[]>([])
   const [gastosPendientesPago, setGastosPendientesPago] = useState<Gasto[]>([])
+  const [serviciosConCostosPendientes, setServiciosConCostosPendientes] = useState<Servicio[]>([])
   const [solicitudesNoLeidas, setSolicitudesNoLeidas] = useState<Presupuesto[]>([])
   const [empleadosState, setEmpleadosState] = useState<Empleado[]>([])
   const [abonosMesState, setAbonosMesState] = useState<AbonoEmpleado[]>([])
@@ -200,13 +202,14 @@ export default function DashboardPage() {
     try {
       const [year, month] = selectedMonth.split("-").map(Number)
       const response = await fetchDashboardData(year, month, ctrl.signal)
-      const { servicios: serviciosData, gastos: gastosData, empleados: empleadosData, serviciosActivos: activosData, abonosMes, kpis: apiKpis, entregadosMes, serviciosFacturadosMes, facturasPendientes: pendientesData, serviciosPendientesCobro: cobrosPendData, gastosPendientesPago: gastosPendData } = response
+      const { servicios: serviciosData, gastos: gastosData, empleados: empleadosData, serviciosActivos: activosData, abonosMes, kpis: apiKpis, entregadosMes, serviciosFacturadosMes, facturasPendientes: pendientesData, serviciosPendientesCobro: cobrosPendData, gastosPendientesPago: gastosPendData, serviciosConCostosPendientes: costosPendData } = response
       setServicios(serviciosData)
       setServiciosActivos(activosData)
       setGastos(gastosData)
       setFacturasPendientes(pendientesData || [])
       setServiciosPendientesCobro(cobrosPendData || [])
       setGastosPendientesPago(gastosPendData || [])
+      setServiciosConCostosPendientes(costosPendData || [])
       // Solicitudes no leídas: query independiente (no depende del mes).
       fetchPresupuestosNoLeidos().then(setSolicitudesNoLeidas).catch(() => {})
       setEmpleadosState(empleadosData || [])
@@ -884,6 +887,7 @@ export default function DashboardPage() {
             maxItems={3}
           />
           <PendingPaymentsAlert servicios={serviciosPendientesCobro} maxItems={3} />
+          <PendingCostosAlert servicios={serviciosConCostosPendientes} maxItems={3} />
           <PendingExpensesAlert gastos={gastosPendientesPago} maxItems={3} />
           <AverageTicketChart />
           <div className="rounded-xl border border-border bg-card p-4 space-y-2">

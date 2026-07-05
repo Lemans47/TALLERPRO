@@ -704,6 +704,31 @@ export async function getServiciosPendientesCobro() {
   return data as Servicio[]
 }
 
+// Todos los servicios con al menos un ítem de costo taller pendiente de pago
+// (costos[].pagado = false, excluyendo pintura y auto-generados), sin filtrar
+// por mes. Usado por la alerta global de "Costos Taller Pendientes" en el
+// dashboard. El @> actúa de prefiltro indexable (GIN, ver scripts/11) y el
+// CASE protege jsonb_array_elements de filas legacy con costos string-encoded.
+export async function getServiciosConCostosPendientes() {
+  const db = getSQL()
+  const data = await db`
+    SELECT s.* FROM servicios s
+    WHERE s.costos @> '[{"pagado": false}]'::jsonb
+      AND EXISTS (
+        SELECT 1 FROM jsonb_array_elements(
+          CASE WHEN jsonb_typeof(s.costos) = 'array' THEN s.costos ELSE '[]'::jsonb END
+        ) AS item
+        WHERE item->'pagado' = 'false'::jsonb
+          AND COALESCE(item->>'categoria', '') <> 'pintura'
+          AND COALESCE(item->>'isAuto', 'false') <> 'true'
+          AND jsonb_typeof(item->'monto') = 'number'
+          AND (item->>'monto')::numeric > 0
+      )
+    ORDER BY s.fecha_ingreso ASC
+  `
+  return data as Servicio[]
+}
+
 export async function createGasto(gasto: Omit<Gasto, "id" | "created_at" | "updated_at">) {
   const db = getSQL()
   const pagado = gasto.pagado !== false // default true

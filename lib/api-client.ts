@@ -32,7 +32,7 @@ export async function fetchDashboardData(
   year: number,
   month: number,
   signal?: AbortSignal,
-): Promise<{ servicios: Servicio[]; gastos: Gasto[]; empleados: Empleado[]; serviciosActivos: Servicio[]; abonosMes: AbonoEmpleado[]; kpis: any; entregadosMes: number; serviciosFacturadosMes: Servicio[]; facturasPendientes: Servicio[]; serviciosPendientesCobro: Servicio[]; gastosPendientesPago: Gasto[] }> {
+): Promise<{ servicios: Servicio[]; gastos: Gasto[]; empleados: Empleado[]; serviciosActivos: Servicio[]; abonosMes: AbonoEmpleado[]; kpis: any; entregadosMes: number; serviciosFacturadosMes: Servicio[]; facturasPendientes: Servicio[]; serviciosPendientesCobro: Servicio[]; gastosPendientesPago: Gasto[]; serviciosConCostosPendientes: Servicio[] }> {
   const params = new URLSearchParams({ year: String(year), month: String(month) })
   // Timeout cliente. Las queries con LATERAL jsonb_array_elements pueden ser
   // lentas y la latencia Chile→Supabase agrega 200-500ms por roundtrip. 60s
@@ -121,6 +121,15 @@ export async function fetchServicios(year?: number, month?: number): Promise<Ser
 export async function fetchServiciosActivos(): Promise<Servicio[]> {
   const res = await fetch(`/api/servicios?activos=1`)
   if (!res.ok) throw new Error("Error fetching servicios activos")
+  return res.json()
+}
+
+// Un servicio puntual por id (puede ser de cualquier mes). Usado por el
+// deep-link /servicios?edit=<id> desde la alerta de costos pendientes.
+export async function fetchServicioById(id: string): Promise<Servicio | null> {
+  const res = await fetch(`/api/servicios?id=${encodeURIComponent(id)}`)
+  if (res.status === 404) return null
+  if (!res.ok) throw new Error("Error fetching servicio")
   return res.json()
 }
 
@@ -462,6 +471,7 @@ export const api = {
     getAll: fetchServicios,
     getByMonth: fetchServicios,
     getActivos: fetchServiciosActivos,
+    getById: fetchServicioById,
     create: createServicioApi,
     update: updateServicioApi,
     delete: deleteServicioApi,

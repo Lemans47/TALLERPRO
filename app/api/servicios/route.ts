@@ -33,6 +33,12 @@ export async function GET(request: Request) {
     const denied = await requireRole()
     if (denied) return denied
     const { searchParams } = new URL(request.url)
+    const id = searchParams.get("id")
+    if (id) {
+      const servicio = await getServicioById(id)
+      if (!servicio) return NextResponse.json({ error: "Servicio no encontrado" }, { status: 404 })
+      return NextResponse.json(servicio)
+    }
     const activos = searchParams.get("activos")
     const ym = parseYearMonth(searchParams)
 
