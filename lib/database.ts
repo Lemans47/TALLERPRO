@@ -252,8 +252,8 @@ export async function getServiciosPorCobrar() {
   const db = getSQL()
   const porCobrar = await getNombresEstadosPorTipo(["por_cobrar"])
   const data = await db`
-    SELECT id, numero_ot, patente, cliente, telefono, estado,
-           saldo_pendiente, fecha_ingreso, fecha_entregado
+    SELECT id, numero_ot, patente, marca, modelo, cliente, telefono, estado,
+           monto_total, anticipo, saldo_pendiente, fecha_ingreso, fecha_entregado
     FROM servicios
     WHERE saldo_pendiente > 0
       AND estado = ANY(${porCobrar.length ? porCobrar : [""]}::text[])
