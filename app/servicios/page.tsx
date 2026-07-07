@@ -31,6 +31,7 @@ export default function ServicesPage() {
   const [serviciosOpen, setServiciosOpen] = useState(true)
   const [presupuestosOpen, setPresupuestosOpen] = useState(true)
   const [backfilling, setBackfilling] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   const { toast } = useToast()
 
   const handleBackfillRevTecnica = async () => {
@@ -50,7 +51,7 @@ export default function ServicesPage() {
           title: "Backfill completo",
           description: `Total: ${data.total} · Actualizados: ${data.updated} · Sin datos: ${data.skipped} · Fallos: ${data.failed}`,
         })
-        loadData()
+        loadData({ background: true })
       }
     } catch (e: any) {
       toast({ title: "Error", description: e?.message ?? "Error de red", variant: "destructive" })
@@ -59,8 +60,8 @@ export default function ServicesPage() {
     }
   }
 
-  const loadData = useCallback(async () => {
-    setLoading(true)
+  const loadData = useCallback(async ({ background = false } = {}) => {
+    if (!background) setLoading(true)
     try {
       const [year, month] = selectedMonth.split("-").map(Number)
       // Servicios: del mes + activos historicos (filtrados server-side por estado).
@@ -80,9 +81,20 @@ export default function ServicesPage() {
     } catch (error) {
       console.error("Error loading data:", error)
     } finally {
-      setLoading(false)
+      if (!background) setLoading(false)
     }
   }, [selectedMonth])
+
+  // Recarga en segundo plano (sin colapsar la lista a un spinner), para que la
+  // posición de scroll de la ventana no se pierda tras guardar/eliminar/convertir.
+  const refreshData = useCallback(async () => {
+    setRefreshing(true)
+    try {
+      await loadData({ background: true })
+    } finally {
+      setRefreshing(false)
+    }
+  }, [loadData])
 
   useEffect(() => {
     loadData()
@@ -133,7 +145,7 @@ export default function ServicesPage() {
     // la lista desactualizada en redes lentas).
     setServicioAEditar(null)
     setShowFormDialog(false)
-    loadData()
+    refreshData()
   }
 
   const filterBySearch = <T extends { patente: string; cliente: string; marca: string; modelo: string }>(
@@ -176,11 +188,11 @@ export default function ServicesPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={loadData}
-            disabled={loading}
+            onClick={refreshData}
+            disabled={refreshing}
             className="border-border hover:bg-secondary bg-transparent"
           >
-            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
             Actualizar
           </Button>
           {canEdit && (
@@ -259,14 +271,14 @@ export default function ServicesPage() {
         <PresupuestosTable
           presupuestos={filterBySearch(presupuestos)}
           onEditPresupuesto={handleEditPresupuesto}
-          onConverted={loadData}
+          onConverted={refreshData}
           loading={loading}
         />
         
         <ServicesTable
           servicios={filterBySearch(servicios)}
           onEditServicio={handleEditServicio}
-          onDeleted={loadData}
+          onDeleted={refreshData}
           loading={loading}
         />
       </div>
