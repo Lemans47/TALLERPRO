@@ -163,9 +163,9 @@ export default function ServicesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="@container space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col @2xl:flex-row @2xl:items-center @2xl:justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-3">
             <div className="p-2 rounded-xl bg-primary/10">
@@ -212,7 +212,7 @@ export default function ServicesPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 @2xl:grid-cols-4 gap-4">
         <div className="rounded-xl border border-border bg-card p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-primary/10">

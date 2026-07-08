@@ -374,7 +374,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
       
       <div className="rounded-xl border border-border bg-card overflow-hidden">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border-b border-border bg-secondary/30">
+      <div className="flex flex-col @2xl:flex-row @2xl:items-center @2xl:justify-between gap-3 p-4 border-b border-border bg-secondary/30">
         <button
           type="button"
           onClick={() => setCollapsed(!collapsed)}
@@ -387,9 +387,9 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
             {serviciosFiltrados.length}
           </Badge>
         </button>
-        {!collapsed && <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+        {!collapsed && <div className="flex flex-wrap gap-2 w-full @2xl:w-auto">
           <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-full sm:w-[170px] bg-secondary/50 border-border">
+            <SelectTrigger className="w-full @2xl:w-[170px] bg-secondary/50 border-border">
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="bg-card border-border">
@@ -402,7 +402,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
             </SelectContent>
           </Select>
           <Select value={filtroEstado} onValueChange={setFiltroEstado}>
-            <SelectTrigger className="w-full sm:w-[180px] bg-secondary/50 border-border">
+            <SelectTrigger className="w-full @2xl:w-[180px] bg-secondary/50 border-border">
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="bg-card border-border">
@@ -458,7 +458,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
         <div className="divide-y divide-border [overflow-anchor:none]">
           {serviciosFiltrados.map((servicio) => (
             <div key={servicio.id} className="p-4 hover:bg-secondary/30 transition-colors [content-visibility:auto] [contain-intrinsic-size:0_220px]">
-              <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+              <div className="flex flex-col @2xl:flex-row @2xl:items-start gap-4">
                 {/* Info */}
                 <div className="flex-1 space-y-3">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -519,7 +519,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                     </div>
                   )}
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                  <div className="grid grid-cols-2 @2xl:grid-cols-4 gap-3 pt-2">
                     <div className="p-2.5 rounded-lg bg-secondary/50 flex flex-col justify-between min-h-[68px]">
                       <p className="text-xs text-muted-foreground">Total</p>
                       <p className="font-semibold">${Number(servicio.monto_total).toLocaleString("es-CL")}</p>
@@ -581,7 +581,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                 </div>
 
                 {/* Actions */}
-                <div className="flex flex-col gap-2 w-full sm:w-[160px] shrink-0">
+                <div className="flex flex-col gap-2 w-full @2xl:w-[160px] shrink-0">
                   {canEdit ? (
                     <Select value={servicio.estado} onValueChange={(v) => handleEstadoChange(servicio.id, v)}>
                       <SelectTrigger className="h-9 text-xs bg-secondary/50 border-border w-full">
