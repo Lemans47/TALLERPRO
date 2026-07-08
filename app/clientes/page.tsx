@@ -445,6 +445,7 @@ export default function ClientesPage() {
         <PDFPreviewModal
           url={pdfPreview.url}
           fileName={pdfPreview.fileName}
+          showWhatsApp
           onClose={() => setPdfPreview(null)}
         />
       )}

@@ -1166,6 +1166,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         <PDFPreviewModal
           url={pdfPreview.url}
           fileName={pdfPreview.fileName}
+          showWhatsApp
           onClose={() => setPdfPreview(null)}
         />
       )}

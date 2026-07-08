@@ -111,7 +111,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
   const [servicioSeleccionado, setServicioSeleccionado] = useState<Servicio | null>(null)
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false)
   const [servicioParaPdf, setServicioParaPdf] = useState<Servicio | null>(null)
-  const [pdfPreview, setPdfPreview] = useState<{ url: string; fileName: string } | null>(null)
+  const [pdfPreview, setPdfPreview] = useState<{ url: string; fileName: string; showWhatsApp?: boolean } | null>(null)
 
   const handleEstadoChange = async (id: string, nuevoEstado: string) => {
     try {
@@ -244,6 +244,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
         <PDFPreviewModal
           url={pdfPreview.url}
           fileName={pdfPreview.fileName}
+          showWhatsApp={pdfPreview.showWhatsApp}
           onClose={() => setPdfPreview(null)}
         />
       )}
@@ -260,7 +261,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
               className="flex flex-col items-center gap-2 p-3 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-colors text-left"
               onClick={async () => {
                 const { blobUrl, fileName } = await generarPDFPresupuesto(servicioParaPdf!, "detalle")
-                setPdfPreview({ url: blobUrl, fileName })
+                setPdfPreview({ url: blobUrl, fileName, showWhatsApp: true })
                 setPdfDialogOpen(false)
               }}
             >
@@ -272,7 +273,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
               className="flex flex-col items-center gap-2 p-3 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-colors text-left"
               onClick={async () => {
                 const { blobUrl, fileName } = await generarPDFPresupuesto(servicioParaPdf!, "completo")
-                setPdfPreview({ url: blobUrl, fileName })
+                setPdfPreview({ url: blobUrl, fileName, showWhatsApp: true })
                 setPdfDialogOpen(false)
               }}
             >
@@ -284,7 +285,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
               className="flex flex-col items-center gap-2 p-3 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-colors text-left"
               onClick={async () => {
                 const { blobUrl, fileName } = await generarPDFPresupuesto(servicioParaPdf!, "totales")
-                setPdfPreview({ url: blobUrl, fileName })
+                setPdfPreview({ url: blobUrl, fileName, showWhatsApp: true })
                 setPdfDialogOpen(false)
               }}
             >
