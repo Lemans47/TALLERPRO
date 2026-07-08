@@ -74,6 +74,7 @@ export function PresupuestosTable({ presupuestos, onEditPresupuesto, onConverted
         <PDFPreviewModal
           url={pdfPreview.url}
           fileName={pdfPreview.fileName}
+          showWhatsApp
           onClose={() => setPdfPreview(null)}
         />
       )}
