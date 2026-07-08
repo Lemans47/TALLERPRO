@@ -142,7 +142,7 @@ export function PresupuestosTable({ presupuestos, onEditPresupuesto, onConverted
         </button>
 
         {/* Content */}
-        {!collapsed && <div className="divide-y divide-border">
+        {!collapsed && <div className="divide-y divide-border [overflow-anchor:none]">
           {presupuestos.map((presupuesto) => (
             <div key={presupuesto.id} className="p-4 hover:bg-secondary/30 transition-colors">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">

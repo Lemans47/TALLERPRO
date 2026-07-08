@@ -455,7 +455,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
           <p>No hay servicios registrados</p>
         </div>
       ) : (
-        <div className="divide-y divide-border">
+        <div className="divide-y divide-border [overflow-anchor:none]">
           {serviciosFiltrados.map((servicio) => (
             <div key={servicio.id} className="p-4 hover:bg-secondary/30 transition-colors [content-visibility:auto] [contain-intrinsic-size:0_220px]">
               <div className="flex flex-col sm:flex-row sm:items-start gap-4">
