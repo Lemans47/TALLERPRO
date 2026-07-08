@@ -145,7 +145,7 @@ export function PresupuestosTable({ presupuestos, onEditPresupuesto, onConverted
         {!collapsed && <div className="divide-y divide-border [overflow-anchor:none]">
           {presupuestos.map((presupuesto) => (
             <div key={presupuesto.id} className="p-4 hover:bg-secondary/30 transition-colors">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex flex-col @2xl:flex-row @2xl:items-center justify-between gap-3">
                 {/* Info */}
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-2">
@@ -168,7 +168,7 @@ export function PresupuestosTable({ presupuestos, onEditPresupuesto, onConverted
                 </div>
 
                 {/* Amount and Actions */}
-                <div className="flex items-center gap-4">
+                <div className="flex items-center flex-wrap gap-4">
                   <div className="text-right p-2 rounded-lg bg-secondary/50">
                     <p className="text-xs text-muted-foreground">Total</p>
                     <p className="font-bold text-lg">${Number(presupuesto.monto_total).toLocaleString("es-CL")}</p>
