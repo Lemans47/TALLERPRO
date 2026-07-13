@@ -258,7 +258,7 @@ export async function generarPDFPresupuesto(
 
   // ─── PRE-CALCULATE all row positions ──────────────────────────────
   type PlacedRow = {
-    type: "category" | "item" | "subtotal" | "blank"
+    type: "category" | "item" | "subtotal" | "blank" | "arrastre" | "pagesubtotal"
     label?: string
     desc?: string
     monto?: number
@@ -298,6 +298,20 @@ export async function generarPDFPresupuesto(
   const ITEM_H = ITEM_H_BASE * scale
   const SUBTOTAL_H = SUBTOTAL_H_BASE * scale
 
+  // Carry-forward totals: a "SUBTOTAL" row at the bottom of each non-final page and a
+  // "VIENE DE PAG. ANTERIOR" row at the top of the next page. Only in modes that show
+  // money (detalle/completo). In "totales" mode pages fill with blank ruled lines only.
+  const showMoney = !soloTotales
+  const PAGE_SUBTOTAL_H = SUBTOTAL_H
+  const ARRASTRE_H = SUBTOTAL_H
+  // Prefix sum of item amounts: cumItems[i] = Σ montos of items in displayRows[0..i)
+  const cumItems: number[] = [0]
+  for (let i = 0; i < displayRows.length; i++) {
+    const row = displayRows[i]
+    cumItems.push(cumItems[i] + (row.type === "item" ? (row.monto || 0) : 0))
+  }
+  const cumThrough = (idx: number) => cumItems[Math.max(0, Math.min(idx, displayRows.length))]
+
   const measureRow = (row: DisplayRow): number =>
     row.type === "category" ? CAT_H : row.type === "subtotal" ? SUBTOTAL_H : ITEM_H
 
@@ -307,6 +321,10 @@ export async function generarPDFPresupuesto(
   // mid-category when keeping it whole would leave a large gap (> GAP_THRESHOLD).
   // When cutting mid-category, the next page shows "<CAT> (CONTINUACIÓN):" header.
   const fullPageAnchor = PAGE_H - 15
+  // Non-final pages reserve room for the bottom "SUBTOTAL" carry-forward row; continuation
+  // pages reserve room at the top for the "VIENE DE PAG. ANTERIOR" row.
+  const nonFinalAnchor = showMoney ? fullPageAnchor - PAGE_SUBTOTAL_H - 1 : fullPageAnchor
+  const startY_cont = startY_next + (showMoney ? ARRASTRE_H : 0)
   const GAP_THRESHOLD = 3 * ITEM_H  // ~16.5mm — split mid-category when gap would fit >=2 more items
 
   const findCategoryLabel = (beforeIdx: number): string | null => {
@@ -347,13 +365,13 @@ export async function generarPDFPresupuesto(
     let yCur = startY_p1
     for (let i = 0; i < displayRows.length; i++) {
       const rh = measureRow(displayRows[i])
-      while (yCur + rh > fullPageAnchor && i > pageStart) {
-        const startY = pageStart === 0 ? startY_p1 : startY_next
-        const { cut, mid } = chooseCut(pageStart, i, startY, fullPageAnchor, yCur)
+      while (yCur + rh > nonFinalAnchor && i > pageStart) {
+        const startY = pageStart === 0 ? startY_p1 : startY_cont
+        const { cut, mid } = chooseCut(pageStart, i, startY, nonFinalAnchor, yCur)
         pageBreaks.push(cut)
         if (mid) midCategoryBreaks.add(pageBreaks.length - 1)
         pageStart = cut
-        yCur = startY_next
+        yCur = startY_cont
         if (mid) yCur += CAT_H  // continuation header on next page
         for (let j = cut; j < i; j++) yCur += measureRow(displayRows[j])
       }
@@ -365,7 +383,7 @@ export async function generarPDFPresupuesto(
   {
     const lastIdx = pageBreaks.length - 1
     const lastPageStart = pageBreaks[lastIdx]
-    const startY = lastIdx === 0 ? startY_p1 : (midCategoryBreaks.has(lastIdx) ? startY_next + CAT_H : startY_next)
+    const startY = lastIdx === 0 ? startY_p1 : startY_cont + (midCategoryBreaks.has(lastIdx) ? CAT_H : 0)
     let yLast = startY
     let overflowIdx = -1
     for (let i = lastPageStart; i < displayRows.length; i++) {
@@ -400,6 +418,12 @@ export async function generarPDFPresupuesto(
       doc.text("VALOR", ML + DESC_W + MONTO_W / 2, cy + 5, { align: "center" })
       black()
       cy += 7
+
+      // Carry-forward header: amount accumulated through the end of the previous page
+      if (showMoney) {
+        placed.push({ type: "arrastre", monto: cumThrough(rowStart), ry: cy, rh: ARRASTRE_H, pg: cp })
+        cy += ARRASTRE_H
+      }
     }
 
     // Inject continuation category header if this page started mid-category
@@ -424,18 +448,25 @@ export async function generarPDFPresupuesto(
       cy += rh
     }
 
-    // On the last page, fill the gap between content and footer with blank rows
-    // so the table looks continuous instead of leaving an empty band before firma.
+    // Fill the gap between content and the page bottom with blank ruled rows so the
+    // table looks continuous instead of leaving an empty band. On the last page the
+    // bottom is the footer anchor; on earlier pages it's just above the carry-forward
+    // subtotal row.
     const isLastPage = pi === pageBreaks.length - 1
-    if (isLastPage) {
-      const spaceLeft = bottomAnchor - cy
-      if (spaceLeft > 0) {
-        const blanksNeeded = Math.floor(spaceLeft / ITEM_H)
-        for (let k = 0; k < blanksNeeded; k++) {
-          placed.push({ type: "blank", ry: cy, rh: ITEM_H, pg: cp })
-          cy += ITEM_H
-        }
+    const pageBottom = isLastPage ? bottomAnchor : fullPageAnchor - (showMoney ? PAGE_SUBTOTAL_H : 0)
+    const spaceLeft = pageBottom - cy
+    if (spaceLeft > 0) {
+      const blanksNeeded = Math.floor(spaceLeft / ITEM_H)
+      for (let k = 0; k < blanksNeeded; k++) {
+        placed.push({ type: "blank", ry: cy, rh: ITEM_H, pg: cp })
+        cy += ITEM_H
       }
+    }
+
+    // Non-final pages close with a carry-forward subtotal (accumulated through rowEnd)
+    if (!isLastPage && showMoney) {
+      placed.push({ type: "pagesubtotal", monto: cumThrough(rowEnd), ry: pageBottom, rh: PAGE_SUBTOTAL_H, pg: cp })
+      cy = pageBottom + PAGE_SUBTOTAL_H
     }
   }
 
@@ -452,8 +483,11 @@ export async function generarPDFPresupuesto(
       doc.setFillColor(210, 210, 210)
       doc.rect(ML, r.ry, CW, r.rh, "F")
       doc.restoreGraphicsState()
-    } else if (r.type === "subtotal") {
+    } else if (r.type === "subtotal" || r.type === "pagesubtotal") {
       doc.setFillColor(232, 232, 232)
+      doc.rect(ML, r.ry, CW, r.rh, "F")
+    } else if (r.type === "arrastre") {
+      doc.setFillColor(244, 244, 244)
       doc.rect(ML, r.ry, CW, r.rh, "F")
     }
   })
@@ -461,10 +495,10 @@ export async function generarPDFPresupuesto(
   // ─── PASS 2: lines ────────────────────────────────────────────────
   placed.forEach((r) => {
     doc.setPage(r.pg)
-    const isCat = r.type === "category"
-    const isSubtotal = r.type === "subtotal"
-    const lw = isCat || isSubtotal ? 0.4 : 0.2
-    const col = isCat || isSubtotal ? 80 : 200
+    const emphasized =
+      r.type === "category" || r.type === "subtotal" || r.type === "pagesubtotal" || r.type === "arrastre"
+    const lw = emphasized ? 0.4 : 0.2
+    const col = emphasized ? 80 : 200
     doc.setDrawColor(col, col, col)
     doc.setLineWidth(lw)
     doc.line(ML, r.ry, MR, r.ry)
@@ -483,6 +517,16 @@ export async function generarPDFPresupuesto(
     } else if (r.type === "subtotal") {
       bold(); doc.setFontSize(8)
       doc.text(fmt(r.monto!), MR - 1, r.ry + r.rh - 1.5, { align: "right" })
+    } else if (r.type === "pagesubtotal") {
+      doc.setTextColor(40, 40, 40); bold(); doc.setFontSize(8)
+      doc.text("SUBTOTAL", ML + 1.5, r.ry + r.rh - 1.5)
+      doc.text(fmt(r.monto!), MR - 1, r.ry + r.rh - 1.5, { align: "right" })
+      black()
+    } else if (r.type === "arrastre") {
+      doc.setTextColor(40, 40, 40); bold(); doc.setFontSize(7.5)
+      doc.text("VIENE DE PAG. ANTERIOR", ML + 1.5, r.ry + r.rh - 1.5)
+      doc.text(fmt(r.monto!), MR - 1, r.ry + r.rh - 1.5, { align: "right" })
+      black()
     } else {
       normal(); doc.setFontSize(8)
       doc.text(up(r.desc!).substring(0, 72), ML + 5, r.ry + r.rh - 1.5)
