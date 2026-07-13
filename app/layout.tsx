@@ -31,9 +31,9 @@ export const metadata: Metadata = {
   generator: "v0.app",
   manifest: "/manifest.json",
   icons: {
-    icon: "/logo-taller.png",
-    shortcut: "/logo-taller.png",
-    apple: "/logo-taller.png",
+    icon: "/logo-sarmiento.svg",
+    shortcut: "/logo-sarmiento.svg",
+    apple: "/logo-sarmiento.svg",
   },
 }
 

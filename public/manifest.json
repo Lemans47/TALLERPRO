@@ -10,15 +10,9 @@
   "categories": ["business", "productivity"],
   "icons": [
     {
-      "src": "/logo-taller.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/logo-taller.png",
-      "sizes": "512x512",
-      "type": "image/png",
+      "src": "/logo-sarmiento.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "any maskable"
     }
   ]
