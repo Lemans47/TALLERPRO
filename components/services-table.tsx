@@ -12,7 +12,7 @@ import { api, type Servicio } from "@/lib/api-client"
 import { formatFechaDMA, sumCostosNetos, hoyChile } from "@/lib/utils"
 import { useEstados } from "@/lib/estados"
 import { useAuth } from "@/lib/auth-context"
-import { FileText, Trash2, Edit, Calendar, User, Car, Wrench, ClipboardList, List, AlignJustify, ListChecks, TrendingUp, Receipt, ChevronDown, ChevronRight, AlertTriangle, CheckCircle2, Clock } from "lucide-react"
+import { FileText, Trash2, Edit, Calendar, User, Car, Wrench, ClipboardList, List, AlignJustify, ListChecks, TrendingUp, Receipt, ChevronDown, ChevronRight, AlertTriangle, CheckCircle2, Clock, Calculator } from "lucide-react"
 import { resumenPagosCostos } from "@/lib/costos-pendientes"
 
 const parseArr = (v: any): any[] => {
@@ -223,6 +223,29 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
         }
       })
   }, [servicios, filtroEstado, soloPendientes, soloPagados, sortBy, filtroEstadoIsCerrado, esCerrado, estadosConfig])
+
+  const totales = useMemo(() => {
+    let venta = 0, neto = 0, abonos = 0, saldo = 0
+    let ganancia = 0, netoConCostos = 0, sinCostos = 0
+    for (const s of serviciosFiltrados) {
+      venta += Number(s.monto_total) || 0
+      neto += Number(s.monto_total_sin_iva) || 0
+      abonos += Number(s.anticipo) || 0
+      saldo += Number(s.saldo_pendiente) || 0
+      const g = calcGanancia(s)
+      if (g) {
+        ganancia += g.ganancia
+        netoConCostos += Number(s.monto_total_sin_iva) || 0
+      } else {
+        sinCostos++
+      }
+    }
+    return {
+      venta, neto, iva: venta - neto, abonos, saldo, ganancia, sinCostos,
+      conCostos: serviciosFiltrados.length - sinCostos,
+      margen: netoConCostos > 0 ? (ganancia / netoConCostos) * 100 : 0,
+    }
+  }, [serviciosFiltrados])
 
   if (loading) {
     return (
@@ -671,6 +694,76 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
               </div>
             </div>
           ))}
+
+          {/* Resumen de totales */}
+          <div className="p-4 bg-secondary/40">
+            <div className="flex flex-col @2xl:flex-row @2xl:items-start gap-4">
+              <div className="flex-1 space-y-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Calculator className="w-4 h-4 text-primary" />
+                  <span className="font-bold">Resumen</span>
+                  <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/30">
+                    {serviciosFiltrados.length} {serviciosFiltrados.length === 1 ? "servicio" : "servicios"}
+                  </Badge>
+                </div>
+
+                <div className="grid grid-cols-2 @2xl:grid-cols-4 gap-3 pt-2">
+                  <div className="p-2.5 rounded-lg bg-secondary/50 flex flex-col justify-between min-h-[68px]">
+                    <p className="text-xs text-muted-foreground">Total Venta</p>
+                    <p className="font-semibold text-base">${Math.round(totales.venta).toLocaleString("es-CL")}</p>
+                    {totales.iva > 0 && (
+                      <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">
+                        Neto ${Math.round(totales.neto).toLocaleString("es-CL")} · IVA ${Math.round(totales.iva).toLocaleString("es-CL")}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="p-2.5 rounded-lg bg-success/5 border border-success/20 flex flex-col justify-between min-h-[68px]">
+                    <p className="text-xs text-muted-foreground">Abonos</p>
+                    <p className="font-semibold text-base text-success">${Math.round(totales.abonos).toLocaleString("es-CL")}</p>
+                  </div>
+
+                  <div
+                    className={`p-2.5 rounded-lg flex flex-col justify-between min-h-[68px] ${totales.saldo > 0 ? "bg-warning/5 border border-warning/20" : "bg-success/5 border border-success/20"}`}
+                  >
+                    <p className="text-xs text-muted-foreground">Saldo Pendiente</p>
+                    <p className={`font-semibold text-base ${totales.saldo > 0 ? "text-warning" : "text-success"}`}>
+                      ${Math.round(totales.saldo).toLocaleString("es-CL")}
+                    </p>
+                  </div>
+
+                  {totales.conCostos === 0 ? (
+                    <div className="p-2.5 rounded-lg bg-secondary/30 border border-border/40 flex flex-col justify-between min-h-[68px]">
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <TrendingUp className="w-3 h-3" /> Ganancia
+                      </p>
+                      <p className="font-semibold text-muted-foreground text-xs">Sin costos</p>
+                    </div>
+                  ) : (() => {
+                    const s = getGananciaStyles(totales.margen)
+                    return (
+                      <div className={`p-2.5 rounded-lg flex flex-col justify-between min-h-[68px] ${s.box}`}>
+                        <p className={`text-xs flex items-center gap-1 ${s.text}`}>
+                          <TrendingUp className="w-3 h-3" /> Ganancia
+                        </p>
+                        <div>
+                          <p className={`font-semibold text-base ${s.text}`}>${Math.round(totales.ganancia).toLocaleString("es-CL")}</p>
+                          <p className={`text-[10px] font-medium ${s.text}`}>{totales.margen.toFixed(1)}% margen</p>
+                          {totales.sinCostos > 0 && (
+                            <p className="text-[10px] text-muted-foreground leading-tight">
+                              {totales.sinCostos} sin costos cargados
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })()}
+                </div>
+              </div>
+
+              <div className="hidden @2xl:block w-[160px] shrink-0" />
+            </div>
+          </div>
         </div>
       )}
       </>}
