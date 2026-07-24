@@ -1085,15 +1085,13 @@ export async function getPromedioMaterialesMesAnterior(): Promise<PromedioMateri
 }
 
 // Piezas Pintura - Lista de piezas con cantidad
+// No se traga el error devolviendo []: un fallo transitorio de conexión se vería como
+// "el catálogo está vacío" y el formulario de servicios guardaría piezas_pintura: []
+// borrando las piezas del servicio. Que propague y el cliente bloquee el guardado.
 export async function getPiezasPintura() {
-  try {
-    const db = getSQL()
-    const data = await db`SELECT * FROM piezas_pintura ORDER BY nombre ASC`
-    return data as PiezaPintura[]
-  } catch (error: any) {
-    console.error("[v0] Error fetching piezas_pintura:", error?.message)
-    return []
-  }
+  const db = getSQL()
+  const data = await db`SELECT * FROM piezas_pintura ORDER BY nombre ASC`
+  return data as PiezaPintura[]
 }
 
 export async function getPiezaPintura(id: string) {

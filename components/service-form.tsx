@@ -98,6 +98,11 @@ interface PiezaPintura {
 // catálogo (no cambia al renombrar) y cae al nombre solo para piezas legacy sin id.
 const piezaKey = (p: { id?: string; nombre: string }) => p.id ?? p.nombre
 
+// Identifica el registro cuyas piezas están cargadas en el formulario. Un servicio y un
+// presupuesto pueden compartir id tras una conversión, de ahí el prefijo.
+const piezasHidratadasKey = (s: { id?: string; isPresupuesto?: boolean } | null | undefined) =>
+  s?.id ? `${s.isPresupuesto ? "presupuesto" : "servicio"}:${s.id}` : "nuevo"
+
 const isAutoItem = (desc: string | null | undefined) => {
   if (!desc) return false
   const d = desc.toLowerCase()
@@ -119,6 +124,13 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   const [savedPresupuesto, setSavedPresupuesto] = useState<any>(null)
   const [pdfPreview, setPdfPreview] = useState<{ url: string; fileName: string } | null>(null)
   const [piezasSeleccionadas, setPiezasSeleccionadas] = useState<PiezaPintura[]>([])
+  // Las piezas del servicio en edición se cargan de forma asíncrona (catálogo + precio
+  // global). Hasta que esa carga termina, `piezasSeleccionadas` está vacío y guardar
+  // escribiría `piezas_pintura: []`, borrando las piezas guardadas y bajando el total
+  // cobrado (cobroTotal incluye el monto de las piezas). Este marcador registra de qué
+  // registro son las piezas ya cargadas; guardar con un valor distinto se bloquea.
+  const piezasHidratadasRef = useRef<string | null>(null)
+  const [piezasCargando, setPiezasCargando] = useState(false)
 
   const [showManoObraModal, setShowManoObraModal] = useState(false)
   const [showMaterialesModal, setShowMaterialesModal] = useState(false)
@@ -236,6 +248,91 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       if (!servicioAEditar) setPiezasSeleccionadas([])
     }
   }
+
+  // Carga en el formulario las piezas guardadas del servicio/presupuesto en edición,
+  // casándolas contra el catálogo. Devuelve true solo si la carga se completó: mientras
+  // devuelva false NO se puede guardar, porque `piezasSeleccionadas` no representa las
+  // piezas reales del registro y se perderían al guardar.
+  const hidratarPiezas = useCallback(
+    async (servicio: (Servicio & { isPresupuesto?: boolean }) | null | undefined): Promise<boolean> => {
+      const clave = piezasHidratadasKey(servicio)
+      if (!servicio) {
+        // Servicio nuevo: no hay piezas guardadas que perder, el catálogo lo carga
+        // loadPreciosYPiezasPintura.
+        piezasHidratadasRef.current = clave
+        return true
+      }
+      setPiezasCargando(true)
+      try {
+        const [precio, piezas] = await Promise.all([api.precioPintura.get(), api.piezasPintura.getAll()])
+        const precioGlobal = precio?.precio_por_pieza || 0
+        const rawPiezasData = Array.isArray(servicio.piezas_pintura)
+          ? servicio.piezas_pintura
+          : (typeof servicio.piezas_pintura === "string" ? JSON.parse(servicio.piezas_pintura) : [])
+        const piezasData = (Array.isArray(rawPiezasData) ? rawPiezasData : []) as Array<{
+          nombre: string; cantidad?: number; precio_unitario?: number; precio?: number; pieza_id?: string
+        }>
+        const norm = (s: string | null | undefined) => String(s || "").trim().toUpperCase()
+
+        // Dedup defensivo por nombre (ver loadPreciosYPiezasPintura).
+        const piezasUnicas = Array.isArray(piezas)
+          ? Array.from(new Map(piezas.map((p) => [norm(p.nombre), p])).values())
+          : []
+        // Casa cada pieza guardada contra el catálogo por pieza_id (estable ante
+        // renombrados) y, si es legacy sin id, por nombre normalizado (insensible a
+        // mayúsculas/espacios). Se registra el índice usado para no asignar el mismo
+        // snapshot a dos piezas del catálogo.
+        const usados = new Set<number>()
+        const tomarSaved = (cat: { id: string; nombre: string }) => {
+          let idx = piezasData.findIndex((pd, i) => !usados.has(i) && !!pd.pieza_id && pd.pieza_id === cat.id)
+          if (idx === -1) idx = piezasData.findIndex((pd, i) => !usados.has(i) && norm(pd.nombre) === norm(cat.nombre))
+          if (idx === -1) return undefined
+          usados.add(idx)
+          return piezasData[idx]
+        }
+        // Preferir precio_unitario guardado (snapshot). Para servicios viejos sin él,
+        // derivar de precio/cantidad o caer al global como último recurso.
+        const precioUnitDe = (pd: { cantidad?: number; precio_unitario?: number; precio?: number }) => {
+          const cant = Number(pd.cantidad) || 1
+          if (pd.precio_unitario != null) return Number(pd.precio_unitario) || 0
+          if (pd.precio != null && cant > 0) return Number(pd.precio) / cant
+          return precioGlobal
+        }
+        const piezasConPrecio = piezasUnicas.map((p) => {
+          const saved = tomarSaved(p)
+          return {
+            id: p.id,
+            nombre: p.nombre,
+            precio: saved ? precioUnitDe(saved) : precioGlobal,
+            cantidad_piezas: saved ? Number(saved.cantidad) || 1 : Number(p.cantidad_piezas) || 1,
+            seleccionada: !!saved,
+          }
+        })
+        // Piezas guardadas que no calzaron con el catálogo (eliminadas del catálogo, o
+        // catálogo vacío porque su carga falló): se conservan seleccionadas para no
+        // perder su aporte al total.
+        const huerfanas = piezasData
+          .map((pd, i) => ({ pd, i }))
+          .filter(({ i }) => !usados.has(i))
+          .map(({ pd }) => ({
+            id: pd.pieza_id || undefined,
+            nombre: pd.nombre,
+            precio: precioUnitDe(pd),
+            cantidad_piezas: Number(pd.cantidad) || 1,
+            seleccionada: true,
+          }))
+        setPiezasSeleccionadas([...piezasConPrecio, ...huerfanas])
+        piezasHidratadasRef.current = clave
+        return true
+      } catch (error) {
+        console.error("Error loading piezas for edit:", error)
+        return false
+      } finally {
+        setPiezasCargando(false)
+      }
+    },
+    [],
+  )
 
   // Aplican el ajuste solo a este servicio (el valor por defecto global se
   // configura en Configuración → Pintura, no aquí).
@@ -386,75 +483,10 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       })
       setCostos(newCostos)
 
-      // Cargar piezas de pintura seleccionadas
-      const cargarPiezasSeleccionadas = async () => {
-        try {
-          const [precio, piezas] = await Promise.all([api.precioPintura.get(), api.piezasPintura.getAll()])
-          const precioGlobal = precio?.precio_por_pieza || 0
-          const rawPiezasData = Array.isArray(servicioAEditar.piezas_pintura)
-            ? servicioAEditar.piezas_pintura
-            : (typeof servicioAEditar.piezas_pintura === "string" ? JSON.parse(servicioAEditar.piezas_pintura) : [])
-          const piezasData = (Array.isArray(rawPiezasData) ? rawPiezasData : []) as Array<{
-            nombre: string; cantidad?: number; precio_unitario?: number; precio?: number; pieza_id?: string
-          }>
-          const norm = (s: string | null | undefined) => String(s || "").trim().toUpperCase()
-
-          if (Array.isArray(piezas) && piezas.length > 0) {
-            // Dedup defensivo por nombre (ver loadPreciosYPiezasPintura).
-            const piezasUnicas = Array.from(
-              new Map(piezas.map((p) => [norm(p.nombre), p])).values()
-            )
-            // Casa cada pieza guardada contra el catálogo por pieza_id (estable ante
-            // renombrados) y, si es legacy sin id, por nombre normalizado (insensible a
-            // mayúsculas/espacios). Se registra el índice usado para no asignar el mismo
-            // snapshot a dos piezas del catálogo.
-            const usados = new Set<number>()
-            const tomarSaved = (cat: { id: string; nombre: string }) => {
-              let idx = piezasData.findIndex((pd, i) => !usados.has(i) && !!pd.pieza_id && pd.pieza_id === cat.id)
-              if (idx === -1) idx = piezasData.findIndex((pd, i) => !usados.has(i) && norm(pd.nombre) === norm(cat.nombre))
-              if (idx === -1) return undefined
-              usados.add(idx)
-              return piezasData[idx]
-            }
-            // Preferir precio_unitario guardado (snapshot). Para servicios viejos sin él,
-            // derivar de precio/cantidad o caer al global como último recurso.
-            const precioUnitDe = (pd: { cantidad?: number; precio_unitario?: number; precio?: number }) => {
-              const cant = Number(pd.cantidad) || 1
-              if (pd.precio_unitario != null) return Number(pd.precio_unitario) || 0
-              if (pd.precio != null && cant > 0) return Number(pd.precio) / cant
-              return precioGlobal
-            }
-            const piezasConPrecio = piezasUnicas.map((p) => {
-              const saved = tomarSaved(p)
-              return {
-                id: p.id,
-                nombre: p.nombre,
-                precio: saved ? precioUnitDe(saved) : precioGlobal,
-                cantidad_piezas: saved ? Number(saved.cantidad) || 1 : Number(p.cantidad_piezas) || 1,
-                seleccionada: !!saved,
-              }
-            })
-            // Piezas guardadas que ya no existen en el catálogo (no calzaron por id ni por
-            // nombre, p.ej. eliminadas del catálogo): se conservan seleccionadas para no
-            // perder su aporte al total.
-            const huerfanas = piezasData
-              .map((pd, i) => ({ pd, i }))
-              .filter(({ i }) => !usados.has(i))
-              .map(({ pd }) => ({
-                id: pd.pieza_id || undefined,
-                nombre: pd.nombre,
-                precio: precioUnitDe(pd),
-                cantidad_piezas: Number(pd.cantidad) || 1,
-                seleccionada: true,
-              }))
-            setPiezasSeleccionadas([...piezasConPrecio, ...huerfanas])
-          }
-        } catch (error) {
-          console.error("Error loading piezas for edit:", error)
-        }
-      }
-      
-      cargarPiezasSeleccionadas()
+      // Cargar piezas de pintura seleccionadas. Hasta que termine, el guardado queda
+      // bloqueado (ver piezasHidratadasRef) para no sobrescribir las piezas guardadas.
+      piezasHidratadasRef.current = null
+      hidratarPiezas(servicioAEditar)
 
       // Cargar fotos existentes
       const parseArr = (v: any) => Array.isArray(v) ? v : (typeof v === "string" && v ? JSON.parse(v) : [])
@@ -465,11 +497,12 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       const abonosRaw = parseToFlatArray((servicioAEditar as any).abonos)
       setAbonos(abonosRaw.map((a: any) => ({ fecha: String(a.fecha ?? ""), monto: Number(a.monto ?? 0) })))
     } else {
+      piezasHidratadasRef.current = piezasHidratadasKey(null)
       setFotosIngreso([])
       setFotosEntrega([])
       setAbonos([])
     }
-  }, [servicioAEditar])
+  }, [servicioAEditar, hidratarPiezas])
 
   const resetForm = () => {
     setFormData({
@@ -906,6 +939,28 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
     if (fieldErrors.patente) setFieldErrors((prev) => ({ ...prev, patente: false }))
   }
 
+  // Impide guardar mientras las piezas del registro en edición no estén cargadas: si se
+  // guardara ahora, `piezas_pintura` se sobrescribiría con [] y el total cobrado perdería
+  // el monto de las piezas. Reintenta la carga y pide volver a guardar.
+  const piezasListasParaGuardar = async (): Promise<boolean> => {
+    if (piezasHidratadasRef.current === piezasHidratadasKey(servicioAEditar)) return true
+    const ok = await hidratarPiezas(servicioAEditar)
+    toast(
+      ok
+        ? {
+            title: "Piezas de pintura cargadas",
+            description: "Revisa las piezas del servicio y vuelve a guardar.",
+          }
+        : {
+            title: "No se pudieron cargar las piezas de pintura",
+            description:
+              "No se guardó para no borrar las piezas del servicio. Revisa tu conexión e intenta de nuevo.",
+            variant: "destructive",
+          },
+    )
+    return false
+  }
+
   const handleSubmit = async () => {
     if (submittingRef.current) return
     if (!validateRequiredFields()) return
@@ -913,6 +968,8 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
 
     setLoading(true)
     try {
+      if (!(await piezasListasParaGuardar())) return
+
       // Convertir cobros por categoría a array con descripción
       const cobrosArray: { categoria: string; descripcion: string; monto: number }[] = []
       Object.entries(cobros).forEach(([categoria, items]) => {
@@ -1045,6 +1102,8 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
 
     setLoading(true)
     try {
+      if (!(await piezasListasParaGuardar())) return
+
       // Convertir cobros por categoría a array con descripción
       const cobrosArray: { categoria: string; descripcion: string; monto: number }[] = []
       Object.entries(cobros).forEach(([categoria, items]) => {
@@ -2619,15 +2678,27 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
             <Button
               onClick={handlePresupuesto}
               variant="outline"
-              disabled={loading}
+              disabled={loading || piezasCargando}
               className="flex-1 h-11 border-warning text-warning hover:bg-warning/10 bg-transparent"
             >
               <FileText className="w-4 h-4 mr-2" />
-              {servicioAEditar?.isPresupuesto ? "Actualizar Presupuesto" : "Crear Presupuesto"}
+              {piezasCargando
+                ? "Cargando piezas..."
+                : servicioAEditar?.isPresupuesto
+                  ? "Actualizar Presupuesto"
+                  : "Crear Presupuesto"}
             </Button>
-            <Button onClick={handleSubmit} disabled={loading} className="flex-1 h-11 bg-primary hover:bg-primary/90">
+            <Button
+              onClick={handleSubmit}
+              disabled={loading || piezasCargando}
+              className="flex-1 h-11 bg-primary hover:bg-primary/90"
+            >
               <Save className="w-4 h-4 mr-2" />
-              {servicioAEditar && !servicioAEditar.isPresupuesto ? "Actualizar Servicio" : "Guardar Servicio"}
+              {piezasCargando
+                ? "Cargando piezas..."
+                : servicioAEditar && !servicioAEditar.isPresupuesto
+                  ? "Actualizar Servicio"
+                  : "Guardar Servicio"}
             </Button>
           </div>
         </div>
