@@ -148,13 +148,20 @@ export default function ServicesPage() {
     refreshData()
   }
 
-  const filterBySearch = <T extends { patente: string; cliente: string; marca: string; modelo: string }>(
+  const filterBySearch = <
+    T extends { patente: string; cliente: string; marca: string; modelo: string; numero_ot?: number | null },
+  >(
     items: T[],
   ): T[] => {
     if (!searchQuery) return items
-    const query = searchQuery.toLowerCase()
+    const query = searchQuery.toLowerCase().trim()
+    // Número de OT: acepta "130", "0130", "OT-0130" y "ot 130". Se compara exacto para
+    // que buscar 130 no traiga la 1300; los presupuestos no tienen numero_ot.
+    const queryOt = query.replace(/^ot[\s-]*/, "").replace(/^0+/, "")
+    const buscaOt = /^\d+$/.test(queryOt)
     return items.filter(
       (item) =>
+        (buscaOt && item.numero_ot != null && String(item.numero_ot) === queryOt) ||
         item.patente.toLowerCase().includes(query) ||
         item.cliente.toLowerCase().includes(query) ||
         item.marca.toLowerCase().includes(query) ||
@@ -263,7 +270,7 @@ export default function ServicesPage() {
       <SearchBar
         value={searchQuery}
         onChange={setSearchQuery}
-        placeholder="Buscar por patente, cliente, marca o modelo..."
+        placeholder="Buscar por N° de OT, patente, cliente, marca o modelo..."
       />
 
       {/* Tables */}
