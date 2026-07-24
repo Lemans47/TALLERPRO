@@ -3,7 +3,17 @@
 import { CollapsibleContent } from "@/components/ui/collapsible"
 import { CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Collapsible } from "@/components/ui/collapsible"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { ServiceForm } from "@/components/service-form"
 import { ServicesTable } from "@/components/services-table"
 import { PresupuestosTable } from "@/components/presupuestos-table"
@@ -24,6 +34,7 @@ export default function ServicesPage() {
   const [presupuestos, setPresupuestos] = useState<Presupuesto[]>([])
   const [loading, setLoading] = useState(true)
   const [showFormDialog, setShowFormDialog] = useState(false)
+  const [confirmarCierre, setConfirmarCierre] = useState(false)
   const { selectedMonth } = useMonth()
   const { esCerrado, esActivo } = useEstados()
   const { role } = useAuth()
@@ -100,9 +111,40 @@ export default function ServicesPage() {
     loadData()
   }, [loadData])
 
-  const handleEditServicio = (servicio: Servicio) => {
-    setServicioAEditar({ ...servicio, isPresupuesto: false })
+  // El formulario avisa si tiene trabajo sin guardar; el ref lo mantiene accesible
+  // desde los listeners (popstate), que no se re-crean en cada render.
+  const formDirtyRef = useRef(false)
+  const handleFormDirtyChange = useCallback((hayCambios: boolean) => {
+    formDirtyRef.current = hayCambios
+  }, [])
+
+  const cerrarFormulario = useCallback(() => {
+    formDirtyRef.current = false
+    setConfirmarCierre(false)
+    setServicioAEditar(null)
+    setShowFormDialog(false)
+  }, [])
+
+  // Cierre pedido por el usuario (X, Esc, clic afuera, Cancelar o botón atrás): si hay
+  // trabajo sin guardar se pregunta antes de descartarlo.
+  const intentarCerrarFormulario = useCallback(() => {
+    if (formDirtyRef.current) {
+      setConfirmarCierre(true)
+      return
+    }
+    cerrarFormulario()
+  }, [cerrarFormulario])
+
+  // El formulario recién avisa su estado cuando termina de cargar; hasta entonces se
+  // asume limpio para no arrastrar el "sucio" de la ficha anterior.
+  const abrirFormulario = useCallback((registro: (Servicio & { isPresupuesto?: boolean }) | null) => {
+    formDirtyRef.current = false
+    setServicioAEditar(registro)
     setShowFormDialog(true)
+  }, [])
+
+  const handleEditServicio = (servicio: Servicio) => {
+    abrirFormulario({ ...servicio, isPresupuesto: false })
   }
 
   // Deep-link desde el dashboard: /servicios?edit=<id> abre el modal de edición
@@ -124,19 +166,42 @@ export default function ServicesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Botón/gesto "atrás" con el formulario abierto: el diálogo no crea entrada en el
+  // historial, así que volver atrás sacaba de /servicios y se perdía todo lo cargado.
+  // Empujamos una entrada al abrirlo para interceptar el gesto y cerrar solo el diálogo.
+  useEffect(() => {
+    if (!showFormDialog) return
+    // Idempotente: en desarrollo StrictMode monta el efecto dos veces y no queremos
+    // apilar dos entradas (obligaría a apretar atrás dos veces).
+    if (!window.history.state?.tpFormDialog) window.history.pushState({ tpFormDialog: true }, "")
+    const onPop = () => {
+      if (formDirtyRef.current) {
+        // Nos quedamos en el formulario: reponemos la entrada consumida y preguntamos.
+        window.history.pushState({ tpFormDialog: true }, "")
+        setConfirmarCierre(true)
+        return
+      }
+      cerrarFormulario()
+    }
+    window.addEventListener("popstate", onPop)
+    return () => {
+      window.removeEventListener("popstate", onPop)
+      // Si el diálogo se cerró por otro camino (guardar, cancelar), sacamos del historial
+      // la entrada que habíamos empujado para no dejar un "atrás" que no hace nada.
+      if (window.history.state?.tpFormDialog) window.history.back()
+    }
+  }, [showFormDialog, cerrarFormulario])
+
   const handleEditPresupuesto = (presupuesto: Presupuesto) => {
-    setServicioAEditar({ ...presupuesto, isPresupuesto: true } as Servicio & { isPresupuesto: boolean })
-    setShowFormDialog(true)
+    abrirFormulario({ ...presupuesto, isPresupuesto: true } as Servicio & { isPresupuesto: boolean })
   }
 
   const handleNuevoServicio = () => {
-    setServicioAEditar(null)
-    setShowFormDialog(true)
+    abrirFormulario(null)
   }
 
   const handleClearEdit = () => {
-    setServicioAEditar(null)
-    setShowFormDialog(false)
+    intentarCerrarFormulario()
   }
 
   const handleSaved = () => {
@@ -291,7 +356,16 @@ export default function ServicesPage() {
       </div>
 
       {/* Dialog with Service Form */}
-      <Dialog open={showFormDialog} onOpenChange={setShowFormDialog}>
+      <Dialog
+        open={showFormDialog}
+        onOpenChange={(open) => {
+          if (open) {
+            setShowFormDialog(true)
+            return
+          }
+          intentarCerrarFormulario()
+        }}
+      >
         <DialogContent className="max-w-[98vw] sm:max-w-[95vw] md:max-w-[90vw] lg:max-w-[85vw] xl:max-w-7xl w-full h-[100dvh] sm:h-[95vh] max-h-[100dvh] flex flex-col bg-card border-border p-0">
           <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-2 border-b border-border">
             <DialogTitle className="text-lg sm:text-xl">
@@ -299,10 +373,31 @@ export default function ServicesPage() {
             </DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
-            <ServiceForm servicioAEditar={servicioAEditar} onClearEdit={handleClearEdit} onSaved={handleSaved} />
+            <ServiceForm
+              servicioAEditar={servicioAEditar}
+              onClearEdit={handleClearEdit}
+              onSaved={handleSaved}
+              onDirtyChange={handleFormDirtyChange}
+            />
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={confirmarCierre} onOpenChange={(o) => !o && setConfirmarCierre(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tenés cambios sin guardar</AlertDialogTitle>
+            <AlertDialogDescription>
+              Si cerrás ahora se pierde lo que cargaste. Igual queda un borrador en este dispositivo y te lo vamos a
+              ofrecer la próxima vez que abras esta ficha.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setConfirmarCierre(false)}>Seguir editando</AlertDialogCancel>
+            <AlertDialogAction onClick={cerrarFormulario}>Cerrar sin guardar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
