@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -61,6 +61,8 @@ interface ServiceFormProps {
   servicioAEditar?: (Servicio & { isPresupuesto?: boolean }) | null
   onClearEdit: () => void
   onSaved: () => void
+  /** Avisa al contenedor si hay trabajo sin guardar, para que confirme antes de cerrar. */
+  onDirtyChange?: (hayCambios: boolean) => void
 }
 
 interface ItemDetalle {
@@ -98,13 +100,45 @@ interface PiezaPintura {
 // catálogo (no cambia al renombrar) y cae al nombre solo para piezas legacy sin id.
 const piezaKey = (p: { id?: string; nombre: string }) => p.id ?? p.nombre
 
+// Identifica el registro cuyas piezas están cargadas en el formulario. Un servicio y un
+// presupuesto pueden compartir id tras una conversión, de ahí el prefijo.
+const piezasHidratadasKey = (s: { id?: string; isPresupuesto?: boolean } | null | undefined) =>
+  s?.id ? `${s.isPresupuesto ? "presupuesto" : "servicio"}:${s.id}` : "nuevo"
+
 const isAutoItem = (desc: string | null | undefined) => {
   if (!desc) return false
   const d = desc.toLowerCase()
   return d.includes("mano de obra") || d.includes("materiales pintura")
 }
 
-export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFormProps) {
+// Borrador local: clave por registro para que el de una OT no pise el de otra.
+const BORRADOR_PREFIJO = "tallerpro:borrador:"
+const borradorKey = (s: { id?: string; isPresupuesto?: boolean } | null | undefined) =>
+  BORRADOR_PREFIJO + piezasHidratadasKey(s)
+
+type Borrador = { guardadoEn: number; datos: string }
+
+const leerBorrador = (clave: string): Borrador | null => {
+  try {
+    const raw = localStorage.getItem(clave)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    return typeof parsed?.datos === "string" ? (parsed as Borrador) : null
+  } catch {
+    return null
+  }
+}
+
+const haceCuanto = (ts: number) => {
+  const min = Math.round((Date.now() - ts) / 60000)
+  if (min < 1) return "hace instantes"
+  if (min < 60) return `hace ${min} min`
+  const horas = Math.round(min / 60)
+  if (horas < 24) return `hace ${horas} h`
+  return `hace ${Math.round(horas / 24)} d`
+}
+
+export function ServiceForm({ servicioAEditar, onClearEdit, onSaved, onDirtyChange }: ServiceFormProps) {
   const { toast } = useToast() // Declare useToast hook
   const { estados: estadosConfig, esCerrado } = useEstados()
   const estadosVisibles = estadosConfig.filter((e) => e.visible)
@@ -119,6 +153,17 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
   const [savedPresupuesto, setSavedPresupuesto] = useState<any>(null)
   const [pdfPreview, setPdfPreview] = useState<{ url: string; fileName: string } | null>(null)
   const [piezasSeleccionadas, setPiezasSeleccionadas] = useState<PiezaPintura[]>([])
+  // Las piezas del servicio en edición se cargan de forma asíncrona (catálogo + precio
+  // global). Hasta que esa carga termina, `piezasSeleccionadas` está vacío y guardar
+  // escribiría `piezas_pintura: []`, borrando las piezas guardadas y bajando el total
+  // cobrado (cobroTotal incluye el monto de las piezas). Este marcador registra de qué
+  // registro son las piezas ya cargadas; guardar con un valor distinto se bloquea.
+  const piezasHidratadasRef = useRef<string | null>(null)
+  const [piezasCargando, setPiezasCargando] = useState(false)
+  // Config global de pintura: también llega async y toca el estado del formulario, así que
+  // la línea base para detectar cambios sin guardar se toma recién cuando termina.
+  const [configPinturaCargando, setConfigPinturaCargando] = useState(true)
+  const [borradorDisponible, setBorradorDisponible] = useState<Borrador | null>(null)
 
   const [showManoObraModal, setShowManoObraModal] = useState(false)
   const [showMaterialesModal, setShowMaterialesModal] = useState(false)
@@ -234,8 +279,95 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
     } catch (error) {
       console.error("Error loading piezas pintura:", error)
       if (!servicioAEditar) setPiezasSeleccionadas([])
+    } finally {
+      setConfigPinturaCargando(false)
     }
   }
+
+  // Carga en el formulario las piezas guardadas del servicio/presupuesto en edición,
+  // casándolas contra el catálogo. Devuelve true solo si la carga se completó: mientras
+  // devuelva false NO se puede guardar, porque `piezasSeleccionadas` no representa las
+  // piezas reales del registro y se perderían al guardar.
+  const hidratarPiezas = useCallback(
+    async (servicio: (Servicio & { isPresupuesto?: boolean }) | null | undefined): Promise<boolean> => {
+      const clave = piezasHidratadasKey(servicio)
+      if (!servicio) {
+        // Servicio nuevo: no hay piezas guardadas que perder, el catálogo lo carga
+        // loadPreciosYPiezasPintura.
+        piezasHidratadasRef.current = clave
+        return true
+      }
+      setPiezasCargando(true)
+      try {
+        const [precio, piezas] = await Promise.all([api.precioPintura.get(), api.piezasPintura.getAll()])
+        const precioGlobal = precio?.precio_por_pieza || 0
+        const rawPiezasData = Array.isArray(servicio.piezas_pintura)
+          ? servicio.piezas_pintura
+          : (typeof servicio.piezas_pintura === "string" ? JSON.parse(servicio.piezas_pintura) : [])
+        const piezasData = (Array.isArray(rawPiezasData) ? rawPiezasData : []) as Array<{
+          nombre: string; cantidad?: number; precio_unitario?: number; precio?: number; pieza_id?: string
+        }>
+        const norm = (s: string | null | undefined) => String(s || "").trim().toUpperCase()
+
+        // Dedup defensivo por nombre (ver loadPreciosYPiezasPintura).
+        const piezasUnicas = Array.isArray(piezas)
+          ? Array.from(new Map(piezas.map((p) => [norm(p.nombre), p])).values())
+          : []
+        // Casa cada pieza guardada contra el catálogo por pieza_id (estable ante
+        // renombrados) y, si es legacy sin id, por nombre normalizado (insensible a
+        // mayúsculas/espacios). Se registra el índice usado para no asignar el mismo
+        // snapshot a dos piezas del catálogo.
+        const usados = new Set<number>()
+        const tomarSaved = (cat: { id: string; nombre: string }) => {
+          let idx = piezasData.findIndex((pd, i) => !usados.has(i) && !!pd.pieza_id && pd.pieza_id === cat.id)
+          if (idx === -1) idx = piezasData.findIndex((pd, i) => !usados.has(i) && norm(pd.nombre) === norm(cat.nombre))
+          if (idx === -1) return undefined
+          usados.add(idx)
+          return piezasData[idx]
+        }
+        // Preferir precio_unitario guardado (snapshot). Para servicios viejos sin él,
+        // derivar de precio/cantidad o caer al global como último recurso.
+        const precioUnitDe = (pd: { cantidad?: number; precio_unitario?: number; precio?: number }) => {
+          const cant = Number(pd.cantidad) || 1
+          if (pd.precio_unitario != null) return Number(pd.precio_unitario) || 0
+          if (pd.precio != null && cant > 0) return Number(pd.precio) / cant
+          return precioGlobal
+        }
+        const piezasConPrecio = piezasUnicas.map((p) => {
+          const saved = tomarSaved(p)
+          return {
+            id: p.id,
+            nombre: p.nombre,
+            precio: saved ? precioUnitDe(saved) : precioGlobal,
+            cantidad_piezas: saved ? Number(saved.cantidad) || 1 : Number(p.cantidad_piezas) || 1,
+            seleccionada: !!saved,
+          }
+        })
+        // Piezas guardadas que no calzaron con el catálogo (eliminadas del catálogo, o
+        // catálogo vacío porque su carga falló): se conservan seleccionadas para no
+        // perder su aporte al total.
+        const huerfanas = piezasData
+          .map((pd, i) => ({ pd, i }))
+          .filter(({ i }) => !usados.has(i))
+          .map(({ pd }) => ({
+            id: pd.pieza_id || undefined,
+            nombre: pd.nombre,
+            precio: precioUnitDe(pd),
+            cantidad_piezas: Number(pd.cantidad) || 1,
+            seleccionada: true,
+          }))
+        setPiezasSeleccionadas([...piezasConPrecio, ...huerfanas])
+        piezasHidratadasRef.current = clave
+        return true
+      } catch (error) {
+        console.error("Error loading piezas for edit:", error)
+        return false
+      } finally {
+        setPiezasCargando(false)
+      }
+    },
+    [],
+  )
 
   // Aplican el ajuste solo a este servicio (el valor por defecto global se
   // configura en Configuración → Pintura, no aquí).
@@ -386,75 +518,10 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       })
       setCostos(newCostos)
 
-      // Cargar piezas de pintura seleccionadas
-      const cargarPiezasSeleccionadas = async () => {
-        try {
-          const [precio, piezas] = await Promise.all([api.precioPintura.get(), api.piezasPintura.getAll()])
-          const precioGlobal = precio?.precio_por_pieza || 0
-          const rawPiezasData = Array.isArray(servicioAEditar.piezas_pintura)
-            ? servicioAEditar.piezas_pintura
-            : (typeof servicioAEditar.piezas_pintura === "string" ? JSON.parse(servicioAEditar.piezas_pintura) : [])
-          const piezasData = (Array.isArray(rawPiezasData) ? rawPiezasData : []) as Array<{
-            nombre: string; cantidad?: number; precio_unitario?: number; precio?: number; pieza_id?: string
-          }>
-          const norm = (s: string | null | undefined) => String(s || "").trim().toUpperCase()
-
-          if (Array.isArray(piezas) && piezas.length > 0) {
-            // Dedup defensivo por nombre (ver loadPreciosYPiezasPintura).
-            const piezasUnicas = Array.from(
-              new Map(piezas.map((p) => [norm(p.nombre), p])).values()
-            )
-            // Casa cada pieza guardada contra el catálogo por pieza_id (estable ante
-            // renombrados) y, si es legacy sin id, por nombre normalizado (insensible a
-            // mayúsculas/espacios). Se registra el índice usado para no asignar el mismo
-            // snapshot a dos piezas del catálogo.
-            const usados = new Set<number>()
-            const tomarSaved = (cat: { id: string; nombre: string }) => {
-              let idx = piezasData.findIndex((pd, i) => !usados.has(i) && !!pd.pieza_id && pd.pieza_id === cat.id)
-              if (idx === -1) idx = piezasData.findIndex((pd, i) => !usados.has(i) && norm(pd.nombre) === norm(cat.nombre))
-              if (idx === -1) return undefined
-              usados.add(idx)
-              return piezasData[idx]
-            }
-            // Preferir precio_unitario guardado (snapshot). Para servicios viejos sin él,
-            // derivar de precio/cantidad o caer al global como último recurso.
-            const precioUnitDe = (pd: { cantidad?: number; precio_unitario?: number; precio?: number }) => {
-              const cant = Number(pd.cantidad) || 1
-              if (pd.precio_unitario != null) return Number(pd.precio_unitario) || 0
-              if (pd.precio != null && cant > 0) return Number(pd.precio) / cant
-              return precioGlobal
-            }
-            const piezasConPrecio = piezasUnicas.map((p) => {
-              const saved = tomarSaved(p)
-              return {
-                id: p.id,
-                nombre: p.nombre,
-                precio: saved ? precioUnitDe(saved) : precioGlobal,
-                cantidad_piezas: saved ? Number(saved.cantidad) || 1 : Number(p.cantidad_piezas) || 1,
-                seleccionada: !!saved,
-              }
-            })
-            // Piezas guardadas que ya no existen en el catálogo (no calzaron por id ni por
-            // nombre, p.ej. eliminadas del catálogo): se conservan seleccionadas para no
-            // perder su aporte al total.
-            const huerfanas = piezasData
-              .map((pd, i) => ({ pd, i }))
-              .filter(({ i }) => !usados.has(i))
-              .map(({ pd }) => ({
-                id: pd.pieza_id || undefined,
-                nombre: pd.nombre,
-                precio: precioUnitDe(pd),
-                cantidad_piezas: Number(pd.cantidad) || 1,
-                seleccionada: true,
-              }))
-            setPiezasSeleccionadas([...piezasConPrecio, ...huerfanas])
-          }
-        } catch (error) {
-          console.error("Error loading piezas for edit:", error)
-        }
-      }
-      
-      cargarPiezasSeleccionadas()
+      // Cargar piezas de pintura seleccionadas. Hasta que termine, el guardado queda
+      // bloqueado (ver piezasHidratadasRef) para no sobrescribir las piezas guardadas.
+      piezasHidratadasRef.current = null
+      hidratarPiezas(servicioAEditar)
 
       // Cargar fotos existentes
       const parseArr = (v: any) => Array.isArray(v) ? v : (typeof v === "string" && v ? JSON.parse(v) : [])
@@ -465,11 +532,167 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
       const abonosRaw = parseToFlatArray((servicioAEditar as any).abonos)
       setAbonos(abonosRaw.map((a: any) => ({ fecha: String(a.fecha ?? ""), monto: Number(a.monto ?? 0) })))
     } else {
+      piezasHidratadasRef.current = piezasHidratadasKey(null)
       setFotosIngreso([])
       setFotosEntrega([])
       setAbonos([])
     }
-  }, [servicioAEditar])
+  }, [servicioAEditar, hidratarPiezas])
+
+  // ─────────── Trabajo sin guardar: aviso al cerrar + borrador local ───────────
+
+  // Todo lo que el usuario puede editar. Se compara contra la línea base para saber si
+  // hay trabajo sin guardar, y es lo mismo que se persiste como borrador.
+  const snapshot = useMemo(
+    () =>
+      JSON.stringify({
+        formData,
+        cobros,
+        costos,
+        piezasSeleccionadas,
+        abonos,
+        fotosIngreso,
+        fotosEntrega,
+        manoObraConfig,
+        materialesConfig,
+        costoRealPintor,
+      }),
+    [
+      formData,
+      cobros,
+      costos,
+      piezasSeleccionadas,
+      abonos,
+      fotosIngreso,
+      fotosEntrega,
+      manoObraConfig,
+      materialesConfig,
+      costoRealPintor,
+    ],
+  )
+  const snapshotRef = useRef(snapshot)
+  const baselineRef = useRef<string | null>(null)
+  const hayCambiosRef = useRef(false)
+  const [hayCambios, setHayCambios] = useState(false)
+  const onDirtyChangeRef = useRef(onDirtyChange)
+  useEffect(() => {
+    onDirtyChangeRef.current = onDirtyChange
+  }, [onDirtyChange])
+
+  const cargandoInicial = piezasCargando || configPinturaCargando
+  // Tras guardar, resetForm() vacía el formulario: eso no son "cambios del usuario" y no
+  // debe reactivar el aviso ni escribir un borrador vacío.
+  const reciénGuardadoRef = useRef(false)
+
+  // La línea base es el estado recién cargado. Se re-toma al cambiar de registro y cuando
+  // terminan las cargas asíncronas, para no marcar como "cambios del usuario" lo que
+  // rellenó el propio sistema (piezas, config de pintura).
+  useEffect(() => {
+    if (cargandoInicial) return
+    reciénGuardadoRef.current = false
+    baselineRef.current = snapshot
+    hayCambiosRef.current = false
+    setHayCambios(false)
+    onDirtyChangeRef.current?.(false)
+    const guardado = leerBorrador(borradorKey(servicioAEditar))
+    setBorradorDisponible(guardado && guardado.datos !== snapshot ? guardado : null)
+    // `snapshot` queda fuera a propósito: la línea base se toma en estos momentos
+    // puntuales, no en cada tecla que escribe el usuario.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [servicioAEditar, cargandoInicial])
+
+  useEffect(() => {
+    snapshotRef.current = snapshot
+    if (reciénGuardadoRef.current) return
+    const cambio = baselineRef.current !== null && snapshot !== baselineRef.current
+    if (cambio !== hayCambiosRef.current) {
+      hayCambiosRef.current = cambio
+      setHayCambios(cambio)
+      onDirtyChangeRef.current?.(cambio)
+    }
+  }, [snapshot])
+
+  // Los borradores de fichas que nunca se reabrieron quedarían para siempre; se purgan
+  // los de más de una semana para no llenar el localStorage del dispositivo.
+  useEffect(() => {
+    try {
+      const limite = Date.now() - 7 * 24 * 60 * 60 * 1000
+      for (const clave of Object.keys(localStorage)) {
+        if (!clave.startsWith(BORRADOR_PREFIJO)) continue
+        const b = leerBorrador(clave)
+        if (!b || b.guardadoEn < limite) localStorage.removeItem(clave)
+      }
+    } catch {
+      /* localStorage no disponible */
+    }
+  }, [])
+
+  // Cerrar/recargar la pestaña con trabajo sin guardar: aviso nativo del navegador.
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (!hayCambiosRef.current) return
+      e.preventDefault()
+      e.returnValue = ""
+    }
+    window.addEventListener("beforeunload", handler)
+    return () => window.removeEventListener("beforeunload", handler)
+  }, [])
+
+  // Borrador local (debounce 1s). Red de seguridad para cuando el aviso no alcanza:
+  // se descartó sin querer, se cerró la app, se cortó la luz.
+  useEffect(() => {
+    if (!hayCambios || reciénGuardadoRef.current) return
+    const clave = borradorKey(servicioAEditar)
+    const t = setTimeout(() => {
+      try {
+        localStorage.setItem(clave, JSON.stringify({ guardadoEn: Date.now(), datos: snapshot }))
+      } catch (e) {
+        console.error("No se pudo guardar el borrador:", e)
+      }
+    }, 1000)
+    return () => clearTimeout(t)
+  }, [snapshot, hayCambios, servicioAEditar])
+
+  const descartarBorrador = () => {
+    try {
+      localStorage.removeItem(borradorKey(servicioAEditar))
+    } catch {
+      /* localStorage no disponible: nada que descartar */
+    }
+    setBorradorDisponible(null)
+  }
+
+  const restaurarBorrador = () => {
+    if (!borradorDisponible) return
+    try {
+      const d = JSON.parse(borradorDisponible.datos)
+      if (d.formData) setFormData(d.formData)
+      if (d.cobros) setCobros(d.cobros)
+      if (d.costos) setCostos(d.costos)
+      if (Array.isArray(d.piezasSeleccionadas)) setPiezasSeleccionadas(d.piezasSeleccionadas)
+      if (Array.isArray(d.abonos)) setAbonos(d.abonos)
+      if (Array.isArray(d.fotosIngreso)) setFotosIngreso(d.fotosIngreso)
+      if (Array.isArray(d.fotosEntrega)) setFotosEntrega(d.fotosEntrega)
+      if (typeof d.manoObraConfig === "number") setManoObraConfig(d.manoObraConfig)
+      if (typeof d.materialesConfig === "number") setMaterialesConfig(d.materialesConfig)
+      setCostoRealPintor(typeof d.costoRealPintor === "number" ? d.costoRealPintor : null)
+      setBorradorDisponible(null)
+      toast({ title: "Borrador recuperado", description: "Revisá los datos y guardá para confirmarlos." })
+    } catch {
+      toast({ title: "No se pudo leer el borrador", variant: "destructive" })
+    }
+  }
+
+  // Tras guardar con éxito: se descarta el borrador y el formulario deja de estar sucio,
+  // para que cerrarlo no dispare la confirmación.
+  const marcarComoGuardado = () => {
+    reciénGuardadoRef.current = true
+    descartarBorrador()
+    baselineRef.current = snapshotRef.current
+    hayCambiosRef.current = false
+    setHayCambios(false)
+    onDirtyChangeRef.current?.(false)
+  }
 
   const resetForm = () => {
     setFormData({
@@ -906,6 +1129,28 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
     if (fieldErrors.patente) setFieldErrors((prev) => ({ ...prev, patente: false }))
   }
 
+  // Impide guardar mientras las piezas del registro en edición no estén cargadas: si se
+  // guardara ahora, `piezas_pintura` se sobrescribiría con [] y el total cobrado perdería
+  // el monto de las piezas. Reintenta la carga y pide volver a guardar.
+  const piezasListasParaGuardar = async (): Promise<boolean> => {
+    if (piezasHidratadasRef.current === piezasHidratadasKey(servicioAEditar)) return true
+    const ok = await hidratarPiezas(servicioAEditar)
+    toast(
+      ok
+        ? {
+            title: "Piezas de pintura cargadas",
+            description: "Revisa las piezas del servicio y vuelve a guardar.",
+          }
+        : {
+            title: "No se pudieron cargar las piezas de pintura",
+            description:
+              "No se guardó para no borrar las piezas del servicio. Revisa tu conexión e intenta de nuevo.",
+            variant: "destructive",
+          },
+    )
+    return false
+  }
+
   const handleSubmit = async () => {
     if (submittingRef.current) return
     if (!validateRequiredFields()) return
@@ -913,6 +1158,8 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
 
     setLoading(true)
     try {
+      if (!(await piezasListasParaGuardar())) return
+
       // Convertir cobros por categoría a array con descripción
       const cobrosArray: { categoria: string; descripcion: string; monto: number }[] = []
       Object.entries(cobros).forEach(([categoria, items]) => {
@@ -1027,6 +1274,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
 
         toast({ title: "Servicio guardado" })
       }
+      marcarComoGuardado()
       onSaved()
       resetForm()
     } catch (error) {
@@ -1045,6 +1293,8 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
 
     setLoading(true)
     try {
+      if (!(await piezasListasParaGuardar())) return
+
       // Convertir cobros por categoría a array con descripción
       const cobrosArray: { categoria: string; descripcion: string; monto: number }[] = []
       Object.entries(cobros).forEach(([categoria, items]) => {
@@ -1148,6 +1398,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
         setSavedPresupuesto(newPresupuesto)
         setPdfFormatDialog(true)
       }
+      marcarComoGuardado()
       onSaved()
       resetForm()
     } catch (error) {
@@ -1227,6 +1478,26 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Borrador sin guardar de una sesión anterior */}
+      {borradorDisponible && (
+        <div className="mb-3 flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border border-warning/50 bg-warning/10 p-3">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium">Hay cambios sin guardar de {haceCuanto(borradorDisponible.guardadoEn)}</p>
+            <p className="text-xs text-muted-foreground">
+              Se cerró el formulario sin guardar. Podés recuperar lo que habías cargado o seguir con los datos actuales.
+            </p>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <Button size="sm" variant="outline" onClick={descartarBorrador}>
+              Descartar
+            </Button>
+            <Button size="sm" onClick={restaurarBorrador}>
+              Recuperar
+            </Button>
+          </div>
+        </div>
+      )}
 
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         {/* Header */}
@@ -1448,7 +1719,9 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
             </Dialog>
 
             {servicioAEditar && (
-              <Button variant="ghost" size="icon" onClick={resetForm} className="h-8 w-8 hover:bg-secondary">
+              // Cierra vía el contenedor (no resetForm) para que, si hay trabajo sin
+              // guardar, se pregunte antes de borrar nada de lo cargado.
+              <Button variant="ghost" size="icon" onClick={onClearEdit} className="h-8 w-8 hover:bg-secondary">
                 <X className="w-4 h-4" />
               </Button>
             )}
@@ -2619,15 +2892,27 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved }: ServiceFo
             <Button
               onClick={handlePresupuesto}
               variant="outline"
-              disabled={loading}
+              disabled={loading || piezasCargando}
               className="flex-1 h-11 border-warning text-warning hover:bg-warning/10 bg-transparent"
             >
               <FileText className="w-4 h-4 mr-2" />
-              {servicioAEditar?.isPresupuesto ? "Actualizar Presupuesto" : "Crear Presupuesto"}
+              {piezasCargando
+                ? "Cargando piezas..."
+                : servicioAEditar?.isPresupuesto
+                  ? "Actualizar Presupuesto"
+                  : "Crear Presupuesto"}
             </Button>
-            <Button onClick={handleSubmit} disabled={loading} className="flex-1 h-11 bg-primary hover:bg-primary/90">
+            <Button
+              onClick={handleSubmit}
+              disabled={loading || piezasCargando}
+              className="flex-1 h-11 bg-primary hover:bg-primary/90"
+            >
               <Save className="w-4 h-4 mr-2" />
-              {servicioAEditar && !servicioAEditar.isPresupuesto ? "Actualizar Servicio" : "Guardar Servicio"}
+              {piezasCargando
+                ? "Cargando piezas..."
+                : servicioAEditar && !servicioAEditar.isPresupuesto
+                  ? "Actualizar Servicio"
+                  : "Guardar Servicio"}
             </Button>
           </div>
         </div>
