@@ -102,7 +102,10 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
   }
   const [filtroEstado, setFiltroEstado] = useState("todos")
   const [sortBy, setSortBy] = useState("estado")
-  const [soloPendientes, setSoloPendientes] = useState(false)
+  // "Incompleto" = servicio marcado con detalle pendiente (falta cargar el detalle)
+  const [soloIncompletos, setSoloIncompletos] = useState(false)
+  // "Pagos Pendientes" = servicio con ítems de Costo Taller sin pagar
+  const [soloPagosPendientes, setSoloPagosPendientes] = useState(false)
   const [soloPagados, setSoloPagados] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
   const [montoPago, setMontoPago] = useState("")
@@ -200,11 +203,14 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
     const ESTADO_ORDER = estadosConfig.map((e) => e.nombre)
     return servicios
       .filter((s) => filtroEstado === "todos" || s.estado === filtroEstado)
-      .filter((s) => !soloPendientes || Boolean((s as any).detalle_pendiente))
+      .filter((s) => !soloIncompletos || Boolean((s as any).detalle_pendiente))
+      .filter((s) => !soloPagosPendientes || resumenPagosCostos(s.costos).estado === "pendiente")
       .filter((s) => !soloPagados || esCerrado(s.estado))
       .filter((s) => {
         if (sortBy !== "estado") return true
         if (soloPagados) return true
+        // Los filtros explícitos deben mostrar también los servicios cerrados
+        if (soloIncompletos || soloPagosPendientes) return true
         if (filtroEstadoIsCerrado) return true
         return !esCerrado(s.estado)
       })
@@ -222,7 +228,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
           default: return 0
         }
       })
-  }, [servicios, filtroEstado, soloPendientes, soloPagados, sortBy, filtroEstadoIsCerrado, esCerrado, estadosConfig])
+  }, [servicios, filtroEstado, soloIncompletos, soloPagosPendientes, soloPagados, sortBy, filtroEstadoIsCerrado, esCerrado, estadosConfig])
 
   const totales = useMemo(() => {
     let venta = 0, neto = 0, abonos = 0, saldo = 0
@@ -437,20 +443,33 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
             </SelectContent>
           </Select>
           <Button
-            variant={soloPendientes ? "default" : "outline"}
+            variant={soloIncompletos ? "default" : "outline"}
             size="sm"
             onClick={() => {
-              setSoloPendientes((v) => {
+              setSoloIncompletos((v) => {
                 const next = !v
                 if (next) setSoloPagados(false)
                 return next
               })
             }}
-            className={`gap-1.5 h-10 ${soloPendientes ? "bg-warning text-warning-foreground hover:bg-warning/90" : "border-warning/40 text-warning hover:bg-warning/10 hover:text-warning"}`}
-            title="Mostrar solo servicios con detalle pendiente"
+            className={`gap-1.5 h-10 ${soloIncompletos ? "bg-warning text-warning-foreground hover:bg-warning/90" : "border-warning/40 text-warning hover:bg-warning/10 hover:text-warning"}`}
+            title="Mostrar solo servicios con detalle pendiente (incompletos)"
           >
             <AlertTriangle className="w-3.5 h-3.5" />
-            Pendientes
+            Incompleto
+          </Button>
+          <Button
+            variant={soloPagosPendientes ? "default" : "outline"}
+            size="sm"
+            onClick={() => {
+              // Filtro independiente: se puede combinar con "Incompleto" o "Pagados"
+              setSoloPagosPendientes((v) => !v)
+            }}
+            className={`gap-1.5 h-10 ${soloPagosPendientes ? "bg-orange-500 text-white hover:bg-orange-500/90" : "border-orange-500/40 text-orange-400 hover:bg-orange-500/10 hover:text-orange-400"}`}
+            title="Mostrar solo servicios con costos taller sin pagar"
+          >
+            <Clock className="w-3.5 h-3.5" />
+            Pagos Pendientes
           </Button>
           <Button
             variant={soloPagados ? "default" : "outline"}
@@ -458,7 +477,7 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
             onClick={() => {
               setSoloPagados((v) => {
                 const next = !v
-                if (next) setSoloPendientes(false)
+                if (next) setSoloIncompletos(false)
                 return next
               })
             }}
