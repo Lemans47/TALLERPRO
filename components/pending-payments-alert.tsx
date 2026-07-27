@@ -14,10 +14,13 @@ interface PendingPaymentsAlertProps {
 
 export function PendingPaymentsAlert({ servicios, maxItems = 5 }: PendingPaymentsAlertProps) {
   const ahora = new Date()
-  const { esPorCobrar } = useEstados()
+  const { esFinalizado } = useEstados()
 
+  // esFinalizado = por_cobrar ∪ cerrado. Un cerrado con saldo > 0 no debería
+  // existir (lib/pagos.ts lo impide al escribir), pero si aparece es deuda real
+  // y tiene que verse acá en vez de quedar invisible en toda la app.
   const pendingPayments = servicios
-    .filter((s) => Number(s.saldo_pendiente) > 0 && esPorCobrar(s.estado))
+    .filter((s) => Number(s.saldo_pendiente) > 0 && esFinalizado(s.estado))
     .map((servicio) => {
       // Antigüedad de la deuda desde que pasó a por_cobrar/cerrado.
       // Fallback a fecha_ingreso para servicios anteriores a la migración.

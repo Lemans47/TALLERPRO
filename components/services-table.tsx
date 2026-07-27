@@ -14,6 +14,7 @@ import { useEstados } from "@/lib/estados"
 import { useAuth } from "@/lib/auth-context"
 import { FileText, Trash2, Edit, Calendar, User, Car, Wrench, ClipboardList, List, AlignJustify, ListChecks, TrendingUp, Receipt, ChevronDown, ChevronRight, AlertTriangle, CheckCircle2, Clock, Calculator } from "lucide-react"
 import { resumenPagosCostos } from "@/lib/costos-pendientes"
+import { parseAbonos as parseAbonosJson, esInconsistente, type Abono } from "@/lib/pagos"
 
 const parseArr = (v: any): any[] => {
   let val = v
@@ -27,11 +28,8 @@ const parseArr = (v: any): any[] => {
   return []
 }
 
-function parseAbonos(s: Servicio): { fecha: string; monto: number }[] {
-  return parseArr((s as any).abonos).map((a: any) => ({
-    fecha: String(a.fecha ?? ""),
-    monto: Number(a.monto ?? 0),
-  }))
+function parseAbonos(s: Servicio): Abono[] {
+  return parseAbonosJson((s as any).abonos)
 }
 
 function fechaHoy(): string {
@@ -118,16 +116,11 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
 
   const handleEstadoChange = async (id: string, nuevoEstado: string) => {
     try {
-      const updateData: Record<string, unknown> = { estado: nuevoEstado }
-      if (esCerrado(nuevoEstado)) {
-        const servicio = servicios.find((s) => s.id === id)
-        if (servicio) {
-          const montoTotal = Number(servicio.monto_total) || 0
-          updateData.anticipo = montoTotal
-          updateData.saldo_pendiente = 0
-        }
-      }
-      await api.servicios.update(id, updateData)
+      // Sólo se manda el estado. Si es un estado cerrado, el servidor registra el
+      // abono por la diferencia y recalcula anticipo/saldo (lib/pagos.ts). Antes
+      // acá se escribía `anticipo = monto_total, saldo = 0` sin tocar `abonos`,
+      // y el historial quedaba desfasado hasta que el formulario lo revertía.
+      await api.servicios.update(id, { estado: nuevoEstado })
       onDeleted()
       toast({ title: "Estado actualizado" })
     } catch (error) {
@@ -141,36 +134,19 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
 
     try {
       const monto = Number(montoPago)
-      const total = Number(servicioSeleccionado.monto_total)
-      let nuevoAnticipo: number
-      let nuevoSaldo: number
-
-      let newAbonos: { fecha: string; monto: number }[]
+      let newAbonos: Abono[]
 
       if (modoCorregir) {
         // Reemplaza el historial con un único abono sintético al valor exacto indicado
-        nuevoAnticipo = monto
-        nuevoSaldo = Math.max(0, total - monto)
-        newAbonos = [{ fecha: fechaHoy(), monto: nuevoAnticipo }]
+        newAbonos = [{ fecha: fechaHoy(), monto }]
       } else {
         // Agrega un abono nuevo al historial existente
-        const existingAbonos = parseAbonos(servicioSeleccionado)
-        newAbonos = [...existingAbonos, { fecha: fechaHoy(), monto }]
-        nuevoAnticipo = newAbonos.reduce((s, a) => s + a.monto, 0)
-        nuevoSaldo = Math.max(0, total - nuevoAnticipo)
+        newAbonos = [...parseAbonos(servicioSeleccionado), { fecha: fechaHoy(), monto }]
       }
 
-      const estadoCerrado = estadosConfig
-        .filter((e) => e.tipo === "cerrado" && e.visible)
-        .sort((a, b) => a.orden - b.orden)[0]?.nombre ?? servicioSeleccionado.estado
-      const nuevoEstado = nuevoSaldo <= 0 ? estadoCerrado : servicioSeleccionado.estado
-
-      await api.servicios.update(servicioSeleccionado.id, {
-        anticipo: nuevoAnticipo,
-        saldo_pendiente: nuevoSaldo,
-        abonos: newAbonos,
-        estado: nuevoEstado,
-      })
+      // Sólo el historial: el servidor deriva anticipo y saldo, y promueve el
+      // estado a cerrado si el servicio ya estaba entregado y quedó saldado.
+      await api.servicios.update(servicioSeleccionado.id, { abonos: newAbonos })
 
       setMontoPago("")
       setModoCorregir(false)
@@ -212,6 +188,9 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
         // Los filtros explícitos deben mostrar también los servicios cerrados
         if (soloIncompletos || soloPagosPendientes) return true
         if (filtroEstadoIsCerrado) return true
+        // Un cerrado con saldo > 0 no debería existir, pero si aparece tiene que
+        // verse: es plata que el cliente debe y que nadie más está mostrando.
+        if (Number(s.saldo_pendiente) > 0) return true
         return !esCerrado(s.estado)
       })
       .sort((a, b) => {
@@ -358,7 +337,10 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                   <div className="rounded-lg border border-border bg-secondary/20 divide-y divide-border max-h-36 overflow-y-auto">
                     {hist.map((a, i) => (
                       <div key={i} className="flex justify-between px-3 py-1.5 text-xs">
-                        <span className="text-muted-foreground">{a.fecha}</span>
+                        <span className="text-muted-foreground">
+                          {a.fecha}
+                          {a.auto && <span className="ml-1.5 opacity-70">· cierre automático</span>}
+                        </span>
                         <span className="font-medium tabular-nums">${Number(a.monto).toLocaleString("es-CL")}</span>
                       </div>
                     ))}
@@ -391,6 +373,12 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                 placeholder="0"
                 className="bg-secondary/50 border-border"
               />
+              {modoCorregir && servicioSeleccionado && esCerrado(servicioSeleccionado.estado) && (
+                <p className="text-xs text-warning leading-tight">
+                  El servicio está cerrado: si bajás el anticipo, el sistema vuelve a saldarlo
+                  automáticamente. Para dejar deuda, primero cambiá el estado a por cobrar.
+                </p>
+              )}
             </div>
             <Button
               onClick={handleRegistrarPago}
@@ -520,6 +508,14 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
                       <Badge className="bg-warning/15 text-warning border border-warning/40 gap-1 hover:bg-warning/20">
                         <AlertTriangle className="w-3 h-3" />
                         Detalle pendiente
+                      </Badge>
+                    )}
+                    {/* Tripwire: el anticipo no cuadra con el historial de abonos,
+                        o el saldo no cuadra con el total. No debería pasar nunca. */}
+                    {esInconsistente(servicio) && (
+                      <Badge variant="destructive" className="gap-1">
+                        <AlertTriangle className="w-3 h-3" />
+                        Revisar pagos
                       </Badge>
                     )}
                     {(() => {

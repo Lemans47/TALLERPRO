@@ -1,4 +1,6 @@
 import postgres from "postgres"
+import { reconciliarPagos, type Abono } from "./pagos"
+import { hoyChile } from "./utils"
 
 // Normaliza un valor destinado a una columna jsonb y lo devuelve como valor JS
 // crudo (array/objeto), NUNCA pre-stringificado. postgres.js con prepare:false
@@ -71,10 +73,9 @@ export interface FotoServicio {
   poster?: string
 }
 
-export interface Abono {
-  fecha: string  // "YYYY-MM-DD"
-  monto: number
-}
+// El tipo vive en lib/pagos.ts junto a la regla que lo produce; se re-exporta
+// para no romper los imports existentes desde `@/lib/database`.
+export type { Abono }
 
 export interface Servicio {
   id: string
@@ -243,14 +244,19 @@ export async function getActiveServicios() {
   return data as Servicio[]
 }
 
-// Servicios en estado Entregado / Por Cobrar (tipo `por_cobrar`) que todavía
-// tienen saldo pendiente. Es la cobranza "real": trabajo terminado y entregado
-// que el cliente aún debe. Se ordena por antigüedad (fecha_entregado o, si
-// falta, fecha_ingreso) para priorizar las deudas más viejas. Usado por el bot
-// de cobranzas de Telegram.
+// Servicios entregados que todavía tienen saldo pendiente. Es la cobranza
+// "real": trabajo terminado y entregado que el cliente aún debe. Se ordena por
+// antigüedad (fecha_entregado o, si falta, fecha_ingreso) para priorizar las
+// deudas más viejas. Usado por el bot de cobranzas de Telegram.
+//
+// Incluye tambien los estados `cerrado`: la deuda se define por
+// `saldo_pendiente > 0`, no por la etiqueta del estado. Con la invariante de
+// lib/pagos.ts un cerrado siempre tiene saldo 0, así que en la práctica no
+// agrega filas — pero si alguna vez se rompe, la deuda se ve en vez de
+// esconderse (antes un "Cerrado/Pagado" con saldo era invisible en toda la app).
 export async function getServiciosPorCobrar() {
   const db = getSQL()
-  const porCobrar = await getNombresEstadosPorTipo(["por_cobrar"])
+  const porCobrar = await getNombresEstadosPorTipo(["por_cobrar", "cerrado"])
   const data = await db`
     SELECT id, numero_ot, patente, marca, modelo, cliente, telefono, estado,
            monto_total, anticipo, saldo_pendiente, fecha_ingreso, fecha_entregado
@@ -407,6 +413,19 @@ export async function createServicio(servicio: Omit<Servicio, "id" | "created_at
     return recent[0] as Servicio
   }
 
+  // `anticipo` y `saldo_pendiente` NO se toman del cliente: se derivan de `abonos`
+  // (ver lib/pagos.ts). El estado puede promoverse a cerrado si ya viene saldado.
+  const cfg = await getEstadosPagosConfig()
+  const pagos = reconciliarPagos({
+    abonos: servicio.abonos ?? [],
+    montoTotal: Number(servicio.monto_total) || 0,
+    estado: servicio.estado,
+    estadosCerrado: cfg.cerrado,
+    estadosPorCobrar: cfg.porCobrar,
+    estadoCerradoDestino: cfg.cerradoDestino,
+    hoy: hoyChile(),
+  })
+
   const data = await db`
     INSERT INTO servicios (
       fecha_ingreso, patente, marca, modelo, color, kilometraje, año, cliente, telefono,
@@ -422,15 +441,15 @@ export async function createServicio(servicio: Omit<Servicio, "id" | "created_at
       ${servicio.rut || null}, ${servicio.domicilio || null}, ${servicio.comuna || null},
       ${servicio.observaciones},
       ${servicio.mano_obra_pintura}, ${safeJson(servicio.cobros)}, ${safeJson(servicio.costos)},
-      ${safeJson(servicio.piezas_pintura)}, ${servicio.estado}, ${servicio.iva},
-      ${servicio.anticipo}, ${servicio.saldo_pendiente}, ${servicio.monto_total},
-      ${servicio.monto_total_sin_iva}, ${safeJson(servicio.observaciones_checkboxes)},
+      ${safeJson(servicio.piezas_pintura)}, ${pagos.estado}, ${servicio.iva},
+      ${pagos.anticipo}, ${pagos.saldoPendiente}, ROUND((${servicio.monto_total ?? 0})::numeric),
+      ROUND((${servicio.monto_total_sin_iva ?? 0})::numeric), ${safeJson(servicio.observaciones_checkboxes)},
       ${safeJson(servicio.fotos_ingreso || [])}, ${safeJson(servicio.fotos_entrega || [])},
-      ${safeJson(servicio.abonos ?? [])},
+      ${safeJson(pagos.abonos)},
       nextval('servicios_numero_ot_seq')::int, ${servicio.detalle_pendiente ?? false},
       ${servicio.fecha_facturacion || null},
       CASE
-        WHEN ${servicio.estado}::text IN (SELECT nombre FROM estados_servicio WHERE tipo IN ('por_cobrar', 'cerrado'))
+        WHEN ${pagos.estado}::text IN (SELECT nombre FROM estados_servicio WHERE tipo IN ('por_cobrar', 'cerrado'))
         THEN CURRENT_DATE
         ELSE NULL
       END
@@ -444,7 +463,30 @@ export async function updateServicio(id: string, servicio: Partial<Servicio>) {
   // fecha_facturacion: permitir "clear" (null explicito). Si la key no viene, mantener.
   const fechaFacSet = "fecha_facturacion" in servicio
   const fechaFacVal = servicio.fecha_facturacion || null
-  const data = await db`
+
+  // Los campos de pago se derivan en el servidor, dentro de la transacción, a
+  // partir del estado real de la fila + lo que venga en el body. Esto es lo que
+  // hace correcto un PUT parcial de `{estado: "Cerrado/Pagado"}`: los abonos y el
+  // monto salen de la propia fila y el cierre agrega el abono por la diferencia.
+  // Ver lib/pagos.ts. Lo que mande el cliente en anticipo/saldo_pendiente se ignora.
+  const cfg = await getEstadosPagosConfig()
+  return await db.begin(async (tx: any) => {
+    const [row] = (await tx`
+      SELECT abonos, monto_total, estado FROM servicios WHERE id = ${id} FOR UPDATE
+    `) as { abonos: unknown; monto_total: number; estado: string }[]
+    if (!row) throw new Error("Servicio no encontrado")
+
+    const pagos = reconciliarPagos({
+      abonos: servicio.abonos ?? row.abonos,
+      montoTotal: Number(servicio.monto_total ?? row.monto_total) || 0,
+      estado: servicio.estado ?? row.estado,
+      estadosCerrado: cfg.cerrado,
+      estadosPorCobrar: cfg.porCobrar,
+      estadoCerradoDestino: cfg.cerradoDestino,
+      hoy: hoyChile(),
+    })
+
+    const data = await tx`
     UPDATE servicios SET
       fecha_ingreso = COALESCE(${servicio.fecha_ingreso ?? null}, fecha_ingreso),
       patente = COALESCE(${servicio.patente ?? null}, patente),
@@ -463,22 +505,21 @@ export async function updateServicio(id: string, servicio: Partial<Servicio>) {
       cobros = COALESCE(${servicio.cobros != null ? safeJson(servicio.cobros) : null}::jsonb, cobros),
       costos = COALESCE(${servicio.costos != null ? safeJson(servicio.costos) : null}::jsonb, costos),
       piezas_pintura = COALESCE(${servicio.piezas_pintura != null ? safeJson(servicio.piezas_pintura) : null}::jsonb, piezas_pintura),
-      estado = COALESCE(${servicio.estado ?? null}, estado),
+      estado = ${pagos.estado},
       iva = COALESCE(${servicio.iva ?? null}, iva),
-      anticipo = COALESCE(${servicio.anticipo ?? null}, anticipo),
-      saldo_pendiente = COALESCE(${servicio.saldo_pendiente ?? null}, saldo_pendiente),
-      monto_total = COALESCE(${servicio.monto_total ?? null}, monto_total),
-      monto_total_sin_iva = COALESCE(${servicio.monto_total_sin_iva ?? null}, monto_total_sin_iva),
+      anticipo = ${pagos.anticipo},
+      saldo_pendiente = ${pagos.saldoPendiente},
+      monto_total = ROUND(COALESCE((${servicio.monto_total ?? null})::numeric, monto_total)),
+      monto_total_sin_iva = ROUND(COALESCE((${servicio.monto_total_sin_iva ?? null})::numeric, monto_total_sin_iva)),
       observaciones_checkboxes = COALESCE(${servicio.observaciones_checkboxes != null ? safeJson(servicio.observaciones_checkboxes) : null}::jsonb, observaciones_checkboxes),
       fotos_ingreso = COALESCE(${servicio.fotos_ingreso != null ? safeJson(servicio.fotos_ingreso) : null}::jsonb, fotos_ingreso),
       fotos_entrega = COALESCE(${servicio.fotos_entrega != null ? safeJson(servicio.fotos_entrega) : null}::jsonb, fotos_entrega),
-      abonos = COALESCE(${servicio.abonos != null ? safeJson(servicio.abonos) : null}::jsonb, abonos),
+      abonos = ${safeJson(pagos.abonos)}::jsonb,
       detalle_pendiente = COALESCE(${servicio.detalle_pendiente ?? null}, detalle_pendiente),
       fecha_facturacion = CASE WHEN ${fechaFacSet}::boolean THEN ${fechaFacVal}::date ELSE fecha_facturacion END,
       fecha_entregado = CASE
-        WHEN ${servicio.estado ?? null}::text IS NOT NULL
-         AND fecha_entregado IS NULL
-         AND ${servicio.estado ?? null}::text IN (SELECT nombre FROM estados_servicio WHERE tipo IN ('por_cobrar', 'cerrado'))
+        WHEN fecha_entregado IS NULL
+         AND ${pagos.estado}::text IN (SELECT nombre FROM estados_servicio WHERE tipo IN ('por_cobrar', 'cerrado'))
         THEN CURRENT_DATE
         ELSE fecha_entregado
       END,
@@ -486,7 +527,8 @@ export async function updateServicio(id: string, servicio: Partial<Servicio>) {
     WHERE id = ${id}
     RETURNING *
   `
-  return data[0] as Servicio
+    return data[0] as Servicio
+  })
 }
 
 export async function deleteServicio(id: string) {
@@ -638,7 +680,7 @@ export async function convertPresupuestoToServicio(presupuestoId: string) {
         rut, domicilio, comuna, observaciones,
         mano_obra_pintura, cobros, costos, piezas_pintura, estado, iva,
         anticipo, saldo_pendiente, monto_total, monto_total_sin_iva, observaciones_checkboxes,
-        fotos_ingreso, fotos_entrega, numero_ot
+        fotos_ingreso, fotos_entrega, abonos, numero_ot
       ) VALUES (
         CURRENT_DATE, ${presupuesto.patente}, ${presupuesto.marca}, ${presupuesto.modelo},
         ${presupuesto.color || null}, ${presupuesto.kilometraje || null}, ${presupuesto.año || null},
@@ -648,9 +690,11 @@ export async function convertPresupuestoToServicio(presupuestoId: string) {
         ${presupuesto.mano_obra_pintura || 0},
         ${safeJson(presupuesto.cobros)}, ${safeJson(presupuesto.costos)},
         ${safeJson(presupuesto.piezas_pintura)}, ${estadoInicial}, ${presupuesto.iva || "sin"},
-        0, ${presupuesto.monto_total || 0}, ${presupuesto.monto_total || 0}, ${presupuesto.monto_total_sin_iva || 0},
+        0, ROUND((${presupuesto.monto_total || 0})::numeric), ROUND((${presupuesto.monto_total || 0})::numeric),
+        ROUND((${presupuesto.monto_total_sin_iva || 0})::numeric),
         ${safeJson(presupuesto.observaciones_checkboxes || [])},
-        ${safeJson(presupuesto.fotos_ingreso || [])}, '[]'::jsonb, nextval('servicios_numero_ot_seq')::int
+        ${safeJson(presupuesto.fotos_ingreso || [])}, '[]'::jsonb,
+        '[]'::jsonb, nextval('servicios_numero_ot_seq')::int
       ) RETURNING *
     `
 
@@ -698,11 +742,13 @@ export async function getGastosPendientesPago() {
   return data as Gasto[]
 }
 
-// Todos los servicios con saldo pendiente y estado por_cobrar, sin filtrar por
-// mes. Usado por la alerta global de "Cobros Pendientes" en el dashboard.
+// Todos los servicios entregados con saldo pendiente, sin filtrar por mes.
+// Usado por la alerta global de "Cobros Pendientes" en el dashboard y por
+// /reportes → Cuentas por Cobrar. Incluye los estados `cerrado` por la misma
+// razón que getServiciosPorCobrar: la deuda la define el saldo, no la etiqueta.
 export async function getServiciosPendientesCobro() {
   const db = getSQL()
-  const porCobrar = await getNombresEstadosPorTipo(["por_cobrar"])
+  const porCobrar = await getNombresEstadosPorTipo(["por_cobrar", "cerrado"])
   const data = await db`
     SELECT * FROM servicios
     WHERE saldo_pendiente > 0
@@ -897,40 +943,8 @@ export async function deleteAbonoWithGastos(id: string) {
   })
 }
 
-// Dashboard KPIs
-export async function getDashboardKPIs(year: number, month: number) {
-  const servicios = await getServiciosByMonth(year, month)
-  const gastos = await getGastosByMonth(year, month)
-  const cerrados = new Set(await getNombresEstadosPorTipo(["cerrado"]))
-  const porCobrarSet = new Set(await getNombresEstadosPorTipo(["por_cobrar"]))
-
-  const serviciosCerrados = servicios.filter((s) => cerrados.has(s.estado))
-  const ingresosSinIVA = serviciosCerrados.reduce((sum, s) => sum + Number(s.monto_total_sin_iva), 0)
-  const ingresosConIVA = serviciosCerrados.reduce((sum, s) => sum + Number(s.monto_total), 0)
-  const totalGastos = gastos.reduce((sum, g) => sum + Number(g.monto), 0)
-  const costosServicios = servicios.reduce((sum, s) => {
-    const costos = s.costos || []
-    return sum + costos.reduce((c: number, costo: any) => c + Number(costo.monto), 0)
-  }, 0)
-
-  const utilidadOperacional = ingresosSinIVA - totalGastos - costosServicios
-  const margenPromedio = ingresosSinIVA > 0 ? (utilidadOperacional / ingresosSinIVA) * 100 : 0
-
-  const porCobrar = servicios
-    .filter((s) => porCobrarSet.has(s.estado) || Number(s.saldo_pendiente) > 0)
-    .reduce((sum, s) => sum + Number(s.saldo_pendiente), 0)
-
-  return {
-    ingresosSinIVA,
-    ingresosConIVA,
-    totalGastos: totalGastos + costosServicios,
-    utilidadOperacional,
-    margenPromedio,
-    porCobrar,
-    serviciosActivos: servicios.filter((s) => !cerrados.has(s.estado)).length,
-    serviciosTotal: servicios.length,
-  }
-}
+// (getDashboardKPIs se eliminó: no tenía llamadores y duplicaba fórmulas que,
+// según CLAUDE.md, sólo pueden vivir en lib/reportes/kpis.ts.)
 
 // Vehicle History
 export async function getVehicleHistory(patente: string) {
@@ -1258,6 +1272,39 @@ export async function getNombresEstadosByTipoMap(tipos: EstadoTipo[]): Promise<R
   }
   cache.set(key, { value: [JSON.stringify(result)], expires: now + 30_000 })
   return result
+}
+
+/**
+ * Config de estados que necesita la reconciliación de pagos: qué nombres son
+ * `cerrado`, cuáles `por_cobrar`, y a cuál promover cuando un servicio se salda
+ * (el primer `cerrado` visible por orden, misma selección que usaba la UI).
+ * Cachea en el `_estadosCache` existente, así `invalidateEstadosCache()` la limpia.
+ */
+export async function getEstadosPagosConfig(): Promise<{
+  cerrado: string[]
+  porCobrar: string[]
+  cerradoDestino: string | null
+}> {
+  const cache = getEstadosCache()
+  const key = "pagos"
+  const now = Date.now()
+  const hit = cache.get(key)
+  if (hit && hit.expires > now) return JSON.parse(hit.value[0])
+
+  const db = getSQL()
+  const rows = (await db`
+    SELECT nombre, tipo, visible, orden FROM estados_servicio
+    WHERE tipo IN ('cerrado', 'por_cobrar')
+    ORDER BY orden ASC
+  `) as { nombre: string; tipo: string; visible: boolean; orden: number }[]
+
+  const value = {
+    cerrado: rows.filter((r) => r.tipo === "cerrado").map((r) => r.nombre),
+    porCobrar: rows.filter((r) => r.tipo === "por_cobrar").map((r) => r.nombre),
+    cerradoDestino: rows.find((r) => r.tipo === "cerrado" && r.visible)?.nombre ?? null,
+  }
+  cache.set(key, { value: [JSON.stringify(value)], expires: now + 30_000 })
+  return value
 }
 
 export async function createEstadoServicio(nombre: string, tipo: EstadoTipo, orden?: number, color?: string) {
