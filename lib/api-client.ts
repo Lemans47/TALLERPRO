@@ -133,7 +133,15 @@ export async function fetchServicioById(id: string): Promise<Servicio | null> {
   return res.json()
 }
 
-export async function createServicioApi(data: Partial<Servicio>): Promise<Servicio> {
+/**
+ * Campos que la UI puede escribir. `anticipo` y `saldo_pendiente` quedan fuera a
+ * propósito: los deriva el servidor desde `abonos` (lib/pagos.ts). Excluirlos del
+ * tipo hace que `npx tsc --noEmit` falle si algún componente vuelve a calcularlos
+ * por su cuenta, que es exactamente cómo se desincronizaron antes.
+ */
+export type ServicioWritable = Partial<Omit<Servicio, "anticipo" | "saldo_pendiente">>
+
+export async function createServicioApi(data: ServicioWritable): Promise<Servicio> {
   const res = await fetch("/api/servicios", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -143,7 +151,7 @@ export async function createServicioApi(data: Partial<Servicio>): Promise<Servic
   return res.json()
 }
 
-export async function updateServicioApi(id: string, data: Partial<Servicio>): Promise<Servicio> {
+export async function updateServicioApi(id: string, data: ServicioWritable): Promise<Servicio> {
   const res = await fetch("/api/servicios", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },

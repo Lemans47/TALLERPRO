@@ -24,6 +24,7 @@ import type { Servicio, Gasto, Empleado, AbonoEmpleado, Presupuesto } from "@/li
 import { useAuth } from "@/lib/auth-context"
 import { useEstados } from "@/lib/estados"
 import { extraerIvaIncluido, safeLocalStorage, hoyChile } from "@/lib/utils"
+import { netoDesdeBruto } from "@/lib/pagos"
 import { sumarCostosReales } from "@/lib/reportes/kpis"
 
 interface KPIs {
@@ -274,8 +275,7 @@ export default function DashboardPage() {
       serviciosFacturados
         .filter((s) => !esCerrado(s.estado))
         .reduce((sum, s) => {
-          const factor = s.iva === "con" ? 1.19 : 1
-          const anticipoSinIva = Number(s.anticipo || 0) / factor
+          const anticipoSinIva = netoDesdeBruto(Number(s.anticipo || 0), s.iva === "con")
           const monto = Number(s.monto_total_sin_iva || 0)
           return sum + Math.max(0, monto - anticipoSinIva)
         }, 0)
@@ -363,7 +363,9 @@ export default function DashboardPage() {
     const hoy = new Date()
     let edadVieja = 0, edadMedia = 0, edadReciente = 0
     const porCobrar = servicios
-      .filter((s) => Number(s.saldo_pendiente || 0) > 0 && esPorCobrar(s.estado))
+      // esFinalizado = por_cobrar ∪ cerrado: la deuda la define el saldo, no la
+      // etiqueta del estado (ver lib/pagos.ts y getServiciosPendientesCobro).
+      .filter((s) => Number(s.saldo_pendiente || 0) > 0 && esFinalizado(s.estado))
       .reduce((sum, s) => {
         const dias = Math.floor((hoy.getTime() - new Date(s.fecha_ingreso).getTime()) / 86400000)
         const monto = Number(s.saldo_pendiente)

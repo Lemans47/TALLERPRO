@@ -6,9 +6,42 @@ import { invalidateDashboardCache } from "@/lib/dashboard-cache"
 import crypto from "crypto"
 
 // Campos monetarios de nivel superior que deben ser números finitos ≥ 0.
+// `anticipo` y `saldo_pendiente` siguen validándose por compatibilidad, pero el
+// servidor los ignora al escribir: se derivan de `abonos` (ver lib/pagos.ts).
 const CAMPOS_MONTO = ["monto_total", "monto_total_sin_iva", "anticipo", "saldo_pendiente"] as const
 function montosServicioValidos(data: Record<string, unknown>): boolean {
   return CAMPOS_MONTO.every((c) => montoValido(data[c]))
+}
+
+// `abonos` alimenta directamente el anticipo y el saldo, así que un array mal
+// formado corrompería la contabilidad del servicio. Antes no se validaba nada.
+function abonosValidos(data: Record<string, unknown>): boolean {
+  const abonos = data.abonos
+  if (abonos == null) return true
+  if (!Array.isArray(abonos)) return false
+  return abonos.every(
+    (a) =>
+      a != null &&
+      typeof a === "object" &&
+      typeof (a as any).fecha === "string" &&
+      montoValido((a as any).monto),
+  )
+}
+
+// Una violación de CHECK (scripts/14-constraints-pagos.sql) es un error del
+// cliente, no del servidor: devolverla como 400 legible en vez de un 500 opaco.
+function errorResponse(error: unknown, fallback: string) {
+  const err = error as { code?: string; constraint?: string; message?: string }
+  if (err?.code === "23514") {
+    return NextResponse.json(
+      { error: `Datos inconsistentes: ${err.constraint ?? err.message}` },
+      { status: 400 },
+    )
+  }
+  if (err?.message === "Servicio no encontrado") {
+    return NextResponse.json({ error: "Servicio no encontrado" }, { status: 404 })
+  }
+  return NextResponse.json({ error: fallback }, { status: 500 })
 }
 
 const CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME
@@ -64,6 +97,9 @@ export async function POST(request: Request) {
     if (!montosServicioValidos(data)) {
       return NextResponse.json({ error: "Monto inválido" }, { status: 400 })
     }
+    if (!abonosValidos(data)) {
+      return NextResponse.json({ error: "Abonos inválidos" }, { status: 400 })
+    }
     const servicio = await createServicio(data)
     invalidateDashboardCache()
     // Sincronizar cliente y vehículo en sus tablas
@@ -75,7 +111,7 @@ export async function POST(request: Request) {
     return NextResponse.json(servicio)
   } catch (error) {
     console.error("Servicios POST error:", error)
-    return NextResponse.json({ error: "Error creating servicio" }, { status: 500 })
+    return errorResponse(error, "Error creating servicio")
   }
 }
 
@@ -88,6 +124,9 @@ export async function PUT(request: Request) {
     if (!montosServicioValidos(updateData)) {
       return NextResponse.json({ error: "Monto inválido" }, { status: 400 })
     }
+    if (!abonosValidos(updateData)) {
+      return NextResponse.json({ error: "Abonos inválidos" }, { status: 400 })
+    }
     const servicio = await updateServicio(id, updateData)
     invalidateDashboardCache()
     // Sincronizar cliente y vehículo en sus tablas
@@ -99,7 +138,7 @@ export async function PUT(request: Request) {
     return NextResponse.json(servicio)
   } catch (error) {
     console.error("Servicios PUT error:", error)
-    return NextResponse.json({ error: "Error updating servicio" }, { status: 500 })
+    return errorResponse(error, "Error updating servicio")
   }
 }
 

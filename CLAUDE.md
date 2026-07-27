@@ -64,9 +64,11 @@ States are **not hardcoded** — they live in the `estados_servicio` table and a
 
 ### Financial Conventions
 
-- All amounts are Chilean pesos (CLP), stored as `DECIMAL(12,0)` — no decimals.
+- All amounts are Chilean pesos (CLP), stored as `DECIMAL(12,0)` — no decimals. Round with `roundMoney()` (lib/utils.ts) before persisting: paint pieces have fractional quantities (0.5, 1.4) and the floating-point product leaves residues.
 - IVA = 19%. The `iva` field on servicios/presupuestos is `"con"` or `"sin"`.
 - `monto_total_sin_iva` and `monto_total` (with IVA if applicable) are stored separately.
+- **Units**: `anticipo`, `saldo_pendiente` and `abonos[].monto` are **gross** (IVA included) — they're cash actually received, and that's what the customer's receipt prints (`lib/pdf-recibo.ts`). Every revenue KPI uses the **net** `monto_total_sin_iva`. Never sum a gross field inside a net aggregate; use `netoDesdeBruto()` (lib/pagos.ts) to convert. `app/api/chart/route.ts` still mixes both bases in its `cobrado` column — known, pending a separate fix.
+- **Payment invariant**: `anticipo = Σ abonos[].monto` and `saldo_pendiente = max(0, monto_total − anticipo)`; a `cerrado` state always implies saldo 0. The rule lives in `lib/pagos.ts` (`reconciliarPagos`) and is applied **server-side** by `createServicio`/`updateServicio` — the client never writes `anticipo` or `saldo_pendiente` (the `ServicioWritable` type in `lib/api-client.ts` excludes them so `tsc` catches regressions). Moving a servicio to a `cerrado` state appends an abono for the remainder; reaching saldo 0 from a `por_cobrar` state promotes it to `cerrado` (never from an `activo` state — the car is still in the shop). CHECK constraints in `scripts/14-constraints-pagos.sql` enforce this at the DB level.
 - KPI calculations are the **single source of truth** in `lib/reportes/kpis.ts`. Both `/api/dashboard` and `/app/reportes` import from there — never duplicate formulas.
 - "Materiales pintura" cost items are excluded from direct cost calculations because they're tracked separately in `gastos` (see `isCostoRealItem()` in kpis.ts).
 

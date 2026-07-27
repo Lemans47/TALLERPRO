@@ -55,6 +55,7 @@ import { generarPDFPresupuesto } from "@/lib/pdf-presupuesto"
 import { PDFPreviewModal } from "@/components/pdf-preview-modal"
 import { PhotoLightbox } from "@/components/photo-lightbox"
 import { roundMoney, costoNetoItem, sumCostosNetos, hoyChile } from "@/lib/utils"
+import { parseAbonos, sumAbonos, type Abono } from "@/lib/pagos"
 import { useEstados } from "@/lib/estados"
 
 interface ServiceFormProps {
@@ -192,7 +193,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved, onDirtyChan
   const [guardarPlantillaOpen, setGuardarPlantillaOpen] = useState(false)
   const [nombreNuevaPlantilla, setNombreNuevaPlantilla] = useState("")
   const [savingPlantilla, setSavingPlantilla] = useState(false)
-  const [abonos, setAbonos] = useState<{ fecha: string; monto: number }[]>([])
+  const [abonos, setAbonos] = useState<Abono[]>([])
 
   const [formData, setFormData] = useState({
     fecha_ingreso: hoyChile(),
@@ -211,7 +212,6 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved, onDirtyChan
     observaciones: "",
     estado: estadoDefault,
     iva: "sin",
-    anticipo: 0,
     detalle_pendiente: false,
     fecha_facturacion: "" as string,
   })
@@ -405,7 +405,6 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved, onDirtyChan
         observaciones: servicioAEditar.observaciones || "",
         estado: servicioAEditar.estado || estadoDefault,
         iva: servicioAEditar.iva || "sin",
-        anticipo: Number(servicioAEditar.anticipo) || 0,
         detalle_pendiente: Boolean((servicioAEditar as any).detalle_pendiente) || false,
         fecha_facturacion: (() => {
           const v: any = (servicioAEditar as any).fecha_facturacion
@@ -528,9 +527,9 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved, onDirtyChan
       setFotosIngreso(parseArr(servicioAEditar.fotos_ingreso))
       setFotosEntrega(parseArr(servicioAEditar.fotos_entrega))
 
-      // Cargar abonos (parseToFlatArray maneja double-encoding igual que cobros/costos)
-      const abonosRaw = parseToFlatArray((servicioAEditar as any).abonos)
-      setAbonos(abonosRaw.map((a: any) => ({ fecha: String(a.fecha ?? ""), monto: Number(a.monto ?? 0) })))
+      // parseAbonos preserva la marca `auto` (si no, el flag del abono de cierre
+      // se perdería en cada edición) y redondea los montos.
+      setAbonos(parseAbonos((servicioAEditar as any).abonos))
     } else {
       piezasHidratadasRef.current = piezasHidratadasKey(null)
       setFotosIngreso([])
@@ -670,7 +669,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved, onDirtyChan
       if (d.cobros) setCobros(d.cobros)
       if (d.costos) setCostos(d.costos)
       if (Array.isArray(d.piezasSeleccionadas)) setPiezasSeleccionadas(d.piezasSeleccionadas)
-      if (Array.isArray(d.abonos)) setAbonos(d.abonos)
+      if (Array.isArray(d.abonos)) setAbonos(parseAbonos(d.abonos))
       if (Array.isArray(d.fotosIngreso)) setFotosIngreso(d.fotosIngreso)
       if (Array.isArray(d.fotosEntrega)) setFotosEntrega(d.fotosEntrega)
       if (typeof d.manoObraConfig === "number") setManoObraConfig(d.manoObraConfig)
@@ -712,7 +711,6 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved, onDirtyChan
       observaciones: "",
       estado: estadoDefault,
       iva: "sin",
-      anticipo: 0,
       detalle_pendiente: false,
       fecha_facturacion: "",
     })
@@ -1041,10 +1039,13 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved, onDirtyChan
 
 
   // Calcular totales
+  // roundMoney por pieza: las cantidades son fraccionarias (0.5, 1.4...) y el
+  // producto en punto flotante deja residuos (90000 * 1.4 = 125999.99999999999)
+  // que se arrastraban hasta el saldo pendiente.
   const totalPiezasPintura = Array.isArray(piezasSeleccionadas)
     ? piezasSeleccionadas
         .filter((p) => p.seleccionada)
-        .reduce((sum, p) => sum + p.precio * (p.cantidad_piezas || 1), 0)
+        .reduce((sum, p) => sum + roundMoney(p.precio * (p.cantidad_piezas || 1)), 0)
     : 0
 
   // Cantidad de piezas seleccionadas (suma de cantidad_piezas por pieza)
@@ -1079,9 +1080,9 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved, onDirtyChan
 
   const totalCostos = costosManualPintura + costosOtros + autoCostoManoObra + autoCostoMateriales
 
-  const cobroTotal = totalPiezasPintura + totalCobros
+  const cobroTotal = roundMoney(totalPiezasPintura + totalCobros)
   const montoIVA = formData.iva === "con" ? roundMoney(cobroTotal * 0.19) : 0
-  const montoConIva = cobroTotal + montoIVA
+  const montoConIva = roundMoney(cobroTotal + montoIVA)
   const utilidad = cobroTotal - totalCostos
 
   const validateRequiredFields = () => {
@@ -1222,11 +1223,8 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved, onDirtyChan
           nombre: p.nombre,
           cantidad: p.cantidad_piezas || 1,
           precio_unitario: p.precio,
-          precio: p.precio * (p.cantidad_piezas || 1),
+          precio: roundMoney(p.precio * (p.cantidad_piezas || 1)),
         }))
-
-      const anticipoFinal = abonos.reduce((sum, a) => sum + (Number(a.monto) || 0), 0)
-      const saldoPendiente = Math.max(0, montoConIva - anticipoFinal)
 
       const servicioData = {
         fecha_ingreso: formData.fecha_ingreso,
@@ -1248,8 +1246,9 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved, onDirtyChan
         piezas_pintura: piezasPinturaArray,
         estado: formData.estado,
         iva: formData.iva,
-        anticipo: anticipoFinal,
-        saldo_pendiente: saldoPendiente,
+        // anticipo y saldo_pendiente los deriva el servidor desde `abonos`
+        // (lib/pagos.ts). Mandarlos desde acá era lo que permitía que las dos
+        // pantallas se contradijeran.
         abonos: abonos,
         monto_total_sin_iva: cobroTotal,
         monto_total: montoConIva,
@@ -1264,9 +1263,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved, onDirtyChan
         await api.servicios.update(servicioAEditar.id, servicioData)
         toast({ title: "Servicio actualizado" })
       } else {
-        await api.servicios.create(
-          servicioData as Omit<Servicio, "id" | "created_at" | "updated_at">,
-        )
+        await api.servicios.create(servicioData)
 
         if (servicioAEditar?.isPresupuesto && servicioAEditar.id) {
           await api.presupuestos.delete(servicioAEditar.id)
@@ -1356,7 +1353,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved, onDirtyChan
           nombre: p.nombre,
           cantidad: p.cantidad_piezas || 1,
           precio_unitario: p.precio,
-          precio: p.precio * (p.cantidad_piezas || 1),
+          precio: roundMoney(p.precio * (p.cantidad_piezas || 1)),
         }))
 
       const presupuestoData = {
@@ -1954,17 +1951,18 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved, onDirtyChan
                   <div className="space-y-1">
                     <Label className="text-xs">Estado</Label>
                     <Select value={formData.estado} onValueChange={(v) => {
-                      if (esCerrado(v) && !esCerrado(formData.estado)) {
-                        const currentAnticipo = abonos.reduce((s, a) => s + (Number(a.monto) || 0), 0)
-                        const remaining = montoConIva - currentAnticipo
+                      // Vista previa de lo que hará el servidor al guardar: si el
+                      // estado destino es cerrado, la diferencia se registra como
+                      // abono. Sin el guard de "sólo en la transición", así que un
+                      // servicio ya cerrado al que se le suben los cobros también
+                      // queda saldado. La regla real vive en lib/pagos.ts.
+                      if (esCerrado(v)) {
+                        const remaining = montoConIva - sumAbonos(abonos)
                         if (remaining > 0) {
-                          const f = hoyChile()
-                          setAbonos([...abonos, { fecha: f, monto: remaining }])
+                          setAbonos([...abonos, { fecha: hoyChile(), monto: remaining, auto: true }])
                         }
-                        setFormData({ ...formData, estado: v })
-                      } else {
-                        setFormData({ ...formData, estado: v })
                       }
+                      setFormData({ ...formData, estado: v })
                     }}>
                       <SelectTrigger className="bg-background/50 h-9">
                         <SelectValue />
@@ -2809,8 +2807,8 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved, onDirtyChan
               </div>
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Saldo Pendiente</Label>
-                <div className={`text-lg font-bold ${montoConIva - abonos.reduce((s, a) => s + (Number(a.monto) || 0), 0) <= 0 ? "text-success" : "text-warning"}`}>
-                  ${Math.max(0, montoConIva - abonos.reduce((s, a) => s + (Number(a.monto) || 0), 0)).toLocaleString("es-CL")}
+                <div className={`text-lg font-bold ${montoConIva - sumAbonos(abonos) <= 0 ? "text-success" : "text-warning"}`}>
+                  ${Math.max(0, montoConIva - sumAbonos(abonos)).toLocaleString("es-CL")}
                 </div>
               </div>
               <div className="space-y-1">
@@ -2867,7 +2865,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved, onDirtyChan
                           placeholder="0"
                           onChange={(e) => {
                             const next = [...abonos]
-                            next[idx] = { ...next[idx], monto: Number(e.target.value) || 0 }
+                            next[idx] = { ...next[idx], monto: roundMoney(Number(e.target.value) || 0) }
                             setAbonos(next)
                           }}
                           className="bg-background/50 h-8 text-xs flex-1 min-w-0"
