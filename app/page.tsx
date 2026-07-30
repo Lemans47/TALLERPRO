@@ -25,7 +25,7 @@ import { useAuth } from "@/lib/auth-context"
 import { useEstados } from "@/lib/estados"
 import { extraerIvaIncluido, safeLocalStorage, hoyChile } from "@/lib/utils"
 import { netoDesdeBruto } from "@/lib/pagos"
-import { sumarCostosReales } from "@/lib/reportes/kpis"
+import { sumarCostosReales, calcularSueldosMes } from "@/lib/reportes/kpis"
 
 interface KPIs {
   vehiculosEnTaller: number
@@ -311,12 +311,11 @@ export default function DashboardPage() {
     const costosCerrados = serviciosCerrados.reduce((sum, s) => sum + sumarCostosReales(s.costos), 0)
     const costosFacturados = serviciosFacturados.reduce((sum, s) => sum + sumarCostosReales(s.costos), 0)
 
-    // Sueldos pagados: abonos reales del mes (para cash flow / Flujo de Caja)
-    const sueldosPagados = abonosMes.reduce((sum, a) => sum + Number(a.monto || 0), 0)
-    // Sueldos devengados: sueldo_base de empleados activos (para margen contable)
-    const sueldosDevengados = empleados
-      .filter((e) => e.activo)
-      .reduce((sum, e) => sum + Number(e.sueldo_base || 0), 0)
+    // Sueldos del mes: helper canónico de lib/reportes/kpis.ts.
+    // `pagados` = abonos reales (cash flow / Flujo de Caja).
+    // `devengados` = max(sueldo_base, abonado) por empleado (margen contable), así un
+    // bono u hora extra por sobre la base sí impacta el resultado.
+    const { devengados: sueldosDevengados, pagados: sueldosPagados } = calcularSueldosMes(empleados, abonosMes)
 
     // Gastos operacionales (excluye sueldos)
     const gastosOperacionales = gastos
