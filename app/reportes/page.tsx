@@ -381,7 +381,7 @@ export default function ReportsPage() {
     }))
     return [
       ...cats,
-      { name: "Sueldos (devengados)", value: kpis.sueldosDevengados, color: "#16a34a" },
+      { name: "Sueldos del mes", value: kpis.sueldosDevengados, color: "#16a34a" },
       { name: "Costos de servicios", value: kpis.costosDirectos, color: "#dc2626" },
     ].filter((d) => d.value > 0)
   }, [kpis])
@@ -867,7 +867,8 @@ export default function ReportsPage() {
         kpiRow("Falta por cobrar (Facturado − Cobrado)", fmtCLP(k.ingresoFacturado - k.ingresoCobrado), prev ? fmtCLP(prev.ingresoFacturado - prev.ingresoCobrado) : "—", prev ? fmtCLP(cmp(k.ingresoFacturado - k.ingresoCobrado, prev.ingresoFacturado - prev.ingresoCobrado).diff) : "—"),
         kpiRow("Costos Directos (variables)", fmtCLP(k.costosDirectos), prev ? fmtCLP(prev.costosDirectos) : "—", prev ? fmtCLP(cmp(k.costosDirectos, prev.costosDirectos).diff) : "—"),
         kpiRow("Margen de Contribución", `${fmtCLP(k.margenContribucion)} (${fmtPct(k.margenContribucionPct)})`, prev ? fmtCLP(prev.margenContribucion) : "—", prev ? fmtCLP(cmp(k.margenContribucion, prev.margenContribucion).diff) : "—"),
-        kpiRow("Sueldos devengados", fmtCLP(k.sueldosDevengados), prev ? fmtCLP(prev.sueldosDevengados) : "—", prev ? fmtCLP(cmp(k.sueldosDevengados, prev.sueldosDevengados).diff) : "—"),
+        kpiRow("Sueldos del mes", fmtCLP(k.sueldosDevengados), prev ? fmtCLP(prev.sueldosDevengados) : "—", prev ? fmtCLP(cmp(k.sueldosDevengados, prev.sueldosDevengados).diff) : "—"),
+        kpiRow("  · de los cuales, extra sobre base", fmtCLP(k.sueldosExtra), prev ? fmtCLP(prev.sueldosExtra) : "—", prev ? fmtCLP(cmp(k.sueldosExtra, prev.sueldosExtra).diff) : "—"),
         kpiRow("Sueldos pagados (caja)", fmtCLP(k.sueldosPagados), prev ? fmtCLP(prev.sueldosPagados) : "—", prev ? fmtCLP(cmp(k.sueldosPagados, prev.sueldosPagados).diff) : "—"),
         kpiRow("Gastos operacionales (s/sueldos)", fmtCLP(k.gastosTabla), prev ? fmtCLP(prev.gastosTabla) : "—", prev ? fmtCLP(cmp(k.gastosTabla, prev.gastosTabla).diff) : "—"),
         kpiRow("Utilidad Neta", `${fmtCLP(k.utilidadNeta)} (${fmtPct(k.margenPct)})`, prev ? fmtCLP(prev.utilidadNeta) : "—", prev ? fmtCLP(cmp(k.utilidadNeta, prev.utilidadNeta).diff) : "—"),
@@ -895,7 +896,7 @@ export default function ReportsPage() {
         ["Ingresos facturados", fmtCLP(k.ingresoFacturado)],
         ["(−) Costos directos", `-${fmtCLP(k.costosDirectos)}`],
         ["= Margen de contribución", fmtCLP(k.margenContribucion)],
-        ["(−) Sueldos devengados", `-${fmtCLP(k.sueldosDevengados)}`],
+        ["(−) Sueldos del mes", `-${fmtCLP(k.sueldosDevengados)}`],
         ["(−) Gastos operacionales", `-${fmtCLP(k.gastosTabla)}`],
         ["= Utilidad neta", fmtCLP(k.utilidadNeta)],
       ],
@@ -1468,11 +1469,16 @@ export default function ReportsPage() {
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm text-muted-foreground flex items-center gap-1">
-                  Sueldos Devengados
-                  <InfoTip>Sueldo base de empleados activos. Criterio contable.</InfoTip>
+                  Sueldos del Mes
+                  <InfoTip>Sueldo base de empleados activos, o lo efectivamente pagado si fue mayor. Criterio contable.</InfoTip>
                 </CardTitle>
               </CardHeader>
-              <CardContent><p className="text-2xl font-bold">{fmtCLP(kpis.sueldosDevengados)}</p></CardContent>
+              <CardContent>
+                <p className="text-2xl font-bold">{fmtCLP(kpis.sueldosDevengados)}</p>
+                {kpis.sueldosExtra > 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">incl. {fmtCLP(kpis.sueldosExtra)} extra sobre base</p>
+                )}
+              </CardContent>
             </Card>
             <Card
               className={
@@ -2136,7 +2142,7 @@ export default function ReportsPage() {
                   isPct: true,
                 },
                 {
-                  label: "Sueldos Devengados",
+                  label: "Sueldos del Mes",
                   cur: kpis.sueldosDevengados,
                   comp: compData.kpis.sueldosDevengados,
                 },

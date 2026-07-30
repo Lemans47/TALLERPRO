@@ -68,10 +68,30 @@ export async function GET() {
           AND fecha::date >= (date_trunc('month', CURRENT_DATE) - INTERVAL '5 months')::date
         GROUP BY 1
       ),
-      sueldos AS (
-        SELECT COALESCE(SUM(sueldo_base), 0) AS total
-        FROM empleados
-        WHERE activo = TRUE
+      -- Sueldos POR MES, replicando calcularSueldosMes() de lib/reportes/kpis.ts:
+      -- max(sueldo_base, abonado) por empleado activo, o solo lo abonado si ya está
+      -- desactivado (finiquito). Antes esto era un SUM(sueldo_base) global con CROSS
+      -- JOIN, o sea la planilla de hoy proyectada sobre los 6 meses.
+      -- El filtro usa las columnas año/mes, no la fecha: un pago de julio hecho en
+      -- agosto se imputa a julio (mismo criterio que getAbonosByMonth).
+      sueldos_mes AS (
+        SELECT
+          m.mes_start AS mes,
+          COALESCE(SUM(
+            CASE WHEN e.activo THEN GREATEST(e.sueldo_base, COALESCE(ab.abonado, 0))
+                 ELSE COALESCE(ab.abonado, 0) END
+          ), 0) AS total
+        FROM meses m
+        CROSS JOIN empleados e
+        LEFT JOIN LATERAL (
+          SELECT SUM(a.monto) AS abonado
+          FROM abonos_empleados a
+          WHERE a.empleado_id = e.id
+            AND a.año = EXTRACT(YEAR  FROM m.mes_start)
+            AND a.mes = EXTRACT(MONTH FROM m.mes_start)
+        ) ab ON TRUE
+        WHERE e.activo OR ab.abonado IS NOT NULL
+        GROUP BY m.mes_start
       )
       SELECT
         TO_CHAR(m.mes_start, 'YYYY-MM') AS mes,
@@ -80,12 +100,12 @@ export async function GET() {
         COALESCE(s.costos_internos, 0)::float AS costos_internos,
         COALESCE(g.fijos, 0)::float AS gastos_fijos_tabla,
         COALESCE(g.operativos, 0)::float AS gastos_operativos_tabla,
-        sueldos.total::float AS sueldos_comprometidos,
+        COALESCE(sm.total, 0)::float AS sueldos_comprometidos,
         COALESCE(s.count_servicios, 0)::int AS count_servicios
       FROM meses m
       LEFT JOIN servicios_mes s ON s.mes = m.mes_start
       LEFT JOIN gastos_mes g ON g.mes = m.mes_start
-      CROSS JOIN sueldos
+      LEFT JOIN sueldos_mes sm ON sm.mes = m.mes_start
       ORDER BY m.mes_start ASC
     `
 

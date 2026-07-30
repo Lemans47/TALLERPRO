@@ -143,6 +143,11 @@ export default function EmpleadosPage() {
   const totalSueldos = empleados.filter(e => e.activo).reduce((s, e) => s + Number(e.sueldo_base), 0)
   const totalPagadoMes = abonos.reduce((s, a) => s + Number(a.monto), 0)
   const totalPendiente = totalSueldos - totalPagadoMes
+  // Excedente por empleado, NO sobre el neto: si a uno le pagas de más y a otro de
+  // menos, los saldos se compensarían y el sobrepago volvería a quedar escondido.
+  const totalExcedente = empleados
+    .filter(e => e.activo)
+    .reduce((s, e) => s + Math.max(0, totalAbonado(e.id) - Number(e.sueldo_base)), 0)
 
   return (
     <div className="p-4 md:p-6 space-y-6 pt-20 md:pt-6">
@@ -185,6 +190,11 @@ export default function EmpleadosPage() {
           <p className={`text-xl font-bold ${totalPendiente > 0 ? "text-warning" : "text-success"}`}>
             ${Math.max(0, totalPendiente).toLocaleString("es-CL")}
           </p>
+          {totalExcedente > 0 && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Extra sobre base: <span className="font-medium text-foreground">${totalExcedente.toLocaleString("es-CL")}</span>
+            </p>
+          )}
         </div>
       </div>
 
@@ -207,6 +217,7 @@ export default function EmpleadosPage() {
             const pendiente = sueldo - total
             const pct = sueldo > 0 ? Math.min(100, Math.round((total / sueldo) * 100)) : 0
             const pagadoCompleto = total >= sueldo
+            const excedente = Math.max(0, total - sueldo)
             const isOpen = expanded === emp.id
 
             return (
@@ -216,9 +227,14 @@ export default function EmpleadosPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="font-semibold">{emp.nombre}</p>
-                      {pagadoCompleto && (
+                      {pagadoCompleto && excedente === 0 && (
                         <span className="flex items-center gap-1 text-xs text-success">
                           <CheckCircle className="w-3.5 h-3.5" /> Completo
+                        </span>
+                      )}
+                      {excedente > 0 && (
+                        <span className="text-xs text-warning border border-warning/40 rounded px-1.5 py-0.5">
+                          +${excedente.toLocaleString("es-CL")} sobre base
                         </span>
                       )}
                     </div>
@@ -275,9 +291,9 @@ export default function EmpleadosPage() {
                       </div>
                     ))}
                     <div className="flex justify-between text-sm font-semibold pt-1">
-                      <span>Pendiente</span>
-                      <span className={pendiente > 0 ? "text-warning" : "text-success"}>
-                        ${Math.max(0, pendiente).toLocaleString("es-CL")}
+                      <span>{excedente > 0 ? "Excedente sobre base" : "Pendiente"}</span>
+                      <span className={pendiente > 0 || excedente > 0 ? "text-warning" : "text-success"}>
+                        ${(excedente > 0 ? excedente : Math.max(0, pendiente)).toLocaleString("es-CL")}
                       </span>
                     </div>
                   </div>

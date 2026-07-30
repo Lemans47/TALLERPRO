@@ -138,7 +138,12 @@ export function ProfitabilityAnalysis({ kpis: kpisProp, prevKpis: prevKpisProp }
 
             {/* Sueldos */}
             <div className="flex items-center justify-between py-2 border-t border-border">
-              <span className="text-sm text-muted-foreground">− Sueldos devengados del mes</span>
+              <span className="text-sm text-muted-foreground">
+                − Sueldos del mes
+                {kpis.sueldosExtra > 0 && (
+                  <span className="text-xs opacity-70"> (incl. {fmt(kpis.sueldosExtra)} extra)</span>
+                )}
+              </span>
               <span className="text-base font-semibold text-red-400">{fmt(kpis.sueldosDevengados)}</span>
             </div>
 

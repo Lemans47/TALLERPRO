@@ -61,6 +61,57 @@ export function tieneIva(s: { iva?: string | null }): boolean {
   return v === "con" || v === "incluido"
 }
 
+export interface SueldosMes {
+  /** Σ max(base, abonado) por empleado. Es el valor que entra a `gastosOperativos`. */
+  devengados: number
+  /**
+   * Σ max(0, abonado − base) de empleados activos. INFORMATIVO: ya está incluido
+   * dentro de `devengados`, NO se suma aparte a ningún total.
+   */
+  extra: number
+  /** Σ abonos del mes. Criterio caja, para Flujo de Caja. */
+  pagados: number
+}
+
+/**
+ * Costo de sueldos del mes, calculado por empleado.
+ *
+ * Criterio: `max(sueldo_base, abonado)`.
+ *   - Pagar de MENOS no baja el costo: la deuda con el trabajador sigue existiendo,
+ *     así que se mantiene el criterio devengado (base completa).
+ *   - Pagar de MÁS (bono, hora extra, aguinaldo) sí lo sube: es plata que salió y
+ *     que antes quedaba invisible en margen, utilidad y punto de equilibrio.
+ *
+ * Un empleado ya desactivado que igual recibió abonos en el mes (finiquito) aporta
+ * solo lo abonado: ya no está en planilla, pero el egreso ocurrió.
+ *
+ * Como `Σ max(base, abonado) ≡ Σ base + Σ max(0, abonado − base)`, esto equivale a
+ * exponer el excedente como línea aparte, pero sin agregar un sumando nuevo que cada
+ * pantalla tendría que acordarse de incluir.
+ */
+export function calcularSueldosMes(empleados: Empleado[], abonosMes: AbonoEmpleado[]): SueldosMes {
+  const abonadoPorEmpleado = new Map<string, number>()
+  for (const a of abonosMes) {
+    abonadoPorEmpleado.set(a.empleado_id, (abonadoPorEmpleado.get(a.empleado_id) ?? 0) + Number(a.monto || 0))
+  }
+
+  let devengados = 0
+  let extra = 0
+  for (const e of empleados) {
+    const base = Number(e.sueldo_base || 0)
+    const abonado = abonadoPorEmpleado.get(e.id) ?? 0
+    if (e.activo) {
+      devengados += Math.max(base, abonado)
+      extra += Math.max(0, abonado - base)
+    } else if (abonado > 0) {
+      devengados += abonado
+    }
+  }
+
+  const pagados = [...abonadoPorEmpleado.values()].reduce((sum, v) => sum + v, 0)
+  return { devengados, extra, pagados }
+}
+
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
 export interface KpisMes {
@@ -83,9 +134,14 @@ export interface KpisMes {
   gastosTabla: number
   /** Sueldos efectivamente abonados en el mes (cash flow). */
   sueldosPagados: number
-  /** Sueldos devengados: `sueldo_base` de empleados activos (criterio contable). */
+  /** Costo de sueldos del mes: Σ max(sueldo_base, abonado) por empleado. Ver `calcularSueldosMes`. */
   sueldosDevengados: number
-  /** gastosTabla + sueldosDevengados (criterio devengado). Lo usa la cascada y el punto de equilibrio. */
+  /**
+   * Excedente pagado por sobre el sueldo base (bonos, horas extra, aguinaldos).
+   * INFORMATIVO: ya está dentro de `sueldosDevengados`, no se suma aparte.
+   */
+  sueldosExtra: number
+  /** gastosTabla + sueldosDevengados. Lo usa la cascada y el punto de equilibrio. */
   gastosOperativos: number
   /** Desglose de gastos por categoría (sin sueldos). */
   gastosDesglose: { categoria: string; monto: number; items: { descripcion: string; monto: number }[] }[]
@@ -169,11 +225,10 @@ export function computeKpisMes(input: KpisInput): KpisMes {
   // ── Gastos operacionales ──
   const gastosNoSueldos = gastos.filter((g) => g.categoria !== "Sueldos")
   const gastosTabla = gastosNoSueldos.reduce((sum, g) => sum + Number(g.monto || 0), 0)
-  const sueldosPagados = abonosMes.reduce((sum, a) => sum + Number(a.monto || 0), 0)
-  const sueldosDevengados = empleados
-    .filter((e) => e.activo)
-    .reduce((sum, e) => sum + Number(e.sueldo_base || 0), 0)
-  // Criterio devengado para reporte gerencial: gastos + sueldos completos del mes.
+  const { devengados: sueldosDevengados, extra: sueldosExtra, pagados: sueldosPagados } =
+    calcularSueldosMes(empleados, abonosMes)
+  // Gastos + sueldos del mes. `sueldosDevengados` toma el mayor entre el sueldo base y
+  // lo efectivamente abonado, así un bono o una hora extra sí impacta el resultado.
   const gastosOperativos = gastosTabla + sueldosDevengados
 
   const gastosDesglose = Object.values(
@@ -250,6 +305,7 @@ export function computeKpisMes(input: KpisInput): KpisMes {
     gastosTabla,
     sueldosPagados,
     sueldosDevengados,
+    sueldosExtra,
     gastosOperativos,
     gastosDesglose,
     margenContribucion,
