@@ -142,9 +142,12 @@ export default function EmpleadosPage() {
   const activosCount = empleados.filter(e => e.activo).length
   const totalSueldos = empleados.filter(e => e.activo).reduce((s, e) => s + Number(e.sueldo_base), 0)
   const totalPagadoMes = abonos.reduce((s, a) => s + Number(a.monto), 0)
-  const totalPendiente = totalSueldos - totalPagadoMes
-  // Excedente por empleado, NO sobre el neto: si a uno le pagas de más y a otro de
-  // menos, los saldos se compensarían y el sobrepago volvería a quedar escondido.
+  // Pendiente y excedente se calculan POR EMPLEADO, no sobre el neto global: si a uno
+  // le pagas de más y a otro de menos, un neto los compensaría y tanto la deuda como
+  // el sobrepago quedarían escondidos.
+  const totalPendiente = empleados
+    .filter(e => e.activo)
+    .reduce((s, e) => s + Math.max(0, Number(e.sueldo_base) - totalAbonado(e.id)), 0)
   const totalExcedente = empleados
     .filter(e => e.activo)
     .reduce((s, e) => s + Math.max(0, totalAbonado(e.id) - Number(e.sueldo_base)), 0)
@@ -188,7 +191,7 @@ export default function EmpleadosPage() {
         <div className="bg-card rounded-xl border p-4">
           <p className="text-xs text-muted-foreground mb-1">Por pagar</p>
           <p className={`text-xl font-bold ${totalPendiente > 0 ? "text-warning" : "text-success"}`}>
-            ${Math.max(0, totalPendiente).toLocaleString("es-CL")}
+            ${totalPendiente.toLocaleString("es-CL")}
           </p>
           {totalExcedente > 0 && (
             <p className="text-xs text-muted-foreground mt-1">
