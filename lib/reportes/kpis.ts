@@ -61,6 +61,29 @@ export function tieneIva(s: { iva?: string | null }): boolean {
   return v === "con" || v === "incluido"
 }
 
+// ─── Alcance de empleados por mes ───────────────────────────────────────────────
+// Los empleados no tienen un campo de mes: su ingreso se deriva de `created_at` y su
+// egreso de `fecha_egreso`. Comparamos por año-mes (slice de los timestamps ISO,
+// misma convención de mes que usa el resto de la app con selectedMonth "YYYY-MM").
+
+/** Clave "YYYY-MM" del mes seleccionado. */
+function claveMes(year: number, month: number): string {
+  return `${year}-${String(month).padStart(2, "0")}`
+}
+
+/** ¿El empleado ya existía (fue creado) en el mes dado o antes? */
+export function empleadoExistiaEnMes(e: Empleado, year: number, month: number): boolean {
+  if (!e.created_at) return true // sin fecha, no lo excluimos
+  return e.created_at.slice(0, 7) <= claveMes(year, month)
+}
+
+/** ¿El empleado estaba activo durante el mes dado? Existía y aún no había egresado. */
+export function empleadoActivoEnMes(e: Empleado, year: number, month: number): boolean {
+  if (!empleadoExistiaEnMes(e, year, month)) return false
+  if (!e.fecha_egreso) return true
+  return e.fecha_egreso.slice(0, 7) >= claveMes(year, month)
+}
+
 export interface SueldosMes {
   /** Σ max(base, abonado) por empleado. Es el valor que entra a `gastosOperativos`. */
   devengados: number
@@ -88,8 +111,17 @@ export interface SueldosMes {
  * Como `Σ max(base, abonado) ≡ Σ base + Σ max(0, abonado − base)`, esto equivale a
  * exponer el excedente como línea aparte, pero sin agregar un sumando nuevo que cada
  * pantalla tendría que acordarse de incluir.
+ *
+ * El alcance es POR MES (`year`/`month`): un empleado creado después del mes no cuenta,
+ * y uno que ya egresó solo aporta lo abonado. Así la planilla de hoy no se proyecta
+ * hacia atrás sobre meses en que el empleado aún no existía (ver `empleadoActivoEnMes`).
  */
-export function calcularSueldosMes(empleados: Empleado[], abonosMes: AbonoEmpleado[]): SueldosMes {
+export function calcularSueldosMes(
+  empleados: Empleado[],
+  abonosMes: AbonoEmpleado[],
+  year: number,
+  month: number,
+): SueldosMes {
   const abonadoPorEmpleado = new Map<string, number>()
   for (const a of abonosMes) {
     abonadoPorEmpleado.set(a.empleado_id, (abonadoPorEmpleado.get(a.empleado_id) ?? 0) + Number(a.monto || 0))
@@ -98,9 +130,10 @@ export function calcularSueldosMes(empleados: Empleado[], abonosMes: AbonoEmplea
   let devengados = 0
   let extra = 0
   for (const e of empleados) {
+    if (!empleadoExistiaEnMes(e, year, month)) continue // aún no había ingresado
     const base = Number(e.sueldo_base || 0)
     const abonado = abonadoPorEmpleado.get(e.id) ?? 0
-    if (e.activo) {
+    if (empleadoActivoEnMes(e, year, month)) {
       devengados += Math.max(base, abonado)
       extra += Math.max(0, abonado - base)
     } else if (abonado > 0) {
@@ -192,6 +225,9 @@ export interface KpisInput {
   estadosCerrado: Set<string>
   /** Set de nombres de estados configurados como `por_cobrar` o `cerrado` (= finalizados). */
   estadosFinalizados: Set<string>
+  /** Año y mes del período calculado. Definen el alcance de empleados (ingreso/egreso). */
+  year: number
+  month: number
 }
 
 // ─── Cálculo principal ────────────────────────────────────────────────────────
@@ -205,6 +241,8 @@ export function computeKpisMes(input: KpisInput): KpisMes {
     serviciosFacturadosMes = [],
     estadosCerrado,
     estadosFinalizados,
+    year,
+    month,
   } = input
 
   // ── Subconjuntos ──
@@ -226,7 +264,7 @@ export function computeKpisMes(input: KpisInput): KpisMes {
   const gastosNoSueldos = gastos.filter((g) => g.categoria !== "Sueldos")
   const gastosTabla = gastosNoSueldos.reduce((sum, g) => sum + Number(g.monto || 0), 0)
   const { devengados: sueldosDevengados, extra: sueldosExtra, pagados: sueldosPagados } =
-    calcularSueldosMes(empleados, abonosMes)
+    calcularSueldosMes(empleados, abonosMes, year, month)
   // Gastos + sueldos del mes. `sueldosDevengados` toma el mayor entre el sueldo base y
   // lo efectivamente abonado, así un bono o una hora extra sí impacta el resultado.
   const gastosOperativos = gastosTabla + sueldosDevengados

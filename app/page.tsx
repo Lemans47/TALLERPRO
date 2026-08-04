@@ -25,7 +25,7 @@ import { useAuth } from "@/lib/auth-context"
 import { useEstados } from "@/lib/estados"
 import { extraerIvaIncluido, safeLocalStorage, hoyChile } from "@/lib/utils"
 import { netoDesdeBruto } from "@/lib/pagos"
-import { sumarCostosReales, calcularSueldosMes } from "@/lib/reportes/kpis"
+import { sumarCostosReales, calcularSueldosMes, empleadoActivoEnMes } from "@/lib/reportes/kpis"
 
 interface KPIs {
   vehiculosEnTaller: number
@@ -315,7 +315,8 @@ export default function DashboardPage() {
     // `pagados` = abonos reales (cash flow / Flujo de Caja).
     // `devengados` = max(sueldo_base, abonado) por empleado (margen contable), así un
     // bono u hora extra por sobre la base sí impacta el resultado.
-    const { devengados: sueldosDevengados, pagados: sueldosPagados } = calcularSueldosMes(empleados, abonosMes)
+    const [sueldosY, sueldosM] = selectedMonth.split("-").map(Number)
+    const { devengados: sueldosDevengados, pagados: sueldosPagados } = calcularSueldosMes(empleados, abonosMes, sueldosY, sueldosM)
 
     // Gastos operacionales (excluye sueldos)
     const gastosOperacionales = gastos
@@ -687,7 +688,7 @@ export default function DashboardPage() {
         if (!mesEsPasado) return null
 
         const detalle = empleadosState
-          .filter((e) => e.activo)
+          .filter((e) => empleadoActivoEnMes(e, selY, selM))
           .map((e) => {
             const abonado = abonosMesState
               .filter((a) => a.empleado_id === e.id)

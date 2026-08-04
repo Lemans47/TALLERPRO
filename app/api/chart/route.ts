@@ -74,11 +74,16 @@ export async function GET() {
       -- JOIN, o sea la planilla de hoy proyectada sobre los 6 meses.
       -- El filtro usa las columnas año/mes, no la fecha: un pago de julio hecho en
       -- agosto se imputa a julio (mismo criterio que getAbonosByMonth).
+      -- El alcance del empleado es POR MES: solo cuenta desde su ingreso (created_at)
+      -- y, si egresó, deja de devengar tras su fecha_egreso. Así la planilla de hoy no
+      -- se proyecta sobre meses en que aún no existía ni sobre meses posteriores a su
+      -- salida (mismo criterio que empleadoActivoEnMes en lib/reportes/kpis.ts).
       sueldos_mes AS (
         SELECT
           m.mes_start AS mes,
           COALESCE(SUM(
-            CASE WHEN e.activo THEN GREATEST(e.sueldo_base, COALESCE(ab.abonado, 0))
+            CASE WHEN (e.fecha_egreso IS NULL OR date_trunc('month', e.fecha_egreso) >= m.mes_start)
+                 THEN GREATEST(e.sueldo_base, COALESCE(ab.abonado, 0))
                  ELSE COALESCE(ab.abonado, 0) END
           ), 0) AS total
         FROM meses m
@@ -90,7 +95,12 @@ export async function GET() {
             AND a.año = EXTRACT(YEAR  FROM m.mes_start)
             AND a.mes = EXTRACT(MONTH FROM m.mes_start)
         ) ab ON TRUE
-        WHERE e.activo OR ab.abonado IS NOT NULL
+        WHERE date_trunc('month', e.created_at) <= m.mes_start
+          AND (
+            e.fecha_egreso IS NULL
+            OR date_trunc('month', e.fecha_egreso) >= m.mes_start
+            OR ab.abonado IS NOT NULL
+          )
         GROUP BY m.mes_start
       )
       SELECT

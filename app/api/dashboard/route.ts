@@ -70,6 +70,8 @@ async function loadDashboardData(year: number, month: number) {
     serviciosFacturadosMes,
     estadosCerrado: new Set(nombresCerrado),
     estadosFinalizados: new Set(nombresFinalizado),
+    year,
+    month,
   })
 
   return {
