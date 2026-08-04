@@ -63,25 +63,44 @@ export function tieneIva(s: { iva?: string | null }): boolean {
 
 // ─── Alcance de empleados por mes ───────────────────────────────────────────────
 // Los empleados no tienen un campo de mes: su ingreso se deriva de `created_at` y su
-// egreso de `fecha_egreso`. Comparamos por año-mes (slice de los timestamps ISO,
-// misma convención de mes que usa el resto de la app con selectedMonth "YYYY-MM").
+// egreso de `fecha_egreso`. Comparamos por año-mes con la convención "YYYY-MM" que
+// usa el resto de la app (selectedMonth).
 
 /** Clave "YYYY-MM" del mes seleccionado. */
 function claveMes(year: number, month: number): string {
   return `${year}-${String(month).padStart(2, "0")}`
 }
 
+/**
+ * Clave "YYYY-MM" en horario de Chile de una fecha que puede llegar como Date (así la
+ * devuelve postgres.js en el servidor para columnas timestamptz) o como string ISO
+ * (así llega al cliente tras serializar a JSON). Usa el mismo criterio de tz que
+ * `hoyChile()` y que el `date_trunc('month', ...)` del route del gráfico.
+ */
+function mesDeChile(v: string | Date | null | undefined): string | null {
+  if (!v) return null
+  const d = v instanceof Date ? v : new Date(v)
+  if (isNaN(d.getTime())) return null
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Santiago",
+    year: "numeric",
+    month: "2-digit",
+  }).format(d) // -> "2026-08"
+}
+
 /** ¿El empleado ya existía (fue creado) en el mes dado o antes? */
 export function empleadoExistiaEnMes(e: Empleado, year: number, month: number): boolean {
-  if (!e.created_at) return true // sin fecha, no lo excluimos
-  return e.created_at.slice(0, 7) <= claveMes(year, month)
+  const k = mesDeChile(e.created_at)
+  if (k === null) return true // sin fecha, no lo excluimos
+  return k <= claveMes(year, month)
 }
 
 /** ¿El empleado estaba activo durante el mes dado? Existía y aún no había egresado. */
 export function empleadoActivoEnMes(e: Empleado, year: number, month: number): boolean {
   if (!empleadoExistiaEnMes(e, year, month)) return false
-  if (!e.fecha_egreso) return true
-  return e.fecha_egreso.slice(0, 7) >= claveMes(year, month)
+  const egreso = mesDeChile(e.fecha_egreso)
+  if (egreso === null) return true
+  return egreso >= claveMes(year, month)
 }
 
 export interface SueldosMes {
