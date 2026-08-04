@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/lib/auth-context"
 import { useMonth } from "@/lib/month-context"
 import { api, type Empleado, type AbonoEmpleado } from "@/lib/api-client"
+import { empleadoActivoEnMes } from "@/lib/reportes/kpis"
 import { formatFechaDMA, hoyChile } from "@/lib/utils"
 import { Users, Plus, Pencil, Trash2, RefreshCw, ChevronDown, ChevronUp, CheckCircle } from "lucide-react"
 
@@ -139,17 +140,24 @@ export default function EmpleadosPage() {
   }
 
   // ── Totales globales ─────────────────────────────────────────────
-  const activosCount = empleados.filter(e => e.activo).length
-  const totalSueldos = empleados.filter(e => e.activo).reduce((s, e) => s + Number(e.sueldo_base), 0)
+  // "Activo en el mes" se deriva de created_at (ingreso) y fecha_egreso, no del flag
+  // global: un empleado creado en agosto no cuenta en julio, y desactivar a alguien no
+  // lo borra de los meses pasados en que sí trabajó.
+  const activoEnMes = (e: Empleado) => empleadoActivoEnMes(e, year, month)
+  // Empleados a mostrar en "Sueldos del mes": los activos en el mes, más los que ya
+  // egresaron pero recibieron un abono (finiquito) en el mes.
+  const empleadosDelMes = empleados.filter(e => activoEnMes(e) || totalAbonado(e.id) > 0)
+  const activosCount = empleados.filter(activoEnMes).length
+  const totalSueldos = empleados.filter(activoEnMes).reduce((s, e) => s + Number(e.sueldo_base), 0)
   const totalPagadoMes = abonos.reduce((s, a) => s + Number(a.monto), 0)
   // Pendiente y excedente se calculan POR EMPLEADO, no sobre el neto global: si a uno
   // le pagas de más y a otro de menos, un neto los compensaría y tanto la deuda como
   // el sobrepago quedarían escondidos.
   const totalPendiente = empleados
-    .filter(e => e.activo)
+    .filter(activoEnMes)
     .reduce((s, e) => s + Math.max(0, Number(e.sueldo_base) - totalAbonado(e.id)), 0)
   const totalExcedente = empleados
-    .filter(e => e.activo)
+    .filter(activoEnMes)
     .reduce((s, e) => s + Math.max(0, totalAbonado(e.id) - Number(e.sueldo_base)), 0)
 
   return (
@@ -211,9 +219,9 @@ export default function EmpleadosPage() {
         <TabsContent value="sueldos" className="mt-4 space-y-3">
           {loading ? (
             <div className="text-center py-12 text-muted-foreground">Cargando...</div>
-          ) : empleados.filter(e => e.activo).length === 0 ? (
+          ) : empleadosDelMes.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">No hay empleados activos.</div>
-          ) : empleados.filter(e => e.activo).map(emp => {
+          ) : empleadosDelMes.map(emp => {
             const abEmp = abonosPorEmpleado(emp.id)
             const total = totalAbonado(emp.id)
             const sueldo = Number(emp.sueldo_base)

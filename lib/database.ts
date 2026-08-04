@@ -828,6 +828,9 @@ export interface Empleado {
   sueldo_base: number
   activo: boolean
   created_at: string
+  /** Fecha en que el empleado fue desactivado (egreso). null mientras esté activo.
+   *  El ingreso se deriva de `created_at`; ver `empleadoActivoEnMes` en lib/reportes/kpis.ts. */
+  fecha_egreso?: string | null
 }
 
 export interface AbonoEmpleado {
@@ -861,13 +864,22 @@ export async function createEmpleado(e: { nombre: string; rut?: string; cargo?: 
 
 export async function updateEmpleado(id: string, e: Partial<Empleado>) {
   const db = getSQL()
+  // `fecha_egreso` se mantiene sincronizado con `activo`: al desactivar se estampa
+  // (si no había una previa) y al reactivar se limpia. Cuando `activo` no viene en el
+  // update, se deja intacta. Así el egreso queda fechado sin un campo aparte en la UI.
+  const activoNuevo = e.activo ?? null
   const data = await db`
     UPDATE empleados SET
-      nombre      = COALESCE(${e.nombre ?? null}, nombre),
-      rut         = COALESCE(${e.rut ?? null}, rut),
-      cargo       = COALESCE(${e.cargo ?? null}, cargo),
-      sueldo_base = COALESCE(${e.sueldo_base ?? null}, sueldo_base),
-      activo      = COALESCE(${e.activo ?? null}, activo)
+      nombre       = COALESCE(${e.nombre ?? null}, nombre),
+      rut          = COALESCE(${e.rut ?? null}, rut),
+      cargo        = COALESCE(${e.cargo ?? null}, cargo),
+      sueldo_base  = COALESCE(${e.sueldo_base ?? null}, sueldo_base),
+      activo       = COALESCE(${activoNuevo}, activo),
+      fecha_egreso = CASE
+        WHEN ${activoNuevo}::boolean IS NULL THEN fecha_egreso
+        WHEN ${activoNuevo}::boolean = false THEN COALESCE(fecha_egreso, now())
+        ELSE NULL
+      END
     WHERE id = ${id}
     RETURNING *
   `
