@@ -9,10 +9,9 @@ import { formatFechaDMA } from "@/lib/utils"
 
 interface PendingExpensesAlertProps {
   gastos: Gasto[]
-  maxItems?: number
 }
 
-export function PendingExpensesAlert({ gastos, maxItems = 5 }: PendingExpensesAlertProps) {
+export function PendingExpensesAlert({ gastos }: PendingExpensesAlertProps) {
   const pendientes = gastos
     .filter((g) => g.pagado === false)
     .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())
@@ -60,9 +59,13 @@ export function PendingExpensesAlert({ gastos, maxItems = 5 }: PendingExpensesAl
       </div>
 
       {/* List */}
-      <div className="divide-y divide-border max-h-[280px] overflow-y-auto">
-        {pendientes.slice(0, maxItems).map((gasto) => (
-          <div key={gasto.id} className="p-4 transition-colors hover:bg-secondary/50">
+      <div className="divide-y divide-border max-h-[420px] overflow-y-auto">
+        {pendientes.map((gasto) => (
+          <Link
+            key={gasto.id}
+            href={`/gastos?edit=${gasto.id}`}
+            className="block p-4 transition-colors hover:bg-secondary/50 cursor-pointer"
+          >
             <div className="flex items-center justify-between gap-4">
               <div className="min-w-0 flex-1">
                 <p className="font-semibold text-foreground">{gasto.descripcion}</p>
@@ -76,16 +79,9 @@ export function PendingExpensesAlert({ gastos, maxItems = 5 }: PendingExpensesAl
                 </p>
               </div>
             </div>
-          </div>
+          </Link>
         ))}
       </div>
-
-      {/* Footer */}
-      {pendientes.length > maxItems && (
-        <div className="p-3 bg-secondary/30 text-center text-sm text-muted-foreground">
-          Y {pendientes.length - maxItems} gastos más pendientes
-        </div>
-      )}
 
       <div className="p-3 border-t border-border">
         <Link href="/gastos">

@@ -888,9 +888,9 @@ export default function DashboardPage() {
             onUpdated={() => fetchPresupuestosNoLeidos().then(setSolicitudesNoLeidas).catch(() => {})}
             maxItems={3}
           />
-          <PendingPaymentsAlert servicios={serviciosPendientesCobro} maxItems={3} />
-          <PendingCostosAlert servicios={serviciosConCostosPendientes} maxItems={3} />
-          <PendingExpensesAlert gastos={gastosPendientesPago} maxItems={3} />
+          <PendingPaymentsAlert servicios={serviciosPendientesCobro} />
+          <PendingCostosAlert servicios={serviciosConCostosPendientes} />
+          <PendingExpensesAlert gastos={gastosPendientesPago} />
           <AverageTicketChart />
           <div className="rounded-xl border border-border bg-card p-4 space-y-2">
             <p className="text-sm font-semibold text-muted-foreground">Acciones Rápidas</p>

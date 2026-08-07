@@ -228,6 +228,13 @@ export async function fetchGastos(year?: number, month?: number): Promise<Gasto[
   return res.json()
 }
 
+export async function fetchGastoById(id: string): Promise<Gasto | null> {
+  const res = await fetch(`/api/gastos?id=${encodeURIComponent(id)}`)
+  if (res.status === 404) return null
+  if (!res.ok) throw new Error("Error fetching gasto")
+  return res.json()
+}
+
 export async function createGastoApi(data: Partial<Gasto>): Promise<Gasto> {
   const res = await fetch("/api/gastos", {
     method: "POST",
@@ -497,6 +504,7 @@ export const api = {
   gastos: {
     getAll: fetchGastos,
     getByMonth: fetchGastos,
+    getById: fetchGastoById,
     create: createGastoApi,
     update: updateGastoApi,
     delete: deleteGastoApi,
