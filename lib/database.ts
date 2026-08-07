@@ -715,6 +715,12 @@ export async function getGastos() {
   return data as Gasto[]
 }
 
+export async function getGastoById(id: string) {
+  const db = getSQL()
+  const data = await db`SELECT * FROM gastos WHERE id = ${id}`
+  return (data[0] as Gasto) || null
+}
+
 export async function getGastosByMonth(year: number, month: number) {
   const db = getSQL()
   const startDate = `${year}-${String(month).padStart(2, "0")}-01`

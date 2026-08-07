@@ -9,10 +9,9 @@ import { useEstados } from "@/lib/estados"
 
 interface PendingPaymentsAlertProps {
   servicios: Servicio[]
-  maxItems?: number
 }
 
-export function PendingPaymentsAlert({ servicios, maxItems = 5 }: PendingPaymentsAlertProps) {
+export function PendingPaymentsAlert({ servicios }: PendingPaymentsAlertProps) {
   const ahora = new Date()
   const { esFinalizado } = useEstados()
 
@@ -78,11 +77,11 @@ export function PendingPaymentsAlert({ servicios, maxItems = 5 }: PendingPayment
       </div>
 
       {/* List */}
-      <div className="divide-y divide-border max-h-[280px] overflow-y-auto">
-        {pendingPayments.slice(0, maxItems).map((pago) => (
+      <div className="divide-y divide-border max-h-[420px] overflow-y-auto">
+        {pendingPayments.map((pago) => (
           <div
             key={pago.id}
-            className={`p-4 transition-colors hover:bg-secondary/50 ${
+            className={`relative p-4 transition-colors hover:bg-secondary/50 ${
               pago.urgencia === "alta"
                 ? "border-l-2 border-l-destructive"
                 : pago.urgencia === "media"
@@ -90,7 +89,14 @@ export function PendingPaymentsAlert({ servicios, maxItems = 5 }: PendingPayment
                   : ""
             }`}
           >
-            <div className="flex items-center justify-between gap-4">
+            {/* Toda la fila abre la edición de ese servicio. Link de fondo para no
+                anidar el <a> de WhatsApp dentro de otro <a>. */}
+            <Link
+              href={`/servicios?edit=${pago.id}`}
+              className="absolute inset-0 z-0"
+              aria-label={`Abrir servicio ${pago.patente}`}
+            />
+            <div className="relative z-10 flex items-center justify-between gap-4 pointer-events-none">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-semibold text-foreground">{pago.patente}</span>
@@ -115,7 +121,8 @@ export function PendingPaymentsAlert({ servicios, maxItems = 5 }: PendingPayment
                         href={`https://wa.me/${pago.telefono.replace(/\D/g, "")}?text=${encodeURIComponent(`Hola ${pago.cliente}, le recordamos que tiene un saldo pendiente de $${Number(pago.saldo_pendiente).toLocaleString("es-CL")} por el servicio de su vehículo ${pago.marca} ${pago.modelo} (${pago.patente}). Quedo a su disposición para coordinar el pago. Saludos, TallerPro.`)}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-muted-foreground hover:text-green-500 transition-colors"
+                        onClick={(e) => e.stopPropagation()}
+                        className="pointer-events-auto relative z-20 text-muted-foreground hover:text-green-500 transition-colors"
                         title="Contactar por WhatsApp"
                       >
                         <MessageCircle className="w-3.5 h-3.5" />
@@ -138,13 +145,6 @@ export function PendingPaymentsAlert({ servicios, maxItems = 5 }: PendingPayment
           </div>
         ))}
       </div>
-
-      {/* Footer */}
-      {pendingPayments.length > maxItems && (
-        <div className="p-3 bg-secondary/30 text-center text-sm text-muted-foreground">
-          Y {pendingPayments.length - maxItems} servicios más con saldo pendiente
-        </div>
-      )}
 
       <div className="p-3 border-t border-border">
         <Link href="/servicios">

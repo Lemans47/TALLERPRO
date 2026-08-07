@@ -11,6 +11,7 @@ import { useMonth } from "@/lib/month-context"
 import { api, type Gasto } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth-context"
 import { GastosFijosPlantillas } from "@/components/gastos-fijos-plantillas"
+import { useToast } from "@/hooks/use-toast"
 
 const ALL_CATEGORIAS = [
   { id: "Gastos de Pintura", label: "Pintura", icon: Paintbrush, color: "text-purple-400", roles: ["admin", "operador"] },
@@ -30,6 +31,7 @@ export default function ExpensesPage() {
   const [gastos, setGastos] = useState<Gasto[]>([])
   const [loading, setLoading] = useState(true)
   const { selectedMonth } = useMonth()
+  const { toast } = useToast()
 
   const loadGastos = useCallback(async () => {
     setLoading(true)
@@ -53,6 +55,25 @@ export default function ExpensesPage() {
     setActiveCategory(gasto.categoria)
     window.scrollTo({ top: 0, behavior: "smooth" })
   }
+
+  // Deep-link desde el dashboard: /gastos?edit=<id> abre la edición de ese gasto.
+  // Se fetchea por id porque puede ser de otro mes y no estar en la lista cargada.
+  // Sin useSearchParams() para no requerir <Suspense>.
+  useEffect(() => {
+    const editId = new URLSearchParams(window.location.search).get("edit")
+    if (!editId) return
+    // Limpiar el param para no re-abrir la edición al refrescar la página
+    window.history.replaceState(null, "", "/gastos")
+    api.gastos
+      .getById(editId)
+      .then((g) => {
+        if (g) handleEditGasto(g)
+        else toast({ title: "Gasto no encontrado", variant: "destructive" })
+      })
+      .catch(() => toast({ title: "No se pudo abrir el gasto", variant: "destructive" }))
+    // Solo al montar: la edición no debe re-abrirse en cada render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleSaved = () => {
     setGastoAEditar(null)

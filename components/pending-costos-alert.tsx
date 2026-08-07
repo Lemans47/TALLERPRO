@@ -9,14 +9,13 @@ import { resumenPagosCostos } from "@/lib/costos-pendientes"
 
 interface PendingCostosAlertProps {
   servicios: Servicio[]
-  maxItems?: number
 }
 
 // Alerta global de "Costos Taller Pendientes": servicios con al menos un ítem
 // de costo marcado como pendiente de pago (excluye pintura y auto-generados).
 // Estructura clonada de pending-expenses-alert; paleta warning para
 // distinguirla del card rojo de Gastos Pendientes.
-export function PendingCostosAlert({ servicios, maxItems = 5 }: PendingCostosAlertProps) {
+export function PendingCostosAlert({ servicios }: PendingCostosAlertProps) {
   const pendientes = servicios
     .map((servicio) => ({ servicio, resumen: resumenPagosCostos(servicio.costos) }))
     .filter((x) => x.resumen.estado === "pendiente")
@@ -64,9 +63,13 @@ export function PendingCostosAlert({ servicios, maxItems = 5 }: PendingCostosAle
       </div>
 
       {/* List */}
-      <div className="divide-y divide-border max-h-[280px] overflow-y-auto">
-        {pendientes.slice(0, maxItems).map(({ servicio, resumen }) => (
-          <div key={servicio.id} className="p-4 transition-colors hover:bg-secondary/50">
+      <div className="divide-y divide-border max-h-[420px] overflow-y-auto">
+        {pendientes.map(({ servicio, resumen }) => (
+          <Link
+            key={servicio.id}
+            href={`/servicios?edit=${servicio.id}`}
+            className="block p-4 transition-colors hover:bg-secondary/50 cursor-pointer"
+          >
             <div className="flex items-center justify-between gap-4">
               <div className="min-w-0 flex-1">
                 <p className="font-semibold text-foreground">
@@ -80,23 +83,12 @@ export function PendingCostosAlert({ servicios, maxItems = 5 }: PendingCostosAle
                 <p className="font-bold text-lg text-warning">
                   ${resumen.totalPendiente.toLocaleString("es-CL")}
                 </p>
-                <Link href={`/servicios?edit=${servicio.id}`}>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" title="Abrir servicio">
-                    <ChevronRight className="w-4 h-4" />
-                  </Button>
-                </Link>
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
               </div>
             </div>
-          </div>
+          </Link>
         ))}
       </div>
-
-      {/* Footer */}
-      {pendientes.length > maxItems && (
-        <div className="p-3 bg-secondary/30 text-center text-sm text-muted-foreground">
-          Y {pendientes.length - maxItems} servicio{pendientes.length - maxItems !== 1 ? "s" : ""} más con costos pendientes
-        </div>
-      )}
 
       <div className="p-3 border-t border-border">
         <Link href="/servicios">

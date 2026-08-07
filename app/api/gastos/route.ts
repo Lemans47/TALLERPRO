@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getGastos, getGastosByMonth, createGasto, updateGasto, deleteGasto } from "@/lib/database"
+import { getGastos, getGastosByMonth, getGastoById, createGasto, updateGasto, deleteGasto } from "@/lib/database"
 import { parseYearMonth, montoValido } from "@/lib/utils"
 import { requireRole } from "@/lib/auth-server"
 import { invalidateDashboardCache } from "@/lib/dashboard-cache"
@@ -12,6 +12,14 @@ export async function GET(request: Request) {
     const denied = await requireRole([...ROLES])
     if (denied) return denied
     const { searchParams } = new URL(request.url)
+
+    const id = searchParams.get("id")
+    if (id) {
+      const gasto = await getGastoById(id)
+      if (!gasto) return NextResponse.json({ error: "Gasto no encontrado" }, { status: 404 })
+      return NextResponse.json(gasto)
+    }
+
     const ym = parseYearMonth(searchParams)
 
     const gastos = ym
