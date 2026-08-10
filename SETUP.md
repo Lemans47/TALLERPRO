@@ -86,19 +86,13 @@ Detalle completo de los bots y el cron en [`TELEGRAM.md`](./TELEGRAM.md).
 
 ## Configuración de la base de datos
 
-> ⚠️ **Importante:** el repositorio **no contiene un bootstrap completo** del
-> esquema desde cero. Los scripts en `scripts/` asumen que el proyecto Supabase
-> ya tiene creadas la mayoría de las tablas (fueron creadas originalmente vía la
-> plataforma v0 / el dashboard de Supabase y no están capturadas como migración).
-> En particular, **ningún script crea** las tablas `vehiculos`, `clientes`,
-> `empleados`, `abonos_empleados`, `user_roles`, `proveedores`, `precios_pintura`
-> ni `piezas_pintura`.
->
-> - Si ya tienes el proyecto Supabase existente del taller: solo necesitas correr
->   las migraciones incrementales pendientes (ver abajo).
-> - Si partes de una base de datos **vacía**: tendrás que crear a mano las tablas
->   faltantes antes de que la app funcione por completo. No hay un script único
->   que lo haga; considera esto un pendiente del repo.
+> ℹ️ **Contexto histórico:** el proyecto se armó originalmente en v0 / el
+> dashboard de Supabase, y varias tablas quedaron creadas "a mano" sin capturarse
+> como migración. Por eso `02-runtime-migration.sql` referenciaba `vehiculos` sin
+> que ningún script la creara. Ese hueco ahora está cubierto por
+> `00-tablas-base-faltantes.sql` (ver el paso 1), que crea las tablas `clientes`,
+> `vehiculos`, `empleados`, `abonos_empleados`, `user_roles`, `proveedores`,
+> `precios_pintura` y `piezas_pintura`.
 
 ### Cómo correr los scripts
 
@@ -106,12 +100,18 @@ Todos los cambios de esquema se ejecutan **manualmente** en el **SQL Editor** de
 Supabase (Dashboard → SQL Editor → pegar → Run). **Nunca** se corre DDL desde el
 código de la aplicación.
 
-1. **`scripts/02-runtime-migration.sql`** — script principal, **idempotente**
+1. **`scripts/00-tablas-base-faltantes.sql`** — crea las tablas base que el resto
+   del esquema asume (`clientes`, `vehiculos`, `empleados`, `abonos_empleados`,
+   `user_roles`, `proveedores`, `precios_pintura`, `piezas_pintura`).
+   **Idempotente** (`CREATE TABLE IF NOT EXISTS` + guards): sobre un proyecto que
+   ya las tenga es un no-op y no toca datos. **En una base vacía, empieza por acá.**
+
+2. **`scripts/02-runtime-migration.sql`** — script principal, **idempotente**
    (se puede correr varias veces sin romper nada). Consolida columnas, secuencias
    (`numero_ot`), columnas generadas `patente_norm`, índices de rendimiento y las
-   tablas `gastos_fijos_plantillas` y `plantillas_servicio`. **Empieza por acá.**
+   tablas `gastos_fijos_plantillas` y `plantillas_servicio`.
 
-2. Luego, según lo que falte en tu proyecto, corre las migraciones incrementales
+3. Luego, según lo que falte en tu proyecto, corre las migraciones incrementales
    en orden numérico (`03` … `15`). Cada una añade una capacidad puntual, por
    ejemplo:
    - `03-user-roles-unique.sql` — constraint UNIQUE en `user_roles(user_id)`.
@@ -130,7 +130,7 @@ código de la aplicación.
    > archivo antes de correrlo. Si tu proyecto ya está al día, muchos serán
    > no-ops.
 
-3. **`scripts/01-create-tables.sql` — ⚠️ NO correr en un proyecto con datos.**
+4. **`scripts/01-create-tables.sql` — ⚠️ NO correr en un proyecto con datos.**
    Este script es **destructivo**: hace `DROP TABLE ... CASCADE` de `servicios`,
    `presupuestos`, `gastos` y `trabajadores`. Además está desactualizado (usa la
    tabla antigua `trabajadores` en vez de `empleados` y no crea las tablas
