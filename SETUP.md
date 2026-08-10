@@ -125,6 +125,12 @@ código de la aplicación.
      `servicios.costos`.
    - `estados-servicio.sql` + `estados-servicio-color.sql` — tabla de estados
      configurables y sus colores.
+   - `16-rls-user-roles.sql` — habilita RLS y las policies de lectura de
+     `user_roles` (ver "Roles de usuario" más abajo).
+   - `17-columnas-core-faltantes.sql` — completa las columnas de `servicios`,
+     `presupuestos` y `gastos` que las migraciones incrementales no cubrían
+     (p. ej. `color`, `kilometraje`, `año`, `fotos_ingreso`/`fotos_entrega`,
+     `detalle_pendiente`, `gastos.pagado`).
 
    > Cada script es idempotente o de un solo uso; revisa el encabezado del
    > archivo antes de correrlo. Si tu proyecto ya está al día, muchos serán
@@ -153,6 +159,11 @@ la tabla `user_roles` (leída vía Supabase, no por la conexión directa).
   `SUPABASE_SERVICE_ROLE_KEY`.
 - Para el **primer** usuario admin, créalo en Supabase Auth y agrega su fila en
   `user_roles` manualmente (`user_id`, `role = 'admin'`).
+
+> **RLS:** la data de negocio va por conexión directa con la service role, que
+> **bypassa RLS**, así que sus tablas no dependen de policies. El único caso donde
+> RLS importa es `user_roles`, que el navegador lee vía el cliente Supabase; sus
+> policies de lectura las aplica `scripts/16-rls-user-roles.sql`.
 
 ## Desarrollo local
 
