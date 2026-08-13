@@ -655,7 +655,7 @@ export default function DashboardPage() {
                   return (
                     <Link
                       key={f.id}
-                      href="/servicios"
+                      href={`/servicios?edit=${f.id}`}
                       className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-warning/10 transition-colors"
                     >
                       <div className="flex items-center gap-3 min-w-0 flex-1">
