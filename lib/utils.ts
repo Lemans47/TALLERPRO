@@ -152,6 +152,54 @@ export function hoyChile(): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Santiago" }).format(new Date())
 }
 
+/** Nombres de mes en español — fuente única para toda la app. */
+export const NOMBRES_MES = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+] as const
+
+export const NOMBRES_MES_CORTOS = [
+  "Ene", "Feb", "Mar", "Abr", "May", "Jun",
+  "Jul", "Ago", "Sep", "Oct", "Nov", "Dic",
+] as const
+
+/** Clave de mes "YYYY-MM" (o "YYYY-MM-DD") → "Agosto 2026". String-based, tz-safe. */
+export function formatMesLargo(mesKey: string): string {
+  const [y, m] = (mesKey ?? "").split("-").map(Number)
+  if (!y || !m || m < 1 || m > 12) return mesKey ?? ""
+  return `${NOMBRES_MES[m - 1]} ${y}`
+}
+
+/** Clave de mes "YYYY-MM" → "Ago 26". String-based, tz-safe. */
+export function formatMesCorto(mesKey: string): string {
+  const [y, m] = (mesKey ?? "").split("-").map(Number)
+  if (!y || !m || m < 1 || m > 12) return mesKey ?? ""
+  return `${NOMBRES_MES_CORTOS[m - 1]} ${String(y).slice(-2)}`
+}
+
+/**
+ * Formatea un timestamp a "DD/MM/YYYY HH:MM" en horario de Chile
+ * (America/Santiago). Para `created_at` y otros timestamps con hora.
+ * Usa `en-GB` a propósito: produce DD/MM/YYYY con barras, igual que
+ * `formatFechaDMA`, evitando los guiones del default numérico de es-CL.
+ */
+export function formatFechaHora(value: Date | string | null | undefined): string {
+  if (!value) return ""
+  const d = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(d.getTime())) return ""
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "America/Santiago",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  })
+    .format(d)
+    .replace(",", "")
+}
+
 /**
  * Valida un monto en pesos: acepta nulo/vacío (se trata como 0) o un número
  * finito ≥ 0. Rechaza NaN, Infinity y negativos, que corromperían los KPIs.

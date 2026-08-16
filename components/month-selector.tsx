@@ -3,7 +3,7 @@
 import { useMonth } from "@/lib/month-context"
 import { Calendar } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { cn } from "@/lib/utils"
+import { cn, formatMesLargo } from "@/lib/utils"
 
 interface MonthSelectorProps {
   variant?: "default" | "sidebar"
@@ -23,10 +23,8 @@ export function MonthSelector({ variant = "default" }: MonthSelectorProps) {
     const fromMonth = y === START_YEAR ? START_MONTH : 1
     const toMonth = y === currentYear ? currentMonth : 12
     for (let m = toMonth; m >= fromMonth; m--) {
-      const date = new Date(y, m - 1, 1)
       const value = `${y}-${String(m).padStart(2, "0")}`
-      const label = date.toLocaleDateString("es-CL", { year: "numeric", month: "long" })
-      months.push({ value, label: label.charAt(0).toUpperCase() + label.slice(1) })
+      months.push({ value, label: formatMesLargo(value) })
     }
   }
 

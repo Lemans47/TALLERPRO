@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Inbox, Phone, Car, Check, ChevronRight } from "lucide-react"
+import { formatFechaHora } from "@/lib/utils"
 import type { Presupuesto } from "@/lib/database"
 
 interface PendingSolicitudesAlertProps {
@@ -74,7 +75,7 @@ export function PendingSolicitudesAlert({ solicitudes, onUpdated, maxItems = 5 }
               <div className="flex items-center gap-2 flex-wrap">
                 <p className="font-medium truncate">{s.cliente}</p>
                 <span className="text-xs text-muted-foreground">
-                  {new Date(s.created_at).toLocaleString("es-CL", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                  {formatFechaHora(s.created_at)}
                 </span>
               </div>
               <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground flex-wrap">
