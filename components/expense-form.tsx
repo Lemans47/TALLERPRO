@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { DateField } from "@/components/ui/date-field"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
 import { Save, X } from "lucide-react"
@@ -150,10 +151,10 @@ export function ExpenseForm({ defaultCategory, gastoAEditar, onSaved, onCancel }
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Fecha</Label>
-              <Input
-                type="date"
+              <DateField
                 value={formData.fecha}
-                onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
+                onChange={(v) => setFormData({ ...formData, fecha: v })}
+                className="w-full"
               />
             </div>
           </div>

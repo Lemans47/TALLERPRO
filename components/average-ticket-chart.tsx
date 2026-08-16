@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from "react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import { Receipt } from "lucide-react"
 import { fetchChartData, type ChartMonthlyRow } from "@/lib/api-client"
+import { formatMesCorto } from "@/lib/utils"
 
-const MONTH_NAMES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
 const START = "2026-04"
 
 export function AverageTicketChart() {
@@ -31,9 +31,8 @@ export function AverageTicketChart() {
     return rows
       .filter((r) => r.mes >= START)
       .map((r) => {
-        const monthNum = Number.parseInt(r.mes.split("-")[1])
         const ticket = r.count_servicios > 0 ? Math.round(Number(r.facturado) / r.count_servicios) : 0
-        return { mes: MONTH_NAMES[monthNum - 1], ticket }
+        return { mes: formatMesCorto(r.mes), ticket }
       })
   }, [rows])
 

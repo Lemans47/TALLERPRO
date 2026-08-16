@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { DateField } from "@/components/ui/date-field"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -1941,11 +1942,10 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved, onDirtyChan
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs">Fecha Ingreso</Label>
-                    <Input
-                      type="date"
+                    <DateField
                       value={formData.fecha_ingreso}
-                      onChange={(e) => setFormData({ ...formData, fecha_ingreso: e.target.value })}
-                      className="bg-background/50 h-9"
+                      onChange={(v) => setFormData({ ...formData, fecha_ingreso: v })}
+                      className="bg-background/50 h-9 w-full"
                     />
                   </div>
                   <div className="space-y-1">
@@ -2791,11 +2791,12 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved, onDirtyChan
                 {formData.iva === "con" && (
                   <div className="pt-1">
                     <Label className="text-[10px] text-muted-foreground">Fecha Factura</Label>
-                    <Input
-                      type="date"
+                    <DateField
                       value={formData.fecha_facturacion}
-                      onChange={(e) => setFormData({ ...formData, fecha_facturacion: e.target.value })}
-                      className="bg-background/50 h-8 text-xs"
+                      onChange={(v) => setFormData({ ...formData, fecha_facturacion: v })}
+                      placeholder="Sin fecha"
+                      clearable
+                      className="bg-background/50 h-8 text-xs w-full"
                     />
                     {!formData.fecha_facturacion && (
                       <p className="text-[10px] text-warning mt-0.5 leading-tight">
@@ -2849,12 +2850,11 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved, onDirtyChan
                   <div className="space-y-1.5">
                     {abonos.map((abono, idx) => (
                       <div key={idx} className="flex items-center gap-2">
-                        <Input
-                          type="date"
+                        <DateField
                           value={abono.fecha}
-                          onChange={(e) => {
+                          onChange={(v) => {
                             const next = [...abonos]
-                            next[idx] = { ...next[idx], fecha: e.target.value }
+                            next[idx] = { ...next[idx], fecha: v }
                             setAbonos(next)
                           }}
                           className="bg-background/50 h-8 text-xs w-32 shrink-0 sm:w-36"

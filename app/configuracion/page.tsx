@@ -37,7 +37,7 @@ import {
 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { api, type PrecioPintura, type PiezaPintura, type EstadoServicio, type EstadoTipo, type PromedioMateriales, type PrecioPinturaConPromedio } from "@/lib/api-client"
-import { formatFechaDMA } from "@/lib/utils"
+import { formatFechaDMA, NOMBRES_MES } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
 import { useEstados } from "@/lib/estados"
 
@@ -195,8 +195,8 @@ export default function ConfiguracionPage() {
     const fin = new Date(inicio)
     fin.setMonth(fin.getMonth() + 2)
     fin.setDate(0)
-    const mesI = inicio.toLocaleString("es-CL", { month: "long" })
-    const mesF = fin.toLocaleString("es-CL", { month: "long", year: "numeric" })
+    const mesI = NOMBRES_MES[inicio.getMonth()]
+    const mesF = `${NOMBRES_MES[fin.getMonth()]} ${fin.getFullYear()}`
     return `${mesI} – ${mesF}`
   }
 

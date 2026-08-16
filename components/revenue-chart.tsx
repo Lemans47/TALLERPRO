@@ -4,9 +4,9 @@ import { useEffect, useMemo, useState } from "react"
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import { TrendingUp } from "lucide-react"
 import { fetchChartData, type ChartMonthlyRow } from "@/lib/api-client"
+import { formatMesCorto } from "@/lib/utils"
 
 type Modo = "facturado" | "cobrado"
-const MONTH_NAMES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
 const START = "2026-04"
 
 const fmtCLP = (v: number) => `$${Math.round(v).toLocaleString("es-CL")}`
@@ -80,8 +80,7 @@ export function RevenueChart() {
         const gastosOperativos = Math.round(Number(r.costos_internos) + Number(r.gastos_operativos_tabla))
         const gastosTotal = gastosFijos + gastosOperativos
         const margen = ingresos > 0 ? Math.round(((ingresos - gastosTotal) / ingresos) * 100) : 0
-        const monthNum = Number.parseInt(r.mes.split("-")[1])
-        return { mes: MONTH_NAMES[monthNum - 1], ingresos, gastosFijos, gastosOperativos, gastosTotal, margen }
+        return { mes: formatMesCorto(r.mes), ingresos, gastosFijos, gastosOperativos, gastosTotal, margen }
       })
   }, [rows, modo])
 

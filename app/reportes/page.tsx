@@ -22,7 +22,7 @@ import { ProfitabilityAnalysis } from "@/components/profitability-analysis"
 import { useMonth } from "@/lib/month-context"
 import { fetchDashboardData, fetchPinturaHistorico, type Servicio, type Gasto, type PinturaHistoricoRow } from "@/lib/api-client"
 import type { AbonoEmpleado, Empleado } from "@/lib/database"
-import { formatFechaDMA, extraerIvaIncluido } from "@/lib/utils"
+import { formatFechaDMA, extraerIvaIncluido, hoyChile, formatMesLargo, formatMesCorto } from "@/lib/utils"
 import { useEstados } from "@/lib/estados"
 import {
   parseJsonbArray, isCostoRealItem, sumarCostosReales, tieneIva,
@@ -239,10 +239,8 @@ export default function ReportsPage() {
   const serviciosPendientesCobro = data?.serviciosPendientesCobro ?? []
 
   // ── Encabezado del mes ───────────────────────────────────────────────────────
-  const [selYear, selMonth] = selectedMonth.split("-").map(Number)
-  const monthName = new Date(selYear, selMonth - 1, 1).toLocaleDateString("es-CL", { month: "long", year: "numeric" })
-  const [compYear, compMonthNum] = compMonth.split("-").map(Number)
-  const compMonthName = new Date(compYear, compMonthNum - 1, 1).toLocaleDateString("es-CL", { month: "long", year: "numeric" })
+  const monthName = formatMesLargo(selectedMonth)
+  const compMonthName = formatMesLargo(compMonth)
 
   // ── Resumen de Pintura (cliente, derivado de servicios JSONB) ───────────────
   const piezasResumen = useMemo(() => {
@@ -498,7 +496,7 @@ export default function ReportsPage() {
     const k = kpis
     const doc = new jsPDF()
     const pageWidth = doc.internal.pageSize.getWidth()
-    const today = new Date().toLocaleDateString("es-CL", { timeZone: "America/Santiago" })
+    const today = formatFechaDMA(hoyChile())
     const periodo = capitalize(monthName)
 
     // Cargar logo y capturar gráficos (degradan a null/"" sin romper el PDF).
@@ -1841,8 +1839,7 @@ export default function ReportsPage() {
                       {pinturaHistorico.map((r) => {
                         const dMO = r.mo_real - r.mo_estimada
                         const dMat = r.mat_real - r.mat_estimado
-                        const [y, m] = r.mes.split("-").map(Number)
-                        const label = new Date(y, m - 1, 1).toLocaleDateString("es-CL", { month: "short", year: "2-digit" })
+                        const label = formatMesCorto(r.mes)
                         return (
                           <tr key={r.mes} className="border-b border-border/50">
                             <td className="py-2 pr-3 font-medium capitalize">{label}</td>
