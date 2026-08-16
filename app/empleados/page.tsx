@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { DateField } from "@/components/ui/date-field"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
@@ -400,7 +401,7 @@ export default function EmpleadosPage() {
             </div>
             <div className="space-y-1.5">
               <Label>Fecha</Label>
-              <Input type="date" value={abonoFecha} onChange={e => setAbonoFecha(e.target.value)} />
+              <DateField value={abonoFecha} onChange={setAbonoFecha} className="w-full" />
             </div>
             <div className="space-y-1.5">
               <Label>Notas (opcional)</Label>
