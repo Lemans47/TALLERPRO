@@ -31,11 +31,17 @@ async function answerCallback(callbackQueryId: string) {
   })
 }
 
-async function editMessage(chatId: number, messageId: number, text: string) {
+async function editMessage(chatId: number, messageId: number, text: string, replyMarkup?: object) {
   await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/editMessageText`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, message_id: messageId, text, parse_mode: "HTML" }),
+    body: JSON.stringify({
+      chat_id: chatId,
+      message_id: messageId,
+      text,
+      reply_markup: replyMarkup,
+      parse_mode: "HTML",
+    }),
   })
 }
 
@@ -80,24 +86,53 @@ export async function POST(request: Request) {
 
       await answerCallback(callbackId)
 
-      // data format: "cat|monto|descripcion"
       const parts = data.split("|")
-      if (parts[0] !== "cat" || parts.length < 3) {
+
+      // Paso 1: eligió categoría → mostrar botones Boleta / Factura
+      // data format: "cat|<indiceCategoria>|<monto>|<descripcion>"
+      if (parts[0] === "cat" && parts.length >= 4) {
+        const catIndex = parts[1]
+        const monto = Number(parts[2])
+        const descripcion = parts.slice(3).join("|")
+        const categoria = CATEGORIAS[Number(catIndex)]?.label ?? ""
+
+        await editMessage(
+          chatId,
+          message.message_id,
+          `💰 <b>$${monto.toLocaleString("es-CL")}</b> — ${descripcion}\n🏷 ${categoria}\n\n¿Es boleta o factura?`,
+          {
+            inline_keyboard: [
+              [
+                { text: "🧾 Boleta", callback_data: `doc|b|${catIndex}|${monto}|${descripcion}` },
+                { text: "📄 Factura", callback_data: `doc|f|${catIndex}|${monto}|${descripcion}` },
+              ],
+            ],
+          }
+        )
+
         return NextResponse.json({ ok: true })
       }
 
-      const categoria = parts[1]
-      const monto = Number(parts[2])
-      const descripcion = parts.slice(3).join("|")
-      const fecha = hoyChile()
+      // Paso 2: eligió tipo de documento → registrar gasto
+      // data format: "doc|<b|f>|<indiceCategoria>|<monto>|<descripcion>"
+      if (parts[0] === "doc" && parts.length >= 5) {
+        const tipoDocumento = parts[1] === "f" ? "factura" : "boleta"
+        const categoria = CATEGORIAS[Number(parts[2])]?.id ?? ""
+        const monto = Number(parts[3])
+        const descripcion = parts.slice(4).join("|")
+        const fecha = hoyChile()
 
-      await createGasto({ fecha, categoria, descripcion, monto })
+        await createGasto({ fecha, categoria, descripcion, monto, tipo_documento: tipoDocumento })
 
-      await editMessage(
-        chatId,
-        message.message_id,
-        `✅ <b>Gasto registrado</b>\n💰 $${monto.toLocaleString("es-CL")}\n📝 ${descripcion}\n🏷 ${categoria}`
-      )
+        const docLabel = tipoDocumento === "factura" ? "Factura" : "Boleta"
+        await editMessage(
+          chatId,
+          message.message_id,
+          `✅ <b>Gasto registrado</b>\n💰 $${monto.toLocaleString("es-CL")}\n📝 ${descripcion}\n🏷 ${categoria}\n📃 ${docLabel}`
+        )
+
+        return NextResponse.json({ ok: true })
+      }
 
       return NextResponse.json({ ok: true })
     }
@@ -135,9 +170,9 @@ export async function POST(request: Request) {
     const { monto, descripcion } = parsed
 
     // Show category buttons
-    const buttons = CATEGORIAS.map((cat) => ({
+    const buttons = CATEGORIAS.map((cat, index) => ({
       text: cat.label,
-      callback_data: `cat|${cat.id}|${monto}|${descripcion}`,
+      callback_data: `cat|${index}|${monto}|${descripcion}`,
     }))
 
     await sendMessage(
