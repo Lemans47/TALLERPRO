@@ -143,9 +143,9 @@ export default function DashboardPage() {
     costoPorPieza: 0,
     margenPintura: 0,
   })
-  const [servicios, setServicios] = useState<Servicio[]>([])
+  const [, setServicios] = useState<Servicio[]>([])
   const [serviciosActivos, setServiciosActivos] = useState<Servicio[]>([])
-  const [gastos, setGastos] = useState<Gasto[]>([])
+  const [, setGastos] = useState<Gasto[]>([])
   const [facturasPendientes, setFacturasPendientes] = useState<Servicio[]>([])
   const [serviciosPendientesCobro, setServiciosPendientesCobro] = useState<Servicio[]>([])
   const [gastosPendientesPago, setGastosPendientesPago] = useState<Gasto[]>([])

@@ -17,7 +17,7 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
   const up     = (s: string) => (s || "").toUpperCase()
 
   function drawLogo(logoBase64: string) {
-    const lx = ML, ly = 6, lw = CW, lh = 34
+    const lx = ML, ly = 6, lw = CW
 
     if (logoBase64) {
       // Wide logo (560x200 aspect ≈ 2.8:1)
@@ -160,7 +160,6 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
   type Row = { type: "category"; label: string } | { type: "item"; desc: string }
   const rows: Row[] = []
   const grouped: Record<string, string[]> = {}
-  const order: string[] = []
 
   const parseArr = (v: any): any[] => {
     let val = v

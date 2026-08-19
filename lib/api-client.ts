@@ -1,4 +1,4 @@
-import type { Servicio, Presupuesto, Gasto, PrecioPintura, PiezaPintura, FotoServicio, Cliente, Vehiculo, Empleado, AbonoEmpleado, EstadoServicio, EstadoTipo } from "./database"
+import type { Servicio, Presupuesto, Gasto, PrecioPintura, PiezaPintura, Cliente, Vehiculo, Empleado, AbonoEmpleado, EstadoServicio, EstadoTipo } from "./database"
 
 // Patentes Chile — Boostr.cl
 export interface VehiculoLookup {

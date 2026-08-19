@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { createClient } from "@/lib/supabase"
-import { useRouter } from "next/navigation"
 import { Eye, EyeOff } from "lucide-react"
 import Image from "next/image"
 
@@ -14,7 +13,6 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [info, setInfo] = useState("")
-  const router = useRouter()
   const supabase = createClient()
 
   const handleLogin = async (e: React.FormEvent) => {
