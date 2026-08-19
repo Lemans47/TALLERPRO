@@ -33,7 +33,7 @@ export async function generarPDFPresupuesto(
 
   // ─── DRAW LOGO ────────────────────────────────────────────────────
   function drawLogo(logoBase64: string) {
-    const lx = ML, ly = 6, lw = CW, lh = 34
+    const lx = ML, ly = 6, lw = CW
 
     // Company logo image on the left — wide format (560x200 aspect ratio ≈ 2.8:1)
     if (logoBase64) doc.addImage(logoBase64, "PNG", lx + 2, ly + 4, 75, 27)
@@ -199,7 +199,6 @@ export async function generarPDFPresupuesto(
   const cobros = parseArr(servicio.cobros)
   const piezas = parseArr(servicio.piezas_pintura)
   const grouped: Record<string, { descripcion: string; monto: number }[]> = {}
-  const categoryOrder: string[] = []
 
   const CAT_LABELS: Record<string, string> = {
     desmontar: "Desmontar y Montar",
@@ -334,7 +333,7 @@ export async function generarPDFPresupuesto(
     return null
   }
 
-  let pageBreaks: number[] = [0]
+  const pageBreaks: number[] = [0]
   const midCategoryBreaks = new Set<number>()  // pageBreaks indices that start mid-category
 
   const chooseCut = (pageStart: number, overflowIdx: number, startY: number, anchor: number, yAtOverflow: number): { cut: number; mid: boolean } => {
@@ -478,7 +477,7 @@ export async function generarPDFPresupuesto(
     doc.setPage(r.pg)
     if (r.type === "category") {
       doc.saveGraphicsState()
-      // @ts-ignore
+      // @ts-expect-error jsPDF GState typings are incomplete
       doc.setGState(new doc.GState({ opacity: 0.45 }))
       doc.setFillColor(210, 210, 210)
       doc.rect(ML, r.ry, CW, r.rh, "F")
@@ -592,7 +591,7 @@ export async function generarPDFPresupuesto(
 
   // Row 3 — TOTAL
   doc.saveGraphicsState()
-  // @ts-ignore
+  // @ts-expect-error jsPDF GState typings are incomplete
   doc.setGState(new doc.GState({ opacity: 0.45 }))
   doc.setFillColor(210, 210, 210)
   doc.rect(labelX, y, labelW, trh, "F")

@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
-import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -25,7 +24,7 @@ import type { AbonoEmpleado, Empleado } from "@/lib/database"
 import { formatFechaDMA, extraerIvaIncluido } from "@/lib/utils"
 import { useEstados } from "@/lib/estados"
 import {
-  parseJsonbArray, isCostoRealItem, sumarCostosReales, tieneIva,
+  parseJsonbArray, tieneIva,
   type KpisMes,
 } from "@/lib/reportes/kpis"
 import {
@@ -173,7 +172,7 @@ interface DashboardResponse {
 
 export default function ReportsPage() {
   const { selectedMonth } = useMonth()
-  const { esCerrado, esPorCobrar } = useEstados()
+  const { esCerrado } = useEstados()
   const [data, setData] = useState<DashboardResponse | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -1327,7 +1326,7 @@ export default function ReportsPage() {
                 Desglose de Gastos
                 <InfoTip>
                   Criterio devengado: costos directos + gastos del taller (sin sueldos) +
-                  sueldos devengados. Suma exactamente el total de "Gastos Totales".
+                  sueldos devengados. Suma exactamente el total de &quot;Gastos Totales&quot;.
                 </InfoTip>
               </CardTitle>
             </CardHeader>
@@ -1546,7 +1545,7 @@ export default function ReportsPage() {
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
                 <AlertCircle className="w-4 h-4" /> Detalle de cuentas por cobrar
-                <InfoTip>Servicios con saldo &gt; 0 en estado "por cobrar". Datos globales (no filtrado por mes) — son los que importan para flujo de caja hoy.</InfoTip>
+                <InfoTip>Servicios con saldo &gt; 0 en estado &quot;por cobrar&quot;. Datos globales (no filtrado por mes) — son los que importan para flujo de caja hoy.</InfoTip>
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -2182,7 +2181,7 @@ export default function ReportsPage() {
               })}
             </div>
           ) : (
-            <p className="text-muted-foreground text-sm">Selecciona un mes y presiona "Cargar" para comparar.</p>
+            <p className="text-muted-foreground text-sm">Selecciona un mes y presiona &quot;Cargar&quot; para comparar.</p>
           )}
         </TabsContent>
 

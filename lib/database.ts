@@ -21,7 +21,6 @@ function safeJson(v: any): any {
 }
 
 declare global {
-  // eslint-disable-next-line no-var
   var _pgSql: ReturnType<typeof postgres> | undefined
 }
 
@@ -1239,7 +1238,6 @@ export async function getEstadosServicio(): Promise<EstadoServicio[]> {
 // el dashboard se cuelgue al cambiar rápido de mes. La tabla `estados_servicio`
 // cambia muy poco — TTL de 30s es seguro y se invalida explícitamente al mutar.
 declare global {
-  // eslint-disable-next-line no-var
   var _estadosCache: Map<string, { value: string[]; expires: number }> | undefined
 }
 
@@ -1541,7 +1539,7 @@ export async function upsertClienteYVehiculo(
   const db = getSQL()
 
   // Buscar o crear cliente por nombre (case-insensitive, trim)
-  let clienteRows = await db`
+  const clienteRows = await db`
     SELECT * FROM clientes WHERE LOWER(TRIM(nombre)) = LOWER(TRIM(${nombre})) LIMIT 1
   `
   let cliente: Cliente

@@ -57,7 +57,6 @@ export default function ConfiguracionPage() {
   const [promedioSugerido, setPromedioSugerido] = useState<PromedioMateriales | null>(null)
   const [aplicandoPromedio, setAplicandoPromedio] = useState(false)
   const [nuevaPieza, setNuevaPieza] = useState({ nombre: "", cantidad_piezas: "1" })
-  const [savingPiezas, setSavingPiezas] = useState(false)
   const [editingNombrePieza, setEditingNombrePieza] = useState<Record<string, string>>({})
   const [editingCantidad, setEditingCantidad] = useState<Record<string, string>>({})
   const { toast } = useToast()

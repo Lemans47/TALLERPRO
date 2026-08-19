@@ -1,8 +1,5 @@
 "use client"
 
-import { CollapsibleContent } from "@/components/ui/collapsible"
-import { CollapsibleTrigger } from "@/components/ui/collapsible"
-import { Collapsible } from "@/components/ui/collapsible"
 import { useState, useEffect, useCallback, useRef } from "react"
 import {
   AlertDialog,
@@ -22,7 +19,7 @@ import { useMonth } from "@/lib/month-context"
 import { api, type Servicio, type Presupuesto } from "@/lib/api-client"
 import { useEstados } from "@/lib/estados"
 import { useAuth } from "@/lib/auth-context"
-import { RefreshCw, Wrench, FileText, ClipboardList, Plus, ChevronUp, ChevronDown, Calendar } from "lucide-react"
+import { RefreshCw, Wrench, FileText, ClipboardList, Plus, Calendar } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
@@ -39,8 +36,6 @@ export default function ServicesPage() {
   const { esCerrado, esActivo } = useEstados()
   const { role } = useAuth()
   const canEdit = role !== "supervisor"
-  const [serviciosOpen, setServiciosOpen] = useState(true)
-  const [presupuestosOpen, setPresupuestosOpen] = useState(true)
   const [backfilling, setBackfilling] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const { toast } = useToast()

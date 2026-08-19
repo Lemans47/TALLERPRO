@@ -4,7 +4,6 @@
 // mutación (servicios, gastos, empleados, abonos), y que el dashboard no muestre
 // cifras viejas durante hasta 30s después de crear/editar/borrar.
 declare global {
-  // eslint-disable-next-line no-var
   var _dashboardCache: Map<string, { value: unknown; expires: number; inFlight?: Promise<unknown> }> | undefined
 }
 
