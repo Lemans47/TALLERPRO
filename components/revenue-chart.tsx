@@ -86,13 +86,13 @@ export function RevenueChart() {
 
   return (
     <div className="rounded-xl border border-border bg-card p-5">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between mb-6">
         <div>
           <h3 className="font-semibold text-lg flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-primary" />
             Ingresos vs Gastos
           </h3>
-          <div className="flex items-center gap-2 mt-1">
+          <div className="flex flex-wrap items-center gap-2 mt-1">
             <button
               onClick={() => setModo("facturado")}
               className={`text-xs px-2.5 py-1 rounded-full transition-colors ${
@@ -116,22 +116,22 @@ export function RevenueChart() {
             <span className="text-xs text-muted-foreground">· Desde Abril 2026</span>
           </div>
         </div>
-        <div className="flex items-center gap-4 text-sm">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "#1a4ed8" }} />
-            <span className="text-muted-foreground">Ingresos</span>
+            <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: "#1a4ed8" }} />
+            <span className="text-muted-foreground whitespace-nowrap">Ingresos</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "#b91c1c" }} />
-            <span className="text-muted-foreground">Gastos Fijos</span>
+            <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: "#b91c1c" }} />
+            <span className="text-muted-foreground whitespace-nowrap">Gastos Fijos</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "#f59e0b" }} />
-            <span className="text-muted-foreground">Gastos Operativos</span>
+            <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: "#f59e0b" }} />
+            <span className="text-muted-foreground whitespace-nowrap">Gastos Operativos</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "#16a34a" }} />
-            <span className="text-muted-foreground">Margen %</span>
+            <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: "#16a34a" }} />
+            <span className="text-muted-foreground whitespace-nowrap">Margen %</span>
           </div>
         </div>
       </div>
