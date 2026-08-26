@@ -310,6 +310,29 @@ export async function getServiciosActivosParaLista() {
   return data as Servicio[]
 }
 
+// Todos los servicios cerrados/pagados, de cualquier fecha. Alimenta el filtro
+// "Pagados" de la pantalla de Servicios cuando el usuario quiere buscar un
+// servicio pagado sin recordar el mes (evita ir mes por mes). Igual que
+// getServiciosActivosParaLista pero para el otro extremo del ciclo.
+export async function getServiciosCerradosParaLista() {
+  const db = getSQL()
+  const cerrados = await getNombresEstadosPorTipo(["cerrado"])
+  const data = await db`
+    SELECT s.*, v.mes_revision_tecnica
+    FROM servicios s
+    LEFT JOIN LATERAL (
+      SELECT mes_revision_tecnica
+      FROM vehiculos
+      WHERE patente_norm = s.patente_norm
+      ORDER BY (mes_revision_tecnica IS NOT NULL) DESC, updated_at DESC NULLS LAST
+      LIMIT 1
+    ) v ON true
+    WHERE s.estado = ANY(${cerrados.length ? cerrados : [""]}::text[])
+    ORDER BY s.fecha_ingreso DESC
+  `
+  return data as Servicio[]
+}
+
 export async function getEntregadosByMonth(year: number, month: number) {
   const db = getSQL()
   const startDate = `${year}-${String(month).padStart(2, "0")}-01`

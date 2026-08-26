@@ -82,9 +82,13 @@ interface ServicesTableProps {
   onEditServicio: (servicio: Servicio) => void
   onDeleted: () => void
   loading?: boolean
+  // Avisa al padre cuando se enciende/apaga "Pagados", para que cargue (o libere)
+  // los servicios pagados de todos los meses y el buscador los alcance.
+  onVerTodosPagados?: (activo: boolean) => void
+  loadingPagados?: boolean
 }
 
-export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }: ServicesTableProps) {
+export function ServicesTable({ servicios, onEditServicio, onDeleted, loading, onVerTodosPagados, loadingPagados }: ServicesTableProps) {
   const { toast } = useToast()
   const { estados: estadosConfig, esCerrado, colorOf } = useEstados()
   const { role } = useAuth()
@@ -466,14 +470,17 @@ export function ServicesTable({ servicios, onEditServicio, onDeleted, loading }:
               setSoloPagados((v) => {
                 const next = !v
                 if (next) setSoloIncompletos(false)
+                // Avisar al padre para cargar/liberar los pagados de todos los meses.
+                onVerTodosPagados?.(next)
                 return next
               })
             }}
             className={`gap-1.5 h-10 ${soloPagados ? "bg-green-500 text-white hover:bg-green-500/90" : "border-green-500/40 text-green-400 hover:bg-green-500/10 hover:text-green-400"}`}
-            title="Mostrar solo servicios cerrados/pagados"
+            title="Mostrar los servicios pagados de todos los meses"
           >
             <CheckCircle2 className="w-3.5 h-3.5" />
             Pagados
+            {loadingPagados && <span className="ml-1 h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />}
           </Button>
         </div>}
       </div>

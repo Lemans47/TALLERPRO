@@ -124,6 +124,15 @@ export async function fetchServiciosActivos(): Promise<Servicio[]> {
   return res.json()
 }
 
+// Todos los servicios cerrados/pagados, de cualquier mes. Se carga bajo demanda
+// al activar el filtro "Pagados" en la pantalla de Servicios, para poder buscar
+// un servicio pagado sin recordar la fecha (sin ir mes por mes).
+export async function fetchServiciosCerrados(): Promise<Servicio[]> {
+  const res = await fetch(`/api/servicios?cerrados=1`)
+  if (!res.ok) throw new Error("Error fetching servicios cerrados")
+  return res.json()
+}
+
 // Un servicio puntual por id (puede ser de cualquier mes). Usado por el
 // deep-link /servicios?edit=<id> desde la alerta de costos pendientes.
 export async function fetchServicioById(id: string): Promise<Servicio | null> {
@@ -486,6 +495,7 @@ export const api = {
     getAll: fetchServicios,
     getByMonth: fetchServicios,
     getActivos: fetchServiciosActivos,
+    getCerrados: fetchServiciosCerrados,
     getById: fetchServicioById,
     create: createServicioApi,
     update: updateServicioApi,

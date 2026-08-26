@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getServicios, getServiciosByMonth, getServiciosActivosParaLista, createServicio, updateServicio, deleteServicio, getServicioById, upsertClienteYVehiculo } from "@/lib/database"
+import { getServicios, getServiciosByMonth, getServiciosActivosParaLista, getServiciosCerradosParaLista, createServicio, updateServicio, deleteServicio, getServicioById, upsertClienteYVehiculo } from "@/lib/database"
 import { parseYearMonth, montoValido } from "@/lib/utils"
 import { requireRole } from "@/lib/auth-server"
 import { invalidateDashboardCache } from "@/lib/dashboard-cache"
@@ -73,14 +73,17 @@ export async function GET(request: Request) {
       return NextResponse.json(servicio)
     }
     const activos = searchParams.get("activos")
+    const cerrados = searchParams.get("cerrados")
     const ym = parseYearMonth(searchParams)
 
     const servicios =
       activos === "1"
         ? await getServiciosActivosParaLista()
-        : ym
-          ? await getServiciosByMonth(ym.year, ym.month)
-          : await getServicios()
+        : cerrados === "1"
+          ? await getServiciosCerradosParaLista()
+          : ym
+            ? await getServiciosByMonth(ym.year, ym.month)
+            : await getServicios()
 
     return NextResponse.json(servicios)
   } catch (error) {

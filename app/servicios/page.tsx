@@ -30,6 +30,12 @@ export default function ServicesPage() {
   const [servicios, setServicios] = useState<Servicio[]>([])
   const [presupuestos, setPresupuestos] = useState<Presupuesto[]>([])
   const [loading, setLoading] = useState(true)
+  // Pagados de todo el historial (no solo del mes). Se cargan bajo demanda al
+  // activar el filtro "Pagados" en la tabla, para poder buscar un servicio
+  // pagado sin recordar la fecha. Vacío mientras el filtro esté apagado.
+  const [pagadosHistoricos, setPagadosHistoricos] = useState<Servicio[]>([])
+  const [verTodosPagados, setVerTodosPagados] = useState(false)
+  const [loadingPagados, setLoadingPagados] = useState(false)
   const [showFormDialog, setShowFormDialog] = useState(false)
   const [confirmarCierre, setConfirmarCierre] = useState(false)
   const { selectedMonth } = useMonth()
@@ -96,15 +102,50 @@ export default function ServicesPage() {
   const refreshData = useCallback(async () => {
     setRefreshing(true)
     try {
-      await loadData({ background: true })
+      await Promise.all([
+        loadData({ background: true }),
+        // Si "Pagados" está activo, mantené fresca la lista histórica también.
+        verTodosPagados
+          ? api.servicios.getCerrados().then(setPagadosHistoricos).catch(() => {})
+          : Promise.resolve(),
+      ])
     } finally {
       setRefreshing(false)
     }
-  }, [loadData])
+  }, [loadData, verTodosPagados])
 
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  // La tabla avisa cuando se enciende/apaga el filtro "Pagados". Al encenderlo,
+  // traemos todos los cerrados de cualquier mes para que el buscador los alcance;
+  // al apagarlo, volvemos a la vista del mes (liberamos la lista histórica).
+  const handleVerTodosPagados = useCallback(async (activo: boolean) => {
+    setVerTodosPagados(activo)
+    if (!activo) {
+      setPagadosHistoricos([])
+      return
+    }
+    setLoadingPagados(true)
+    try {
+      setPagadosHistoricos(await api.servicios.getCerrados())
+    } catch (error) {
+      console.error("Error loading pagados históricos:", error)
+      toast({ title: "Error", description: "No se pudieron cargar los pagados de otros meses", variant: "destructive" })
+    } finally {
+      setLoadingPagados(false)
+    }
+  }, [toast])
+
+  // Cuando "Pagados" está activo, la tabla recibe los del mes + los pagados de
+  // todo el historial (deduplicados por id). Con el filtro apagado, solo los del mes.
+  const serviciosParaTabla = verTodosPagados
+    ? (() => {
+        const ids = new Set(servicios.map((s) => s.id))
+        return [...servicios, ...pagadosHistoricos.filter((s) => !ids.has(s.id))]
+      })()
+    : servicios
 
   // El formulario avisa si tiene trabajo sin guardar; el ref lo mantiene accesible
   // desde los listeners (popstate), que no se re-crean en cada render.
@@ -343,10 +384,12 @@ export default function ServicesPage() {
         />
         
         <ServicesTable
-          servicios={filterBySearch(servicios)}
+          servicios={filterBySearch(serviciosParaTabla)}
           onEditServicio={handleEditServicio}
           onDeleted={refreshData}
           loading={loading}
+          onVerTodosPagados={handleVerTodosPagados}
+          loadingPagados={loadingPagados}
         />
       </div>
 
