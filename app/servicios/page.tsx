@@ -404,7 +404,19 @@ export default function ServicesPage() {
           intentarCerrarFormulario()
         }}
       >
-        <DialogContent className="max-w-[98vw] sm:max-w-[95vw] md:max-w-[90vw] lg:max-w-[85vw] xl:max-w-7xl w-full h-[100dvh] sm:h-[95vh] max-h-[100dvh] flex flex-col bg-card border-border p-0">
+        <DialogContent
+          className="max-w-[98vw] sm:max-w-[95vw] md:max-w-[90vw] lg:max-w-[85vw] xl:max-w-7xl w-full h-[100dvh] sm:h-[95vh] max-h-[100dvh] flex flex-col bg-card border-border p-0"
+          // El AlertDialog de confirmación es hermano de este Dialog (no está anidado
+          // dentro del contenido), así que sus toques caen "afuera" de este modal. Sin
+          // esto, tocar "Seguir editando" cerraría este Dialog, que al haber cambios sin
+          // guardar reabre el alert de inmediato: el botón parecía no hacer nada.
+          onInteractOutside={(e) => {
+            if (confirmarCierre) e.preventDefault()
+          }}
+          onEscapeKeyDown={(e) => {
+            if (confirmarCierre) e.preventDefault()
+          }}
+        >
           <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-2 border-b border-border">
             <DialogTitle className="text-lg sm:text-xl">
               {servicioAEditar ? `Editar ${servicioAEditar.isPresupuesto ? "Presupuesto" : "Servicio"}` : "Nuevo Servicio"}
