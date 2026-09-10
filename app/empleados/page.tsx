@@ -162,7 +162,7 @@ export default function EmpleadosPage() {
     .reduce((s, e) => s + Math.max(0, totalAbonado(e.id) - Number(e.sueldo_base)), 0)
 
   return (
-    <div className="p-4 md:p-6 space-y-6 pt-20 md:pt-6">
+    <div className="p-4 md:p-6 space-y-6 pt-20 lg:pt-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
         <div className="flex items-center gap-3 flex-1">

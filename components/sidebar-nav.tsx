@@ -86,7 +86,7 @@ export function SidebarNav() {
   return (
     <>
       {/* Mobile Header */}
-      <header className="md:hidden fixed top-0 left-0 right-0 h-16 bg-sidebar backdrop-blur-md border-b border-sidebar-border flex items-center justify-between px-4 z-50">
+      <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-sidebar backdrop-blur-md border-b border-sidebar-border flex items-center justify-between px-4 z-50">
         <div className="flex items-center gap-3">
           <Image
             src="/logo-sarmiento.svg"
@@ -107,7 +107,7 @@ export function SidebarNav() {
 
       {/* Mobile Sidebar Overlay */}
       {isOpen && (
-        <div className="md:hidden fixed inset-0 top-16 bg-sidebar z-40 overflow-y-auto">
+        <div className="lg:hidden fixed inset-0 top-16 bg-sidebar z-40 overflow-y-auto">
           <div className="flex flex-col min-h-full">
             <div className="p-4 border-b border-sidebar-border">
               <MonthSelector variant="sidebar" />
@@ -131,7 +131,7 @@ export function SidebarNav() {
       )}
 
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex w-64 bg-sidebar border-r border-sidebar-border h-screen flex-col fixed left-0 top-0">
+      <aside className="hidden lg:flex w-64 bg-sidebar border-r border-sidebar-border h-screen flex-col fixed left-0 top-0">
         {/* Logo */}
         <div className="p-5 border-b border-sidebar-border">
           <div className="flex items-center gap-3">

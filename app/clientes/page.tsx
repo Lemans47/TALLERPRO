@@ -175,7 +175,7 @@ export default function ClientesPage() {
   })
 
   return (
-    <div className="p-4 md:p-6 space-y-6 pt-20 md:pt-6">
+    <div className="p-4 md:p-6 space-y-6 pt-20 lg:pt-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
         <div className="flex items-center gap-3 flex-1">
