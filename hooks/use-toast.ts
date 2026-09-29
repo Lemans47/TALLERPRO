@@ -6,7 +6,10 @@ import * as React from 'react'
 import type { ToastActionElement, ToastProps } from '@/components/ui/toast'
 
 const TOAST_LIMIT = 1
-const TOAST_REMOVE_DELAY = 1000000
+// Tiempo que el toast permanece visible antes de cerrarse solo.
+const TOAST_DURATION = 3000
+// Espera antes de sacarlo del estado: solo cubre la animacion de salida.
+const TOAST_REMOVE_DELAY = 400
 
 type ToasterToast = ToastProps & {
   id: string
@@ -55,6 +58,41 @@ interface State {
 }
 
 const toastTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
+const dismissTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
+
+// Radix pausa su temporizador interno cuando la ventana pierde el foco (hoja
+// de compartir, descarga del PDF, cambio de pestana en el movil), asi que el
+// toast podia quedarse visible indefinidamente. Este temporizador propio
+// garantiza el cierre.
+const addToDismissQueue = (toastId: string, duration: number) => {
+  if (dismissTimeouts.has(toastId)) {
+    return
+  }
+
+  const timeout = setTimeout(() => {
+    dismissTimeouts.delete(toastId)
+    dispatch({
+      type: 'DISMISS_TOAST',
+      toastId: toastId,
+    })
+  }, duration)
+
+  dismissTimeouts.set(toastId, timeout)
+}
+
+const clearDismissQueue = (toastId?: string) => {
+  if (toastId === undefined) {
+    dismissTimeouts.forEach((timeout) => clearTimeout(timeout))
+    dismissTimeouts.clear()
+    return
+  }
+
+  const timeout = dismissTimeouts.get(toastId)
+  if (timeout) {
+    clearTimeout(timeout)
+    dismissTimeouts.delete(toastId)
+  }
+}
 
 const addToRemoveQueue = (toastId: string) => {
   if (toastTimeouts.has(toastId)) {
@@ -74,11 +112,15 @@ const addToRemoveQueue = (toastId: string) => {
 
 export const reducer = (state: State, action: Action): State => {
   switch (action.type) {
-    case 'ADD_TOAST':
-      return {
-        ...state,
-        toasts: [action.toast, ...state.toasts].slice(0, TOAST_LIMIT),
-      }
+    case 'ADD_TOAST': {
+      const toasts = [action.toast, ...state.toasts].slice(0, TOAST_LIMIT)
+      // Los toasts desplazados por TOAST_LIMIT ya no se renderizan: sus
+      // temporizadores no deben seguir vivos.
+      state.toasts
+        .filter((t) => !toasts.some((kept) => kept.id === t.id))
+        .forEach((t) => clearDismissQueue(t.id))
+      return { ...state, toasts }
+    }
 
     case 'UPDATE_TOAST':
       return {
@@ -93,6 +135,8 @@ export const reducer = (state: State, action: Action): State => {
 
       // ! Side effects ! - This could be extracted into a dismissToast() action,
       // but I'll keep it here for simplicity
+      clearDismissQueue(toastId)
+
       if (toastId) {
         addToRemoveQueue(toastId)
       } else {
@@ -114,6 +158,7 @@ export const reducer = (state: State, action: Action): State => {
       }
     }
     case 'REMOVE_TOAST':
+      clearDismissQueue(action.toastId)
       if (action.toastId === undefined) {
         return {
           ...state,
@@ -150,10 +195,13 @@ function toast({ ...props }: Toast) {
     })
   const dismiss = () => dispatch({ type: 'DISMISS_TOAST', toastId: id })
 
+  const duration = props.duration ?? TOAST_DURATION
+
   dispatch({
     type: 'ADD_TOAST',
     toast: {
       ...props,
+      duration,
       id,
       open: true,
       onOpenChange: (open) => {
@@ -161,6 +209,10 @@ function toast({ ...props }: Toast) {
       },
     },
   })
+
+  if (duration !== Number.POSITIVE_INFINITY) {
+    addToDismissQueue(id, duration)
+  }
 
   return {
     id: id,
