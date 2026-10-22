@@ -1118,6 +1118,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved, onDirtyChan
       marca: s.marca || prev.marca,
       modelo: s.modelo || prev.modelo,
       color: s.color || prev.color,
+      vin: s.vin || prev.vin,
       año: s.año ? Number(s.año) : prev.año,
       kilometraje: s.kilometraje ? Number(s.kilometraje) : prev.kilometraje,
       cliente: s.cliente || prev.cliente,
@@ -1233,6 +1234,9 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved, onDirtyChan
         marca: formData.marca,
         modelo: formData.modelo,
         color: formData.color,
+        // El VIN se guarda en `vehiculos` (lo sincroniza /api/servicios), no en
+        // la fila de servicios, y vuelve por JOIN sobre la patente.
+        vin: formData.vin,
         kilometraje: formData.kilometraje,
         año: formData.año,
         cliente: formData.cliente,

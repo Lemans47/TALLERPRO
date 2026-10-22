@@ -14,6 +14,7 @@ async function ensureColumn(db: any) {
 // marca/modelo desde el registro vehicular, por eso NO exige sesión. No expone
 // datos de clientes (eso es /api/buscar-patente, que sí requiere sesión).
 export async function GET(request: Request) {
+  let cache: Record<string, unknown> | null = null
   try {
     const { searchParams } = new URL(request.url)
     const rawPatente = searchParams.get("patente") ?? ""
@@ -24,28 +25,37 @@ export async function GET(request: Request) {
     }
 
     // 1. Buscar en caché local (DB)
+    // El caché sirve solo si ya trae VIN: las filas que creó la sincronización de
+    // servicios (upsertClienteYVehiculo) tienen marca/modelo pero nunca VIN, y
+    // cortar acá dejaba la patente sin VIN para siempre. Si falta, se consulta la
+    // API y el resultado se cachea; si la API falla, se devuelve igual el caché.
     try {
       const vehiculoEnDB = await getVehiculoByPatente(patente)
       if (vehiculoEnDB?.marca) {
-        return NextResponse.json({
+        cache = {
           patente: vehiculoEnDB.patente,
           marca: vehiculoEnDB.marca,
           modelo: vehiculoEnDB.modelo,
           año: vehiculoEnDB.año ? Number(vehiculoEnDB.año) : null,
           color: vehiculoEnDB.color,
-          vin: vehiculoEnDB.vin,
+          vin: vehiculoEnDB.vin ?? null,
           mes_revision_tecnica: vehiculoEnDB.mes_revision_tecnica ?? null,
           fromCache: true,
-        })
+        }
+        if (vehiculoEnDB.vin) return NextResponse.json(cache)
       }
     } catch (dbError) {
       console.error("[lookup-patente] error leyendo DB:", dbError)
     }
 
+    // Cuando solo faltaba el VIN, un fallo de la API no es un error para el
+    // usuario: ya teníamos marca/modelo y los devolvemos tal cual.
+    const fallback = (res: NextResponse) => (cache ? NextResponse.json(cache) : res)
+
     // 2. Llamar a GetAPI.cl
     const apiKey = process.env.GETAPI_API_KEY
     if (!apiKey) {
-      return NextResponse.json({ error: "API Key no configurada" }, { status: 500 })
+      return fallback(NextResponse.json({ error: "API Key no configurada" }, { status: 500 }))
     }
 
     const externalRes = await fetch(`https://chile.getapi.cl/v1/vehicles/plate/${patente}`, {
@@ -54,18 +64,18 @@ export async function GET(request: Request) {
     })
 
     if (externalRes.status === 404 || externalRes.status === 422) {
-      return NextResponse.json({ error: "Patente no encontrada" }, { status: 404 })
+      return fallback(NextResponse.json({ error: "Patente no encontrada" }, { status: 404 }))
     }
     if (externalRes.status === 429) {
-      return NextResponse.json({ error: "Límite de consultas alcanzado" }, { status: 429 })
+      return fallback(NextResponse.json({ error: "Límite de consultas alcanzado" }, { status: 429 }))
     }
     if (!externalRes.ok) {
-      return NextResponse.json({ error: "Error consultando API de patentes" }, { status: 502 })
+      return fallback(NextResponse.json({ error: "Error consultando API de patentes" }, { status: 502 }))
     }
 
     const body = await externalRes.json()
     if (!body.success || !body.data) {
-      return NextResponse.json({ error: "Patente no encontrada" }, { status: 404 })
+      return fallback(NextResponse.json({ error: "Patente no encontrada" }, { status: 404 }))
     }
 
     // 3. Normalizar respuesta de GetAPI.cl
@@ -82,18 +92,30 @@ export async function GET(request: Request) {
       try {
         const db = getSQL()
         await ensureColumn(db)
-        await db`
-          INSERT INTO vehiculos (patente, marca, modelo, color, año, vin, mes_revision_tecnica)
-          VALUES (${patente}, ${marca}, ${modelo}, ${color}, ${año}, ${vin}, ${mes_revision_tecnica})
-          ON CONFLICT (patente) DO UPDATE SET
-            marca = COALESCE(EXCLUDED.marca, vehiculos.marca),
-            modelo = COALESCE(EXCLUDED.modelo, vehiculos.modelo),
-            color = COALESCE(EXCLUDED.color, vehiculos.color),
-            año = COALESCE(EXCLUDED.año, vehiculos.año),
-            vin = COALESCE(EXCLUDED.vin, vehiculos.vin),
-            mes_revision_tecnica = COALESCE(EXCLUDED.mes_revision_tecnica, vehiculos.mes_revision_tecnica),
+        // UPDATE + INSERT sobre patente_norm en vez de ON CONFLICT (patente):
+        // `vehiculos` no tiene índice único sobre `patente`, así que el
+        // ON CONFLICT fallaba con 42P10 y el catch de abajo se lo tragaba —
+        // por eso el VIN que devolvía la API nunca llegaba a quedar cacheado.
+        // patente_norm es la columna generada e indexada (misma convención que
+        // upsertClienteYVehiculo).
+        const actualizados = await db`
+          UPDATE vehiculos SET
+            marca = COALESCE(${marca}, marca),
+            modelo = COALESCE(${modelo}, modelo),
+            color = COALESCE(${color}, color),
+            año = COALESCE(${año}, año),
+            vin = COALESCE(${vin}, vin),
+            mes_revision_tecnica = COALESCE(${mes_revision_tecnica}, mes_revision_tecnica),
             updated_at = NOW()
+          WHERE patente_norm = ${patente}
+          RETURNING id
         `
+        if (actualizados.length === 0) {
+          await db`
+            INSERT INTO vehiculos (patente, marca, modelo, color, año, vin, mes_revision_tecnica)
+            VALUES (${patente}, ${marca}, ${modelo}, ${color}, ${año}, ${vin}, ${mes_revision_tecnica})
+          `
+        }
       } catch (dbError) {
         console.error("[lookup-patente] error guardando en DB:", dbError)
       }
@@ -102,6 +124,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ patente, marca, modelo, año, color, vin, mes_revision_tecnica, fromCache: false })
   } catch (error: any) {
     console.error("[lookup-patente] error:", error)
+    if (cache) return NextResponse.json(cache)
     if (error?.name === "TimeoutError") {
       return NextResponse.json({ error: "Timeout consultando API de patentes" }, { status: 504 })
     }

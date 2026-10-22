@@ -105,10 +105,13 @@ export async function POST(request: Request) {
     }
     const servicio = await createServicio(data)
     invalidateDashboardCache()
-    // Sincronizar cliente y vehículo en sus tablas
+    // Sincronizar cliente y vehículo en sus tablas. El VIN sale del body y no de
+    // `servicio`: vive en `vehiculos`, no es columna de `servicios` (igual que
+    // mes_revision_tecnica), así que el INSERT no lo devuelve.
     if (servicio.cliente && servicio.patente) {
       await upsertClienteYVehiculo(servicio.cliente, servicio.telefono || "", servicio.patente, {
         marca: servicio.marca, modelo: servicio.modelo, color: servicio.color, año: servicio.año ? Number(servicio.año) : undefined,
+        vin: typeof data.vin === "string" ? data.vin.trim().toUpperCase() || undefined : undefined,
       }).catch((e) => console.error("upsertClienteYVehiculo (POST):", e))
     }
     return NextResponse.json(servicio)
@@ -136,6 +139,7 @@ export async function PUT(request: Request) {
     if (servicio.cliente && servicio.patente) {
       await upsertClienteYVehiculo(servicio.cliente, servicio.telefono || "", servicio.patente, {
         marca: servicio.marca, modelo: servicio.modelo, color: servicio.color, año: servicio.año ? Number(servicio.año) : undefined,
+        vin: typeof updateData.vin === "string" ? updateData.vin.trim().toUpperCase() || undefined : undefined,
       }).catch((e) => console.error("upsertClienteYVehiculo (PUT):", e))
     }
     return NextResponse.json(servicio)
