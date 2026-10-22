@@ -59,6 +59,12 @@ import { roundMoney, costoNetoItem, sumCostosNetos, hoyChile } from "@/lib/utils
 import { parseAbonos, sumAbonos, type Abono } from "@/lib/pagos"
 import { useEstados } from "@/lib/estados"
 
+// Patentes a las que ya se les consultó el VIN en esta sesión del navegador.
+// Si el registro vehicular no tiene VIN para una patente, no hay nada que cachear,
+// y reintentarlo en cada apertura del servicio gastaría cuota de la API sin obtener
+// nada nuevo. Vive fuera del componente para sobrevivir a los remontajes.
+const vinConsultadoEnSesion = new Set<string>()
+
 interface ServiceFormProps {
   servicioAEditar?: (Servicio & { isPresupuesto?: boolean }) | null
   onClearEdit: () => void
@@ -165,6 +171,10 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved, onDirtyChan
   // Config global de pintura: también llega async y toca el estado del formulario, así que
   // la línea base para detectar cambios sin guardar se toma recién cuando termina.
   const [configPinturaCargando, setConfigPinturaCargando] = useState(true)
+  // El VIN de servicios viejos se rellena consultando la patente: también es async y
+  // toca el formulario, así que la línea base se toma recién cuando termina.
+  const [vinCargando, setVinCargando] = useState(false)
+  const vinFetchRef = useRef<string | null>(null)
   const [borradorDisponible, setBorradorDisponible] = useState<Borrador | null>(null)
 
   const [showManoObraModal, setShowManoObraModal] = useState(false)
@@ -395,7 +405,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved, onDirtyChan
         marca: servicioAEditar.marca || "",
         modelo: servicioAEditar.modelo || "",
         color: servicioAEditar.color || "",
-        vin: (servicioAEditar as any).vin || "",
+        vin: servicioAEditar.vin || "",
         kilometraje: servicioAEditar.kilometraje,
         año: servicioAEditar.año,
         cliente: servicioAEditar.cliente,
@@ -539,6 +549,47 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved, onDirtyChan
     }
   }, [servicioAEditar, hidratarPiezas])
 
+  // Relleno del VIN al abrir un servicio que no lo tiene. Las fichas creadas antes de
+  // que el VIN se guardara —y las patentes que la sincronización de servicios creó solo
+  // con marca/modelo— llegan sin él. Se consulta una sola patente, la que se está
+  // abriendo, en vez de un backfill masivo que no cabría en la cuota de la API.
+  // /api/lookup-patente cachea el resultado en `vehiculos`, así que la próxima apertura
+  // ya lo recibe por JOIN y no vuelve a consultar.
+  useEffect(() => {
+    if (!servicioAEditar || servicioAEditar.isPresupuesto) return
+    if (servicioAEditar.vin) return
+    const patente = (servicioAEditar.patente || "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase()
+    if (patente.length < 6) return
+    if (vinConsultadoEnSesion.has(patente)) return
+    vinConsultadoEnSesion.add(patente)
+
+    let cancelado = false
+    vinFetchRef.current = patente
+    setVinCargando(true)
+    lookupPatente(patente, true)
+      .then((data) => {
+        // Solo si el campo sigue vacío: no pisar lo que el usuario alcanzó a escribir.
+        if (cancelado || !data?.vin) return
+        setFormData((prev) => (prev.vin ? prev : { ...prev, vin: data.vin as string }))
+      })
+      .catch(() => {
+        // Solo un fallo de red permite reintentar: si el servidor respondió que esa
+        // patente no tiene VIN, insistir gastaría cuota sin traer nada nuevo.
+        vinConsultadoEnSesion.delete(patente)
+      })
+      .finally(() => {
+        // Solo la consulta vigente baja la bandera: si mientras tanto se abrió otro
+        // servicio, la dueña de la bandera es la consulta nueva.
+        if (vinFetchRef.current === patente) {
+          vinFetchRef.current = null
+          setVinCargando(false)
+        }
+      })
+    return () => {
+      cancelado = true
+    }
+  }, [servicioAEditar])
+
   // ─────────── Trabajo sin guardar: aviso al cerrar + borrador local ───────────
 
   // Todo lo que el usuario puede editar. Se compara contra la línea base para saber si
@@ -579,7 +630,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved, onDirtyChan
     onDirtyChangeRef.current = onDirtyChange
   }, [onDirtyChange])
 
-  const cargandoInicial = piezasCargando || configPinturaCargando
+  const cargandoInicial = piezasCargando || configPinturaCargando || vinCargando
   // Tras guardar, resetForm() vacía el formulario: eso no son "cambios del usuario" y no
   // debe reactivar el aviso ni escribir un borrador vacío.
   const reciénGuardadoRef = useRef(false)
@@ -1760,7 +1811,7 @@ export function ServiceForm({ servicioAEditar, onClearEdit, onSaved, onDirtyChan
                           if (patenteLimpia.length >= 6 && !formData.marca) {
                             setLookingUpPatente(true)
                             try {
-                              const data = await lookupPatente(patenteLimpia)
+                              const data = await lookupPatente(patenteLimpia, true)
                               if (data) {
                                 setFormData((prev) => ({
                                   ...prev,

@@ -19,16 +19,23 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const rawPatente = searchParams.get("patente") ?? ""
     const patente = rawPatente.replace(/[^a-zA-Z0-9]/g, "").toUpperCase()
+    // `vin=1` pide completar el VIN aunque el caché ya tenga marca/modelo. Lo manda
+    // solo el formulario interno de servicios. La página pública /solicitar-presupuesto
+    // no usa el VIN, así que sigue cortando en el caché: este endpoint no exige sesión
+    // y gastar la cuota de la API de patentes por un dato que ahí nadie lee sería
+    // regalarla a cualquiera que golpee la URL.
+    const quiereVin = searchParams.get("vin") === "1"
 
     if (!patente || patente.length < 4) {
       return NextResponse.json({ error: "Patente inválida" }, { status: 400 })
     }
 
     // 1. Buscar en caché local (DB)
-    // El caché sirve solo si ya trae VIN: las filas que creó la sincronización de
-    // servicios (upsertClienteYVehiculo) tienen marca/modelo pero nunca VIN, y
-    // cortar acá dejaba la patente sin VIN para siempre. Si falta, se consulta la
-    // API y el resultado se cachea; si la API falla, se devuelve igual el caché.
+    // Con `vin=1` el caché sirve solo si ya trae VIN: las filas que creó la
+    // sincronización de servicios (upsertClienteYVehiculo) tienen marca/modelo pero
+    // nunca VIN, y cortar acá dejaba la patente sin VIN para siempre. Si falta, se
+    // consulta la API y el resultado se cachea; si la API falla, se devuelve igual
+    // el caché.
     try {
       const vehiculoEnDB = await getVehiculoByPatente(patente)
       if (vehiculoEnDB?.marca) {
@@ -42,7 +49,7 @@ export async function GET(request: Request) {
           mes_revision_tecnica: vehiculoEnDB.mes_revision_tecnica ?? null,
           fromCache: true,
         }
-        if (vehiculoEnDB.vin) return NextResponse.json(cache)
+        if (vehiculoEnDB.vin || !quiereVin) return NextResponse.json(cache)
       }
     } catch (dbError) {
       console.error("[lookup-patente] error leyendo DB:", dbError)
