@@ -132,11 +132,37 @@ export function PDFPreviewModal({ url, fileName, onClose, showWhatsApp }: PDFPre
     window.open("https://wa.me/", "_blank")
   }
 
-  const handlePrint = () => {
-    // Print via a temporary hidden iframe so it works regardless of the visible
-    // viewer being canvas-based. Falls back to opening the PDF in a new tab.
+  // Documento de impresión armado con las páginas ya renderizadas por pdf.js.
+  // Imprimir el blob PDF dentro de un <iframe> no funciona en iOS/iPadOS ni en
+  // navegadores configurados para descargar los PDF (el visor nativo nunca se
+  // carga, así que print() no imprime nada). Las imágenes se imprimen igual en
+  // todas las plataformas y son las mismas que el usuario está viendo.
+  const buildPrintDocument = (imgs: string[], autoPrint: boolean) => `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${fileName.replace(/[<>&"]/g, "")}</title>
+    <style>
+      @page { margin: 0; }
+      html, body { margin: 0; padding: 0; background: #fff; }
+      img { display: block; width: 100%; break-after: page; page-break-after: always; }
+      img:last-child { break-after: auto; page-break-after: auto; }
+    </style>
+  </head>
+  <body>
+    ${imgs.map((src) => `<img src="${src}" alt="" />`).join("")}
+    ${autoPrint
+      ? `<script>window.addEventListener("load", function () { setTimeout(function () { window.focus(); window.print(); }, 200); });</scr` + `ipt>`
+      : ""}
+  </body>
+</html>`
+
+  // Último recurso: mandar a imprimir el PDF nativo.
+  const printPdfFallback = () => {
     try {
       const frame = document.createElement("iframe")
+      frame.setAttribute("aria-hidden", "true")
       frame.style.position = "fixed"
       frame.style.right = "0"
       frame.style.bottom = "0"
@@ -151,12 +177,88 @@ export function PDFPreviewModal({ url, fileName, onClose, showWhatsApp }: PDFPre
         } catch {
           window.open(url, "_blank")
         }
-        // Clean up after the print dialog has had time to open
+        // Limpieza tras dar tiempo a que se abra el diálogo de impresión
         setTimeout(() => frame.remove(), 60000)
       }
       document.body.appendChild(frame)
     } catch {
       window.open(url, "_blank")
+    }
+  }
+
+  const handlePrint = () => {
+    // Si las páginas todavía se están renderizando, cae al PDF nativo.
+    if (pages.length === 0) {
+      printPdfFallback()
+      return
+    }
+
+    const isIOS =
+      /iP(ad|hone|od)/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+
+    // iOS/iPadOS ignora print() invocado sobre un iframe oculto: hay que abrir
+    // una ventana real y que el propio documento se mande a imprimir.
+    if (isIOS) {
+      const win = window.open("", "_blank")
+      if (win) {
+        win.document.write(buildPrintDocument(pages, true))
+        win.document.close()
+        return
+      }
+      printPdfFallback()
+      return
+    }
+
+    try {
+      const frame = document.createElement("iframe")
+      frame.setAttribute("aria-hidden", "true")
+      frame.style.position = "fixed"
+      frame.style.right = "0"
+      frame.style.bottom = "0"
+      frame.style.width = "0"
+      frame.style.height = "0"
+      frame.style.border = "0"
+      document.body.appendChild(frame)
+
+      // Se escribe el documento en el iframe en lugar de usar srcdoc: las
+      // páginas son data URLs de varios MB y no caben bien en un atributo.
+      const doc = frame.contentDocument
+      const win = frame.contentWindow
+      if (!doc || !win) {
+        frame.remove()
+        printPdfFallback()
+        return
+      }
+      doc.open()
+      doc.write(buildPrintDocument(pages, false))
+      doc.close()
+
+      const print = () => {
+        try {
+          win.focus()
+          win.print()
+        } catch {
+          printPdfFallback()
+        }
+        // Limpieza tras dar tiempo a que se abra el diálogo de impresión
+        setTimeout(() => frame.remove(), 60000)
+      }
+
+      // Esperar a que las imágenes estén decodificadas; si no, Chrome manda a
+      // imprimir páginas en blanco.
+      Promise.all(
+        Array.from(doc.images).map((img) =>
+          img.complete
+            ? Promise.resolve()
+            : new Promise<void>((res) => {
+                img.onload = () => res()
+                img.onerror = () => res()
+              }),
+        ),
+      ).then(() => setTimeout(print, 100))
+    } catch {
+      printPdfFallback()
     }
   }
 
@@ -172,30 +274,35 @@ export function PDFPreviewModal({ url, fileName, onClose, showWhatsApp }: PDFPre
             variant="outline"
             size="sm"
             onClick={handlePrint}
-            className="bg-transparent border-border gap-1.5"
+            className="bg-transparent border-border gap-1.5 px-2 sm:px-3"
+            title="Imprimir"
+            aria-label="Imprimir"
           >
             <Printer className="w-4 h-4" />
-            Imprimir
+            <span className="hidden sm:inline">Imprimir</span>
           </Button>
           {showWhatsApp && (
             <Button
               variant="outline"
               size="sm"
               onClick={handleWhatsApp}
-              className="bg-transparent border-border gap-1.5 text-[#25D366] hover:text-[#25D366]"
+              className="bg-transparent border-border gap-1.5 px-2 sm:px-3 text-[#25D366] hover:text-[#25D366]"
               title="Enviar por WhatsApp"
+              aria-label="Enviar por WhatsApp"
             >
               <WhatsAppIcon className="w-4 h-4" />
-              WhatsApp
+              <span className="hidden sm:inline">WhatsApp</span>
             </Button>
           )}
           <Button
             size="sm"
             onClick={handleDownload}
-            className="bg-primary hover:bg-primary/90 text-primary-foreground gap-1.5"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground gap-1.5 px-2 sm:px-3"
+            title="Descargar"
+            aria-label="Descargar"
           >
             <Download className="w-4 h-4" />
-            Descargar
+            <span className="hidden sm:inline">Descargar</span>
           </Button>
           <Button
             variant="ghost"
