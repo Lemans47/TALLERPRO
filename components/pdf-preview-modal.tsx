@@ -1,8 +1,31 @@
 "use client"
 
 import { useRef, useEffect, useState } from "react"
+import { createPortal } from "react-dom"
 import { Button } from "@/components/ui/button"
 import { Download, Printer, X } from "lucide-react"
+
+// CSS de impresión. Se inyecta sólo mientras se imprime para no tocar el
+// margen de página (@page) del resto de la app.
+const PRINT_CSS = `
+.pdf-print-root { display: none; }
+@media print {
+  @page { margin: 0; }
+  html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }
+  body.printing-pdf > * { display: none !important; }
+  body.printing-pdf > .pdf-print-root { display: block !important; }
+  body.printing-pdf .pdf-print-root img {
+    display: block;
+    width: 100%;
+    break-after: page;
+    page-break-after: always;
+  }
+  body.printing-pdf .pdf-print-root img:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+}
+`
 
 interface PDFPreviewModalProps {
   url: string
@@ -26,6 +49,8 @@ export function PDFPreviewModal({ url, fileName, onClose, showWhatsApp }: PDFPre
   const [pages, setPages] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [printing, setPrinting] = useState(false)
+  const printRootRef = useRef<HTMLDivElement>(null)
 
   // Render PDF pages to canvas images on every platform.
   // Relying on the browser's native <iframe> PDF viewer is unreliable: when the
@@ -132,33 +157,8 @@ export function PDFPreviewModal({ url, fileName, onClose, showWhatsApp }: PDFPre
     window.open("https://wa.me/", "_blank")
   }
 
-  // Documento de impresión armado con las páginas ya renderizadas por pdf.js.
-  // Imprimir el blob PDF dentro de un <iframe> no funciona en iOS/iPadOS ni en
-  // navegadores configurados para descargar los PDF (el visor nativo nunca se
-  // carga, así que print() no imprime nada). Las imágenes se imprimen igual en
-  // todas las plataformas y son las mismas que el usuario está viendo.
-  const buildPrintDocument = (imgs: string[], autoPrint: boolean) => `<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>${fileName.replace(/[<>&"]/g, "")}</title>
-    <style>
-      @page { margin: 0; }
-      html, body { margin: 0; padding: 0; background: #fff; }
-      img { display: block; width: 100%; break-after: page; page-break-after: always; }
-      img:last-child { break-after: auto; page-break-after: auto; }
-    </style>
-  </head>
-  <body>
-    ${imgs.map((src) => `<img src="${src}" alt="" />`).join("")}
-    ${autoPrint
-      ? `<script>window.addEventListener("load", function () { setTimeout(function () { window.focus(); window.print(); }, 200); });</scr` + `ipt>`
-      : ""}
-  </body>
-</html>`
-
-  // Último recurso: mandar a imprimir el PDF nativo.
+  // Último recurso: abrir el PDF nativo para que se imprima desde el visor
+  // del navegador (o, en móvil, desde la hoja de compartir del sistema).
   const printPdfFallback = () => {
     try {
       const frame = document.createElement("iframe")
@@ -186,84 +186,98 @@ export function PDFPreviewModal({ url, fileName, onClose, showWhatsApp }: PDFPre
     }
   }
 
+  // Imprime las páginas que pdf.js ya renderizó —las mismas que el usuario
+  // está viendo— desde el documento principal, con una hoja de estilos que
+  // oculta la app y deja sólo las páginas.
+  //
+  // Es el único camino que funciona parejo en todas partes: imprimir el blob
+  // del PDF dentro de un <iframe> oculto no funciona en Android Chrome ni en
+  // iOS/iPadOS (ignoran print() sobre un iframe), ni en navegadores
+  // configurados para descargar los PDF en vez de mostrarlos; y abrir una
+  // ventana aparte se rompe en la PWA instalada y con el bloqueo de popups.
   const handlePrint = () => {
-    // Si las páginas todavía se están renderizando, cae al PDF nativo.
-    if (pages.length === 0) {
+    // iOS en modo PWA instalada no abre el diálogo de impresión por JS:
+    // ahí conviene el PDF nativo, que se imprime desde la hoja de compartir.
+    const iosStandalone =
+      (navigator as any).standalone === true &&
+      (/iP(ad|hone|od)/.test(navigator.userAgent) ||
+        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1))
+
+    if (pages.length === 0 || typeof window.print !== "function" || iosStandalone) {
       printPdfFallback()
       return
     }
-
-    const isIOS =
-      /iP(ad|hone|od)/.test(navigator.userAgent) ||
-      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
-
-    // iOS/iPadOS ignora print() invocado sobre un iframe oculto: hay que abrir
-    // una ventana real y que el propio documento se mande a imprimir.
-    if (isIOS) {
-      const win = window.open("", "_blank")
-      if (win) {
-        win.document.write(buildPrintDocument(pages, true))
-        win.document.close()
-        return
-      }
-      printPdfFallback()
-      return
-    }
-
-    try {
-      const frame = document.createElement("iframe")
-      frame.setAttribute("aria-hidden", "true")
-      frame.style.position = "fixed"
-      frame.style.right = "0"
-      frame.style.bottom = "0"
-      frame.style.width = "0"
-      frame.style.height = "0"
-      frame.style.border = "0"
-      document.body.appendChild(frame)
-
-      // Se escribe el documento en el iframe en lugar de usar srcdoc: las
-      // páginas son data URLs de varios MB y no caben bien en un atributo.
-      const doc = frame.contentDocument
-      const win = frame.contentWindow
-      if (!doc || !win) {
-        frame.remove()
-        printPdfFallback()
-        return
-      }
-      doc.open()
-      doc.write(buildPrintDocument(pages, false))
-      doc.close()
-
-      const print = () => {
-        try {
-          win.focus()
-          win.print()
-        } catch {
-          printPdfFallback()
-        }
-        // Limpieza tras dar tiempo a que se abra el diálogo de impresión
-        setTimeout(() => frame.remove(), 60000)
-      }
-
-      // Esperar a que las imágenes estén decodificadas; si no, Chrome manda a
-      // imprimir páginas en blanco.
-      Promise.all(
-        Array.from(doc.images).map((img) =>
-          img.complete
-            ? Promise.resolve()
-            : new Promise<void>((res) => {
-                img.onload = () => res()
-                img.onerror = () => res()
-              }),
-        ),
-      ).then(() => setTimeout(print, 100))
-    } catch {
-      printPdfFallback()
-    }
+    setPrinting(true)
   }
+
+  // Monta la hoja de estilos, espera a que las imágenes estén decodificadas
+  // (si no, Chrome imprime páginas en blanco) y abre el diálogo de impresión.
+  useEffect(() => {
+    if (!printing) return
+    let cancelled = false
+
+    const style = document.createElement("style")
+    style.textContent = PRINT_CSS
+    document.head.appendChild(style)
+
+    const cleanup = () => {
+      document.body.classList.remove("printing-pdf")
+      style.remove()
+      window.removeEventListener("afterprint", onAfterPrint)
+      clearTimeout(safetyTimer)
+      setPrinting(false)
+    }
+    const onAfterPrint = () => {
+      if (!cancelled) cleanup()
+    }
+    // Red de seguridad: algunos navegadores no emiten afterprint.
+    const safetyTimer = setTimeout(onAfterPrint, 120000)
+    window.addEventListener("afterprint", onAfterPrint)
+
+    const imgs = Array.from(printRootRef.current?.querySelectorAll("img") ?? [])
+    Promise.all(
+      imgs.map((img) =>
+        img.complete
+          ? Promise.resolve()
+          : new Promise<void>((res) => {
+              img.onload = () => res()
+              img.onerror = () => res()
+            }),
+      ),
+    ).then(() => {
+      if (cancelled) return
+      document.body.classList.add("printing-pdf")
+      try {
+        window.print()
+      } catch {
+        cleanup()
+        printPdfFallback()
+      }
+    })
+
+    return () => {
+      cancelled = true
+      document.body.classList.remove("printing-pdf")
+      style.remove()
+      window.removeEventListener("afterprint", onAfterPrint)
+      clearTimeout(safetyTimer)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [printing])
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background/95 backdrop-blur-sm">
+      {/* Páginas a imprimir: van en un portal a <body> para que el CSS de
+          impresión pueda ocultar la app y dejar sólo el documento. */}
+      {printing &&
+        createPortal(
+          <div className="pdf-print-root" ref={printRootRef} aria-hidden="true">
+            {pages.map((src, i) => (
+              <img key={i} src={src} alt="" />
+            ))}
+          </div>,
+          document.body,
+        )}
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border bg-card shrink-0">
         <div className="flex items-center gap-2 min-w-0">
