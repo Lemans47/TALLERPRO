@@ -12,9 +12,14 @@ export interface VehiculoLookup {
   fromCache?: boolean
 }
 
-export async function lookupPatente(patente: string): Promise<VehiculoLookup | null> {
+/** `conVin` fuerza a completar el VIN aunque el caché ya tenga marca/modelo, a costa
+ *  de una consulta a la API de patentes. Lo usa el formulario de servicios; la página
+ *  pública de presupuestos no, porque no muestra el VIN. */
+export async function lookupPatente(patente: string, conVin = false): Promise<VehiculoLookup | null> {
   const cleanPatente = patente.replace(/[^a-zA-Z0-9]/g, "").toUpperCase()
-  const res = await fetch(`/api/lookup-patente?patente=${encodeURIComponent(cleanPatente)}`)
+  const params = new URLSearchParams({ patente: cleanPatente })
+  if (conVin) params.set("vin", "1")
+  const res = await fetch(`/api/lookup-patente?${params}`)
   if (!res.ok) return null
   return res.json()
 }

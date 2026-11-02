@@ -106,7 +106,11 @@ export interface Servicio {
   fotos_ingreso: FotoServicio[]
   fotos_entrega: FotoServicio[]
   numero_ot?: number
+  /** Datos del vehículo (tabla `vehiculos`), traídos por JOIN sobre patente_norm.
+   *  No son columnas de `servicios`: createServicio/updateServicio los ignoran al
+   *  escribir y la sincronización la hace upsertClienteYVehiculo desde la ruta. */
   mes_revision_tecnica?: string
+  vin?: string
   detalle_pendiente: boolean
   fecha_facturacion?: string | null
   /** Fecha en que el servicio cambió a un estado tipo `por_cobrar` o `cerrado`.
@@ -181,7 +185,18 @@ export interface PiezaPintura {
 // Servicios
 export async function getServicioById(id: string) {
   const db = getSQL()
-  const data = await db`SELECT * FROM servicios WHERE id = ${id}`
+  const data = await db`
+    SELECT s.*, v.mes_revision_tecnica, v.vin
+    FROM servicios s
+    LEFT JOIN LATERAL (
+      SELECT
+        (ARRAY_REMOVE(ARRAY_AGG(mes_revision_tecnica ORDER BY updated_at DESC NULLS LAST), NULL))[1] AS mes_revision_tecnica,
+        (ARRAY_REMOVE(ARRAY_AGG(vin ORDER BY updated_at DESC NULLS LAST), NULL))[1] AS vin
+      FROM vehiculos
+      WHERE patente_norm = s.patente_norm
+    ) v ON true
+    WHERE s.id = ${id}
+  `
   return (data[0] as Servicio) || null
 }
 
@@ -217,14 +232,17 @@ export async function getHistorialByCliente(nombre: string) {
 export async function getServicios() {
   const db = getSQL()
   const data = await db`
-    SELECT s.*, v.mes_revision_tecnica
+    SELECT s.*, v.mes_revision_tecnica, v.vin
     FROM servicios s
     LEFT JOIN LATERAL (
-      SELECT mes_revision_tecnica
+      -- Cada columna se resuelve por separado al valor no nulo más reciente: si
+      -- quedaron filas duplicadas para la patente, una con revisión y otra con
+      -- VIN, un LIMIT 1 perdería uno de los dos.
+      SELECT
+        (ARRAY_REMOVE(ARRAY_AGG(mes_revision_tecnica ORDER BY updated_at DESC NULLS LAST), NULL))[1] AS mes_revision_tecnica,
+        (ARRAY_REMOVE(ARRAY_AGG(vin ORDER BY updated_at DESC NULLS LAST), NULL))[1] AS vin
       FROM vehiculos
       WHERE patente_norm = s.patente_norm
-      ORDER BY (mes_revision_tecnica IS NOT NULL) DESC, updated_at DESC NULLS LAST
-      LIMIT 1
     ) v ON true
     ORDER BY s.fecha_ingreso DESC
   `
@@ -295,14 +313,17 @@ export async function getServiciosActivosParaLista() {
   // Lista visible en /servicios = activos + por_cobrar (todo menos los cerrados).
   const visibles = await getNombresEstadosPorTipo(["activo", "por_cobrar"])
   const data = await db`
-    SELECT s.*, v.mes_revision_tecnica
+    SELECT s.*, v.mes_revision_tecnica, v.vin
     FROM servicios s
     LEFT JOIN LATERAL (
-      SELECT mes_revision_tecnica
+      -- Cada columna se resuelve por separado al valor no nulo más reciente: si
+      -- quedaron filas duplicadas para la patente, una con revisión y otra con
+      -- VIN, un LIMIT 1 perdería uno de los dos.
+      SELECT
+        (ARRAY_REMOVE(ARRAY_AGG(mes_revision_tecnica ORDER BY updated_at DESC NULLS LAST), NULL))[1] AS mes_revision_tecnica,
+        (ARRAY_REMOVE(ARRAY_AGG(vin ORDER BY updated_at DESC NULLS LAST), NULL))[1] AS vin
       FROM vehiculos
       WHERE patente_norm = s.patente_norm
-      ORDER BY (mes_revision_tecnica IS NOT NULL) DESC, updated_at DESC NULLS LAST
-      LIMIT 1
     ) v ON true
     WHERE s.estado = ANY(${visibles.length ? visibles : [""]}::text[])
     ORDER BY s.fecha_ingreso DESC
@@ -318,14 +339,17 @@ export async function getServiciosCerradosParaLista() {
   const db = getSQL()
   const cerrados = await getNombresEstadosPorTipo(["cerrado"])
   const data = await db`
-    SELECT s.*, v.mes_revision_tecnica
+    SELECT s.*, v.mes_revision_tecnica, v.vin
     FROM servicios s
     LEFT JOIN LATERAL (
-      SELECT mes_revision_tecnica
+      -- Cada columna se resuelve por separado al valor no nulo más reciente: si
+      -- quedaron filas duplicadas para la patente, una con revisión y otra con
+      -- VIN, un LIMIT 1 perdería uno de los dos.
+      SELECT
+        (ARRAY_REMOVE(ARRAY_AGG(mes_revision_tecnica ORDER BY updated_at DESC NULLS LAST), NULL))[1] AS mes_revision_tecnica,
+        (ARRAY_REMOVE(ARRAY_AGG(vin ORDER BY updated_at DESC NULLS LAST), NULL))[1] AS vin
       FROM vehiculos
       WHERE patente_norm = s.patente_norm
-      ORDER BY (mes_revision_tecnica IS NOT NULL) DESC, updated_at DESC NULLS LAST
-      LIMIT 1
     ) v ON true
     WHERE s.estado = ANY(${cerrados.length ? cerrados : [""]}::text[])
     ORDER BY s.fecha_ingreso DESC
@@ -359,14 +383,17 @@ export async function getServiciosByMonth(year: number, month: number) {
   const endDate = `${year}-${String(month).padStart(2, "0")}-${lastDay}`
 
   const data = await db`
-    SELECT s.*, v.mes_revision_tecnica
+    SELECT s.*, v.mes_revision_tecnica, v.vin
     FROM servicios s
     LEFT JOIN LATERAL (
-      SELECT mes_revision_tecnica
+      -- Cada columna se resuelve por separado al valor no nulo más reciente: si
+      -- quedaron filas duplicadas para la patente, una con revisión y otra con
+      -- VIN, un LIMIT 1 perdería uno de los dos.
+      SELECT
+        (ARRAY_REMOVE(ARRAY_AGG(mes_revision_tecnica ORDER BY updated_at DESC NULLS LAST), NULL))[1] AS mes_revision_tecnica,
+        (ARRAY_REMOVE(ARRAY_AGG(vin ORDER BY updated_at DESC NULLS LAST), NULL))[1] AS vin
       FROM vehiculos
       WHERE patente_norm = s.patente_norm
-      ORDER BY (mes_revision_tecnica IS NOT NULL) DESC, updated_at DESC NULLS LAST
-      LIMIT 1
     ) v ON true
     WHERE s.fecha_ingreso >= ${startDate}
     AND s.fecha_ingreso <= ${endDate}

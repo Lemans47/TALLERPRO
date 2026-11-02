@@ -144,14 +144,31 @@ export async function generarOrdenTrabajo(servicio: Servicio) {
     { h: "COLOR", w: 22, v: servicio.color || "" },
     { h: "A\xD1O", w: 18, v: servicio.año?.toString() || "" },
     { h: "KILOMETRAJE", w: 30, v: servicio.kilometraje != null ? Number(servicio.kilometraje).toLocaleString("es-CL") : "" },
-    { h: "N\xB0 MOTOR", w: CW - 158, v: "" },
+    // `ajustar`: el VIN son 17 caracteres y el recorte por ancho de las demás
+    // columnas se lo comería; acá se baja el cuerpo hasta que entre completo.
+    { h: "VIN / CHASIS", w: CW - 158, v: servicio.vin || "", ajustar: true },
   ]
   let vx = ML
   vcols.forEach((col) => {
     doc.rect(vx, y, col.w, 12)
     bold(); doc.setFontSize(7); doc.text(col.h, vx + 1, y + 4)
-    normal(); doc.setFontSize(8)
-    doc.text(up(String(col.v)).substring(0, Math.floor(col.w / 2.2)), vx + 1, y + 9)
+    normal()
+    const texto = up(String(col.v))
+    if ("ajustar" in col && col.ajustar) {
+      // Un VIN recortado no sirve para nada (no se puede pedir un repuesto con
+      // 14 de 17 dígitos), así que en vez de cortarlo se reduce el cuerpo hasta
+      // que quepa, midiendo con la fuente real en vez de estimar por carácter.
+      let fs = 8
+      doc.setFontSize(fs)
+      while (fs > 5 && doc.getTextWidth(texto) > col.w - 2) {
+        fs -= 0.5
+        doc.setFontSize(fs)
+      }
+      doc.text(texto, vx + 1, y + 9)
+    } else {
+      doc.setFontSize(8)
+      doc.text(texto.substring(0, Math.floor(col.w / 2.2)), vx + 1, y + 9)
+    }
     vx += col.w
   })
   y += 13
