@@ -14,15 +14,31 @@ const PRINT_CSS = `
   html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }
   body.printing-pdf > * { display: none !important; }
   body.printing-pdf > .pdf-print-root { display: block !important; }
-  body.printing-pdf .pdf-print-root img {
-    display: block;
+  body.printing-pdf .pdf-print-page {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     width: 100%;
+    height: 100vh;
+    overflow: hidden;
     break-after: page;
     page-break-after: always;
   }
-  body.printing-pdf .pdf-print-root img:last-child {
+  /* La última hoja va con alto automático: con 100vh el navegador agrega una
+     hoja en blanco al final. */
+  body.printing-pdf .pdf-print-page:last-child {
+    height: auto;
     break-after: auto;
     page-break-after: auto;
+  }
+  /* Encajar la página dentro de la hoja sin deformarla. Con width: 100% a secas
+     el alto se pasa por redondeo y cada página desborda a una hoja en blanco. */
+  body.printing-pdf .pdf-print-page img {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 100vh;
   }
 }
 `
@@ -273,7 +289,9 @@ export function PDFPreviewModal({ url, fileName, onClose, showWhatsApp }: PDFPre
         createPortal(
           <div className="pdf-print-root" ref={printRootRef} aria-hidden="true">
             {pages.map((src, i) => (
-              <img key={i} src={src} alt="" />
+              <div className="pdf-print-page" key={i}>
+                <img src={src} alt="" />
+              </div>
             ))}
           </div>,
           document.body,
