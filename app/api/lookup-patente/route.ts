@@ -1,15 +1,6 @@
 import { NextResponse } from "next/server"
 import { getVehiculoByPatente, getSQL } from "@/lib/database"
 
-let migrated = false
-async function ensureColumn(db: any) {
-  if (migrated) return
-  try {
-    await db`ALTER TABLE vehiculos ADD COLUMN IF NOT EXISTS mes_revision_tecnica TEXT`
-    migrated = true
-  } catch { migrated = true }
-}
-
 // Endpoint usado por la página pública /solicitar-presupuesto para autocompletar
 // marca/modelo desde el registro vehicular, por eso NO exige sesión. No expone
 // datos de clientes (eso es /api/buscar-patente, que sí requiere sesión).
@@ -98,7 +89,6 @@ export async function GET(request: Request) {
     if (marca) {
       try {
         const db = getSQL()
-        await ensureColumn(db)
         // UPDATE + INSERT sobre patente_norm en vez de ON CONFLICT (patente):
         // `vehiculos` no tiene índice único sobre `patente`, así que el
         // ON CONFLICT fallaba con 42P10 y el catch de abajo se lo tragaba —

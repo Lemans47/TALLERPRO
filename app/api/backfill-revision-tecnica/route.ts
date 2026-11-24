@@ -19,10 +19,6 @@ export async function POST() {
 
   const db = getSQL()
 
-  try {
-    await db`ALTER TABLE vehiculos ADD COLUMN IF NOT EXISTS mes_revision_tecnica TEXT`
-  } catch {}
-
   // ── PASO 1: Deduplicar vehiculos por patente normalizada ──────────────────
   // Agrupa rows cuya patente normaliza igual, mergea datos con COALESCE,
   // deja una fila canónica con la patente limpia, borra las demás.

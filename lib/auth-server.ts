@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
+import { getSQL } from "@/lib/database"
 
 export type Role = "admin" | "supervisor" | "operador"
 
@@ -30,8 +31,14 @@ export async function getSessionUser(): Promise<{ userId: string; role: Role | n
       data: { user },
     } = await supabase.auth.getUser()
     if (!user) return null
-    const { data } = await supabase.from("user_roles").select("role").eq("user_id", user.id).single()
-    return { userId: user.id, role: (data?.role as Role) ?? null }
+    // getUser() (NO getSession()) valida el token contra Supabase Auth: esa es
+    // la verificación de identidad. El rol se lee por la conexión directa a
+    // Postgres en vez de PostgREST: ahorra un round-trip HTTP por request y no
+    // depende del schema cache de PostgREST. Es seguro porque corre solo en el
+    // servidor, el user_id sale del token ya verificado y va parametrizado.
+    // Sin caché a propósito: quitar un rol debe aplicar en la próxima request.
+    const rows = await getSQL()`SELECT role FROM user_roles WHERE user_id = ${user.id} LIMIT 1`
+    return { userId: user.id, role: (rows[0]?.role as Role) ?? null }
   } catch {
     return null
   }

@@ -78,7 +78,7 @@ States are **not hardcoded** — they live in the `estados_servicio` table and a
 
 ### Database Migrations
 
-**Never run DDL in application code.** All schema changes go in `scripts/*.sql` and must be run manually in Supabase SQL Editor. `scripts/02-runtime-migration.sql` is the primary idempotent migration script. The `ensurePrecioPinturaColumns()` function in database.ts is a legacy exception still in place.
+**Never run DDL in application code.** All schema changes go in `scripts/*.sql` and must be run manually in Supabase SQL Editor. `scripts/02-runtime-migration.sql` is the primary idempotent migration script. This is not just style: on Supabase every DDL statement — even a no-op `ADD COLUMN IF NOT EXISTS` — fires the `pgrst_ddl_watch` event trigger, which reloads PostgREST's schema cache and kills in-flight REST requests. Since `requireRole()` reads `user_roles` through PostgREST on every API call, runtime DDL on cold starts made the whole app hang for seconds.
 
 ### Photo Storage
 

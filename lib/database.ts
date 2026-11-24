@@ -1034,23 +1034,15 @@ export async function getVehicleHistory(patente: string) {
 // Precio Pintura
 // Precios Pintura - Precio global + defaults de costo (mano de obra y materiales)
 
-// Migración idempotente: agrega las columnas de defaults de costo si no existen.
-let precioPinturaColumnsReady = false
-async function ensurePrecioPinturaColumns() {
-  if (precioPinturaColumnsReady) return
-  try {
-    const db = getSQL()
-    await db`ALTER TABLE precios_pintura ADD COLUMN IF NOT EXISTS mano_obra_default NUMERIC(12,0) NOT NULL DEFAULT 0`
-    await db`ALTER TABLE precios_pintura ADD COLUMN IF NOT EXISTS materiales_default NUMERIC(12,0) NOT NULL DEFAULT 0`
-    precioPinturaColumnsReady = true
-  } catch (error: any) {
-    console.error("[v0] ensurePrecioPinturaColumns:", error?.message)
-  }
-}
+// Las columnas mano_obra_default / materiales_default viven en
+// scripts/00-tablas-base-faltantes.sql. NO correr DDL acá: cada ALTER TABLE
+// (aunque sea "IF NOT EXISTS") dispara el event trigger pgrst_ddl_watch de
+// Supabase, que recarga el schema cache de PostgREST y corta las requests en
+// vuelo — incluida la lectura de user_roles que hace requireRole() en cada
+// llamada a la API. Corría en cada cold start de Vercel y dejaba la app colgada.
 
 export async function getPrecioPintura(): Promise<PrecioPintura | null> {
   try {
-    await ensurePrecioPinturaColumns()
     const db = getSQL()
     const data = await db`SELECT * FROM precios_pintura LIMIT 1`
     return (data[0] as PrecioPintura) || null
@@ -1066,7 +1058,6 @@ export async function updatePrecioPintura(values: {
   materiales_default?: number
 }) {
   try {
-    await ensurePrecioPinturaColumns()
     const db = getSQL()
     const data = await db`
       UPDATE precios_pintura SET
@@ -1085,7 +1076,6 @@ export async function updatePrecioPintura(values: {
 
 export async function initPrecioPintura(precio_por_pieza: number = 0) {
   try {
-    await ensurePrecioPinturaColumns()
     const db = getSQL()
     const existing = await db`SELECT * FROM precios_pintura LIMIT 1`
     if (existing.length > 0) {
